@@ -1,0 +1,6 @@
+.n8n-data/
+.env
+l3-status.txt
+n8n.pid
+mock-mcp.pid
+*.log

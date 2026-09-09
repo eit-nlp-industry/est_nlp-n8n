@@ -1,0 +1,11 @@
+{
+    "orderWorkflowId":  "trDI8XqAkjmpT80n",
+    "webhook":  "http://localhost:5678/webhook/demo-lookup",
+    "weatherWebhook":  "http://localhost:5678/webhook/mcp-weather",
+    "orderWebhook":  "http://localhost:5678/webhook/mcp-order",
+    "agentWorkflowId":  "suskgh4uMujNAt5e",
+    "weatherWorkflowId":  "liWTYYjfJm1RGwpc",
+    "editor":  "http://localhost:5678/workflow/suskgh4uMujNAt5e",
+    "webhookWorkflowId":  "jYRVeF7RmPpf3enA",
+    "openaiCredentialId":  "zRS4GLLOabZZN0VG"
+}

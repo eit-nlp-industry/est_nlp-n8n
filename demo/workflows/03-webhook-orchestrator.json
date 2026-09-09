@@ -1,0 +1,85 @@
+{
+	"name": "Demo Webhook Orchestrator",
+	"nodes": [
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "demo-lookup",
+				"responseMode": "lastNode",
+				"options": {}
+			},
+			"id": "c3e0c333-0003-4000-8000-000000000001",
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 2,
+			"position": [200, 300],
+			"webhookId": "c3e0c333-0003-4000-8000-webhook0001"
+		},
+		{
+			"parameters": {
+				"assignments": {
+					"assignments": [
+						{
+							"id": "city-pass",
+							"name": "city",
+							"value": "={{ $json.body?.city ?? $json.query?.city ?? 'Shanghai' }}",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"id": "c3e0c333-0003-4000-8000-000000000002",
+			"name": "Extract City",
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [420, 300]
+		},
+		{
+			"parameters": {
+				"source": "database",
+				"workflowId": {
+					"__rl": true,
+					"value": "WEATHER_WORKFLOW_ID",
+					"mode": "id"
+				}
+			},
+			"id": "c3e0c333-0003-4000-8000-000000000003",
+			"name": "Execute Weather Lookup",
+			"type": "n8n-nodes-base.executeWorkflow",
+			"typeVersion": 1.2,
+			"position": [640, 300]
+		}
+	],
+	"connections": {
+		"Webhook": {
+			"main": [
+				[
+					{
+						"node": "Extract City",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Extract City": {
+			"main": [
+				[
+					{
+						"node": "Execute Weather Lookup",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"pinData": {},
+	"meta": {
+		"templateCredsSetupCompleted": true
+	}
+}

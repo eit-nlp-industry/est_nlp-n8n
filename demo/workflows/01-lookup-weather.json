@@ -1,0 +1,96 @@
+{
+	"name": "Demo Lookup Weather",
+	"nodes": [
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "mcp-weather",
+				"responseMode": "lastNode",
+				"options": {}
+			},
+			"id": "a1e0c111-0001-4000-8000-0000000000wh",
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 2,
+			"position": [240, 120],
+			"webhookId": "a1e0c111-0001-4000-8000-webhook0001"
+		},
+		{
+			"parameters": {},
+			"id": "a1e0c111-0001-4000-8000-000000000001",
+			"name": "When Executed by Another Workflow",
+			"type": "n8n-nodes-base.executeWorkflowTrigger",
+			"typeVersion": 1,
+			"position": [240, 300]
+		},
+		{
+			"parameters": {
+				"assignments": {
+					"assignments": [
+						{
+							"id": "city-field",
+							"name": "city",
+							"value": "={{ $json.city ?? $json.body?.city ?? $json.query ?? 'unknown' }}",
+							"type": "string"
+						},
+						{
+							"id": "condition-field",
+							"name": "condition",
+							"value": "sunny",
+							"type": "string"
+						},
+						{
+							"id": "temp-field",
+							"name": "tempC",
+							"value": 22,
+							"type": "number"
+						},
+						{
+							"id": "note-field",
+							"name": "note",
+							"value": "Mock weather for the n8n demo (no external API).",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"id": "a1e0c111-0001-4000-8000-000000000002",
+			"name": "Format Weather",
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [480, 300]
+		}
+	],
+	"connections": {
+		"When Executed by Another Workflow": {
+			"main": [
+				[
+					{
+						"node": "Format Weather",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Webhook": {
+			"main": [
+				[
+					{
+						"node": "Format Weather",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"pinData": {},
+	"meta": {
+		"templateCredsSetupCompleted": true
+	}
+}

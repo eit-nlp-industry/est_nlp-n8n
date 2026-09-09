@@ -1,0 +1,96 @@
+{
+	"name": "Demo Lookup Order",
+	"nodes": [
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "mcp-order",
+				"responseMode": "lastNode",
+				"options": {}
+			},
+			"id": "b2e0c222-0002-4000-8000-0000000000wh",
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 2,
+			"position": [240, 120],
+			"webhookId": "b2e0c222-0002-4000-8000-webhook0001"
+		},
+		{
+			"parameters": {},
+			"id": "b2e0c222-0002-4000-8000-000000000001",
+			"name": "When Executed by Another Workflow",
+			"type": "n8n-nodes-base.executeWorkflowTrigger",
+			"typeVersion": 1,
+			"position": [240, 300]
+		},
+		{
+			"parameters": {
+				"assignments": {
+					"assignments": [
+						{
+							"id": "order-id-field",
+							"name": "orderId",
+							"value": "={{ $json.orderId ?? $json.body?.orderId ?? $json.query ?? 'ORD-1001' }}",
+							"type": "string"
+						},
+						{
+							"id": "status-field",
+							"name": "status",
+							"value": "shipped",
+							"type": "string"
+						},
+						{
+							"id": "eta-field",
+							"name": "eta",
+							"value": "2026-09-03",
+							"type": "string"
+						},
+						{
+							"id": "note-field",
+							"name": "note",
+							"value": "Mock order lookup for the n8n demo (no external API).",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"id": "b2e0c222-0002-4000-8000-000000000002",
+			"name": "Format Order",
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [480, 300]
+		}
+	],
+	"connections": {
+		"When Executed by Another Workflow": {
+			"main": [
+				[
+					{
+						"node": "Format Order",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Webhook": {
+			"main": [
+				[
+					{
+						"node": "Format Order",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"pinData": {},
+	"meta": {
+		"templateCredsSetupCompleted": true
+	}
+}
