@@ -169,7 +169,16 @@ export async function buildMcpClientForServer(
 		? resolveMcpDomainPolicy(server, credentialData, nativeMcpHostname)
 		: undefined;
 
-	const registryNodeName = server.metadata?.nodeTypeName;
+	// Only cloud/local MCP *registry* synthetic nodes use metadata.nodeTypeName
+	// for connection lookup. Preset client tools (e.g. RAGFlow) also store their
+	// concrete node type there for the editor round-trip — those must not enter
+	// the registry path or Bearer auth fails with a fake "credential" error.
+	const metadataNodeTypeName = server.metadata?.nodeTypeName;
+	const registryNodeName =
+		typeof metadataNodeTypeName === 'string' &&
+		metadataNodeTypeName.startsWith('@n8n/mcp-registry.')
+			? metadataNodeTypeName
+			: undefined;
 	if (!registryNodeName && credentialType?.endsWith('McpOAuth2Api')) {
 		credentialError = new OperationalError(
 			`Credential type "${credentialType}" requires an MCP registry node`,

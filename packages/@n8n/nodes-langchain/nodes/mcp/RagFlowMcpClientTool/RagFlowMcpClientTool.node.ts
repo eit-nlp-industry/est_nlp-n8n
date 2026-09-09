@@ -119,14 +119,17 @@ export class RagFlowMcpClientTool implements INodeType {
 						value: 'none',
 					},
 				],
-				default: 'bearerAuth',
-				description: 'The way to authenticate with your endpoint',
+				// Do not preselect auth or a credential; the user must choose both.
+				default: 'none',
+				description:
+					'Choose how to authenticate. For RAGFlow, select Bearer Auth and pick your own credential',
 			},
 			{
 				displayName: 'Credentials',
 				name: 'credentials',
 				type: 'credentials',
 				default: '',
+				required: true,
 				displayOptions: {
 					show: {
 						authentication: ['headerAuth', 'bearerAuth', 'mcpOAuth2Api', 'multipleHeadersAuth'],

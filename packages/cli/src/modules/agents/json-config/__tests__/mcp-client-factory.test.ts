@@ -123,6 +123,36 @@ describe('buildMcpClientForServer — header derivation', () => {
 		expect(headers.Authorization).toBe('Bearer tok123');
 	});
 
+	it('treats non-registry metadata.nodeTypeName as a client preset, not a registry node', async () => {
+		const resolveRegistryConnection = vi.fn(async () => undefined);
+		const credentialProvider = mock<CredentialProvider>();
+		credentialProvider.resolve.mockResolvedValue({ token: 'tok123' } as never);
+		const oauthService = mock<OauthService>();
+
+		await buildMcpClientForServer(
+			makeServer({
+				name: 'ragflow',
+				authentication: 'bearerAuth',
+				credential: 'cred-1',
+				metadata: { nodeTypeName: '@n8n/n8n-nodes-langchain.ragFlowMcpClientTool' },
+			}),
+			{
+				credentialProvider,
+				oauthService,
+				projectId: 'proj-1',
+				proxyFetch,
+				resolveRegistryConnection,
+			},
+		);
+
+		expect(resolveRegistryConnection).not.toHaveBeenCalled();
+		const [configs] = mcpClientCtor.mock.calls[0] as [Array<{ fetch: typeof fetch }>];
+		await configs[0].fetch('https://example.test/mcp');
+		const [, init] = proxyFetchMock.mock.calls[0] as [unknown, RequestInit];
+		const headers = headersToCaseInsensitiveRecord(init.headers);
+		expect(headers.Authorization).toBe('Bearer tok123');
+	});
+
 	it('sends the configured name/value pair for headerAuth', async () => {
 		const headers = await captureInitialHeaders(
 			makeServer({ authentication: 'headerAuth', credential: 'cred-1' }),
