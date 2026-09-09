@@ -7,6 +7,17 @@ export const CALENDLY_TRIGGER_NODE_TYPE = 'n8n-nodes-base.calendlyTrigger';
 export const CODE_NODE_TYPE = 'n8n-nodes-base.code';
 export const AI_CODE_NODE_TYPE = '@n8n/n8n-nodes-langchain.code';
 export const AI_MCP_TOOL_NODE_TYPE = '@n8n/n8n-nodes-langchain.mcpClientTool';
+export const AI_RAGFLOW_MCP_TOOL_NODE_TYPE = '@n8n/n8n-nodes-langchain.ragFlowMcpClientTool';
+
+/** Generic MCP Client Tool nodes that share the same parameter / Agent UI shape. */
+export const AI_MCP_CLIENT_TOOL_NODE_TYPES = [
+	AI_MCP_TOOL_NODE_TYPE,
+	AI_RAGFLOW_MCP_TOOL_NODE_TYPE,
+] as const;
+
+export function isAiMcpClientToolNodeType(nodeTypeName: string): boolean {
+	return (AI_MCP_CLIENT_TOOL_NODE_TYPES as readonly string[]).includes(nodeTypeName);
+}
 export const WIKIPEDIA_TOOL_NODE_TYPE = '@n8n/n8n-nodes-langchain.toolWikipedia';
 export const CRON_NODE_TYPE = 'n8n-nodes-base.cron';
 export const CLEARBIT_NODE_TYPE = 'n8n-nodes-base.clearbit';

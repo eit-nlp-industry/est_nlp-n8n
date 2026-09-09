@@ -2,7 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { NodeHelpers } from 'n8n-workflow';
 import type { INode, INodeCredentials, INodeParameters, INodeTypeDescription } from 'n8n-workflow';
 
-import { AI_MCP_TOOL_NODE_TYPE } from '@/app/constants/nodeTypes';
+import {
+	AI_MCP_TOOL_NODE_TYPE,
+	AI_RAGFLOW_MCP_TOOL_NODE_TYPE,
+	isAiMcpClientToolNodeType,
+} from '@/app/constants/nodeTypes';
 import type { AgentJsonMcpServerConfig } from '../types';
 import type { McpAuthenticationSchemaType } from '@n8n/api-types';
 
@@ -137,7 +141,11 @@ function isMcpRegistryNodeType(nodeTypeName: string): boolean {
 }
 
 function isMcpClientNodeType(nodeTypeName: string): boolean {
-	return nodeTypeName === AI_MCP_TOOL_NODE_TYPE || nodeTypeName === 'mcpClientTool';
+	return (
+		isAiMcpClientToolNodeType(nodeTypeName) ||
+		nodeTypeName === 'mcpClientTool' ||
+		nodeTypeName === 'ragFlowMcpClientTool'
+	);
 }
 
 function resolveMetadata(
@@ -148,6 +156,15 @@ function resolveMetadata(
 
 	if (isMcpRegistryNodeType(nodeTypeName)) {
 		metadata.nodeTypeName = nodeTypeName;
+	} else if (nodeTypeName === AI_RAGFLOW_MCP_TOOL_NODE_TYPE) {
+		// Keep preset MCP client types so reconnect/edit does not fall back to generic MCP Client.
+		metadata.nodeTypeName = nodeTypeName;
+	} else if (nodeTypeName === AI_MCP_TOOL_NODE_TYPE || nodeTypeName === 'mcpClientTool') {
+		delete metadata.nodeTypeName;
+	} else if (isMcpClientNodeType(nodeTypeName)) {
+		metadata.nodeTypeName = nodeTypeName.startsWith('@')
+			? nodeTypeName
+			: `@n8n/n8n-nodes-langchain.${nodeTypeName}`;
 	} else {
 		delete metadata.nodeTypeName;
 	}
@@ -215,9 +232,10 @@ export function nodeTypeToNewMcpServer(nodeType: INodeTypeDescription): AgentJso
 
 	const authentication = resolveDefaultAuthentication(nodeType, defaults);
 	const serverTransport = defaults.serverTransport;
-	const metadata = isMcpRegistryNodeType(nodeType.name)
-		? { nodeTypeName: nodeType.name }
-		: undefined;
+	const metadata =
+		isMcpRegistryNodeType(nodeType.name) || nodeType.name === AI_RAGFLOW_MCP_TOOL_NODE_TYPE
+			? { nodeTypeName: nodeType.name }
+			: undefined;
 
 	return {
 		name: slugify(nodeType.displayName.replace(/\s+tool$/i, '')),

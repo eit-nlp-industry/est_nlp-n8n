@@ -54,6 +54,7 @@ const NODE_DENYLIST = [
 	'@n8n/n8n-nodes-langchain.toolCode',
 	'@n8n/n8n-nodes-langchain.toolHttpRequest',
 	'@n8n/n8n-nodes-langchain.mcpClientTool',
+	'@n8n/n8n-nodes-langchain.ragFlowMcpClientTool',
 	// Legacy versions read `parameters.name` at runtime as the tool's identity;
 	// newer versions derive it from the node name, so $fromAI on that field would
 	// produce an invalid tool name. Keep these ranges in sync when bumping versions.

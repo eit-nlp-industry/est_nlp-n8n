@@ -14,7 +14,7 @@ import { useNodeTypesStore } from '../stores/nodeTypes.store';
 import { useAgentRequestStore } from '@n8n/stores/useAgentRequestStore';
 import { type IFormInput } from '@n8n/design-system';
 import { type JSONSchema7 } from 'json-schema';
-import { AI_MCP_TOOL_NODE_TYPE } from '../constants';
+import { isAiMcpClientToolNodeType } from '../constants';
 import { TOOL_NODE_TYPES_NEED_INPUT } from '../utils/nodes/nodeTransforms';
 
 export type FieldMetadata = {
@@ -181,8 +181,8 @@ export function useToolParameters({ node }: GetToolParametersProps) {
 			return { parameters: hitlToolParameters };
 		}
 
-		// Handle MCPClientTool nodes differently
-		if (newNode.type === AI_MCP_TOOL_NODE_TYPE) {
+		// Handle MCP Client Tool nodes differently (generic + RAGFlow preset)
+		if (isAiMcpClientToolNodeType(newNode.type)) {
 			const mcpResult = await getMCPTools(newNode);
 			return { parameters: mcpResult };
 		}
