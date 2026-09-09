@@ -5,6 +5,7 @@ import type {
 	InstanceAiToolCallState,
 	TaskList,
 } from '@n8n/api-types';
+import { N8nAiActivityStep } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { computed } from 'vue';
 import {
@@ -15,6 +16,7 @@ import {
 } from '../agentTimeline.utils';
 import { useTelemetry } from '@n8n/composables/useTelemetry';
 import { useRootStore } from '@n8n/stores/useRootStore';
+import { useToolLabel } from '../toolLabels';
 import { useThread } from '../instanceAi.store';
 import AgentSection from './AgentSection.vue';
 import AnsweredQuestions from './AnsweredQuestions.vue';
@@ -25,8 +27,11 @@ import TaskChecklist from './TaskChecklist.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
 import TimelineActivityIndicator from './TimelineActivityIndicator.vue';
 import TimelineTextSegment from './TimelineTextSegment.vue';
+import ToolResultJson from './ToolResultJson.vue';
+import ToolResultRenderer from './ToolResultRenderer.vue';
 
 const i18n = useI18n();
+const { getToolLabel } = useToolLabel();
 const thread = useThread();
 const telemetry = useTelemetry();
 const rootStore = useRootStore();
@@ -282,6 +287,21 @@ function mapTaskItemsToPlannedTasks(tasks?: TaskList): PlannedTaskArg[] | undefi
 			/>
 
 			<TaskChecklist v-else-if="block.type === 'tasks'" :tasks="props.agentNode.tasks" />
+
+			<N8nAiActivityStep
+				v-else-if="block.type === 'json-render'"
+				:label="getToolLabel(block.toolCall.toolName, block.toolCall.args)"
+				:loading="block.toolCall.isLoading"
+				:error="block.toolCall.error"
+			>
+				<ToolResultJson v-if="block.toolCall.args" :value="block.toolCall.args" />
+				<ToolResultRenderer
+					v-if="block.toolCall.result !== undefined"
+					:result="block.toolCall.result"
+					:tool-name="block.toolCall.toolName"
+					:tool-args="block.toolCall.args"
+				/>
+			</N8nAiActivityStep>
 
 			<PlanReviewPanel
 				v-else-if="block.type === 'plan-review'"

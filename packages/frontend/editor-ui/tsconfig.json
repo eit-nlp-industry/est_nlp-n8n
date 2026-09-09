@@ -46,7 +46,12 @@
 			"@n8n/telemetry*": ["../../@n8n/telemetry/src*"],
 			"@n8n/api-types*": ["../../@n8n/api-types/src*"],
 			"@n8n/utils*": ["../../@n8n/utils/src*"],
-			"@n8n/expression-runtime": ["./vite/expression-runtime-stub.ts"]
+			"@n8n/expression-runtime": ["./vite/expression-runtime-stub.ts"],
+			"@eit/json-render-protocol": ["../../../../eit-json-render/packages/protocol/src/index.ts"],
+			"@eit/json-render-vue": ["../../../../eit-json-render/packages/vue/src/index.ts"],
+			"@eit/json-render-element-plus": [
+				"../../../../eit-json-render/packages/element-plus/src/index.ts"
+			]
 		},
 		// TODO: remove all options below this line
 		"useUnknownInCatchVariables": false

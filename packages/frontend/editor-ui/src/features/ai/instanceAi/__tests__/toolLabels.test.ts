@@ -75,6 +75,10 @@ describe('getToolIcon', () => {
 		expect(getToolIcon('data-tables')).toBe('table');
 	});
 
+	test('returns table for render-ui', () => {
+		expect(getToolIcon('render-ui')).toBe('table');
+	});
+
 	test('returns workflow for workflow-related tools', () => {
 		expect(getToolIcon('workflows')).toBe('workflow');
 		expect(getToolIcon('executions')).toBe('workflow');

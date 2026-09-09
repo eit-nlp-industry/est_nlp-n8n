@@ -306,6 +306,21 @@ describe('buildTimelineBlocks', () => {
 		expect(blocks[0].type === 'thinking' && blocks[0].entries).toHaveLength(4);
 	});
 
+	test('render-ui dashboards render as a standalone block outside thinking', () => {
+		const blocks = blocksOf(
+			[reasoning('r1'), toolEntry('tc-1', 'r1'), text('Dashboard is ready.', 'r1')],
+			[
+				makeToolCall({
+					toolCallId: 'tc-1',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'json-render', 'text']);
+	});
+
 	test('an mcp connect confirmation renders as a standalone block', () => {
 		const blocks = blocksOf(
 			[reasoning('r1'), toolEntry('tc-1', 'r1')],

@@ -7403,6 +7403,7 @@
 	"instanceAi.tools.build-workflow-with-agent": "Building workflow",
 	"instanceAi.tools.build-workflow-with-agent.imperative": "edit workflow",
 	"instanceAi.tools.ask-user": "Asking user",
+	"instanceAi.tools.render-ui": "Rendering dashboard",
 	"instanceAi.tools.cancel-background-task": "Cancelling task",
 	"instanceAi.tools.correct-background-task": "Correcting task",
 	"instanceAi.tools.pause-for-user": "Waiting for input",

@@ -1420,6 +1420,7 @@ export interface InstanceAiToolCallState {
 		| 'planner'
 		| 'eval-setup'
 		| 'skill'
+		| 'json-render'
 		| 'default';
 	confirmation?: InstanceAiConfirmation;
 	confirmationStatus?: 'pending' | 'approved' | 'denied';
@@ -2057,6 +2058,7 @@ export function getRenderHint(toolName: string): InstanceAiToolCallState['render
 	if (toolName === 'research-with-agent') return 'researcher';
 	if (toolName === 'create-tasks') return 'planner';
 	if (toolName === 'eval-setup-with-agent') return 'eval-setup';
+	if (toolName === 'render-ui') return 'json-render';
 	if (
 		['create_skills', 'list_skills', 'read_skill', 'update_skill', 'load_skill'].includes(toolName)
 	)

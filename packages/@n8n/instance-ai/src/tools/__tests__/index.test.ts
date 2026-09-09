@@ -82,6 +82,11 @@ vi.mock('../shared/ask-user.tool', () => ({
 	createAskUserTool: vi.fn(() => ({ id: 'ask-user' })),
 }));
 
+vi.mock('../render-ui/render-ui.tool', () => ({
+	RENDER_UI_TOOL_ID: 'render-ui',
+	createRenderUiTool: vi.fn(() => ({ id: 'render-ui' })),
+}));
+
 vi.mock('../task-control.tool', () => ({
 	createTaskControlTool: vi.fn(() => ({ id: 'task-control' })),
 }));
@@ -141,6 +146,7 @@ describe('domain tool construction', () => {
 			'n8n-docs': { id: 'n8n-docs' },
 			nodes: { id: 'nodes' },
 			'ask-user': { id: 'ask-user' },
+			'render-ui': { id: 'render-ui' },
 			'build-workflow': { id: 'build-workflow' },
 		});
 		expect(domainTools.has('templates')).toBe(false);
@@ -162,6 +168,7 @@ describe('domain tool construction', () => {
 			'n8n-docs': { id: 'n8n-docs' },
 			nodes: { id: 'nodes' },
 			'ask-user': { id: 'ask-user' },
+			'render-ui': { id: 'render-ui' },
 			'build-workflow': { id: 'build-workflow' },
 		});
 		expect(orchestratorTools.has('templates')).toBe(false);
@@ -226,6 +233,10 @@ describe('domain tool construction', () => {
 
 	it('never defers mcp-servers behind search_tools', () => {
 		expect(ALWAYS_LOADED_TOOL_NAMES.has('mcp-servers')).toBe(true);
+	});
+
+	it('never defers render-ui behind search_tools', () => {
+		expect(ALWAYS_LOADED_TOOL_NAMES.has('render-ui')).toBe(true);
 	});
 
 	it('registers create-tasks but not the removed plan orchestration tool', () => {

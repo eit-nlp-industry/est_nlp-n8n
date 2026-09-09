@@ -1,3 +1,4 @@
+import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { createComponentRenderer } from '@/__tests__/render';
 import ToolResultRenderer from '../components/ToolResultRenderer.vue';
@@ -59,5 +60,31 @@ describe('ToolResultRenderer', () => {
 		expect(container.querySelector('embed')).not.toBeInTheDocument();
 		// An iframe needs a title where an embed did not.
 		expect(iframe?.getAttribute('title')).toBeTruthy();
+	});
+
+	it('renders a json-render dashboard payload', async () => {
+		const { getByText, findByText } = renderComponent({
+			props: {
+				toolName: 'render-ui',
+				result: {
+					format: 'json-render-v1',
+					payload: {
+						format: 'json-render-v1',
+						spec: {
+							root: 'root',
+							elements: {
+								root: { type: 'Card', props: { title: 'Weather snapshot' }, children: ['metric'] },
+								metric: { type: 'Metric', props: { label: 'Shanghai', value: '22°C' } },
+							},
+						},
+					},
+				},
+			},
+		});
+
+		await findByText('Weather snapshot');
+		await nextTick();
+		expect(getByText('Shanghai')).toBeInTheDocument();
+		expect(getByText('22°C')).toBeInTheDocument();
 	});
 });

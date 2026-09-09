@@ -1,6 +1,7 @@
 // Each import in this file must resolve with no build step.
 // Put an import that needs a `dist` in `vitest.config.mts`.
 import vue from '@vitejs/plugin-vue';
+import { existsSync } from 'node:fs';
 import { resolve } from 'path';
 import { defineConfig, type UserConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -15,7 +16,7 @@ import legacy from '@vitejs/plugin-legacy';
 import browserslist from 'browserslist';
 import { isLocaleFile, sendLocaleUpdate } from './vite/i18n-locales-hmr-helpers';
 import { nodePopularityPlugin } from './vite/vite-plugin-node-popularity.mjs';
-import { editorUiAliases } from './vite/aliases.mjs';
+import { editorUiAliases, jsonRenderRoot } from './vite/aliases.mjs';
 import { DEFAULT_BACKEND_PORT, devServerPlugin, readDevPort } from './vite/dev-ports.mjs';
 // Imported from source, not from `@n8n/constants`: this file must resolve with no build step.
 import { HTML_NONCE_PLACEHOLDER } from '../../@n8n/constants/src/csp';
@@ -34,7 +35,7 @@ const packagesDir = resolve(__dirname, '..', '..');
 
 // zod is the only single-instance-sensitive library the frontend bundles; dedupe it so
 // Vite resolves it to a single copy. The other curated libs are backend-only.
-const singleInstanceDedupe = ['zod'];
+const singleInstanceDedupe = ['zod', 'vue', 'element-plus'];
 
 const alias = editorUiAliases(__dirname, packagesDir);
 
@@ -72,6 +73,15 @@ const plugins: UserConfig['plugins'] = [
 		],
 	}),
 	vue(),
+	{
+		name: 'allow-eit-json-render',
+		configureServer(server) {
+			const root = jsonRenderRoot(__dirname);
+			if (existsSync(root)) {
+				server.config.server.fs.allow.push(root);
+			}
+		},
+	},
 	svgLoader({
 		svgoConfig: {
 			plugins: [
