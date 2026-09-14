@@ -2420,6 +2420,32 @@ export interface ExecuteAgentData {
 	/** Why the agent stopped. */
 	finishReason: string;
 	/**
+	 * LLM request/response snapshots for this call. Present only when
+	 * model-turn debug is enabled (`N8N_AGENTS_DEBUG_MODEL_IO`).
+	 */
+	modelTurns?: Array<{
+		turnIndex: number;
+		timestamp: number;
+		endTime: number;
+		model?: string;
+		finishReason?: string;
+		usage?: {
+			promptTokens: number;
+			completionTokens: number;
+			totalTokens: number;
+		};
+		request: {
+			system: unknown;
+			messages: unknown[];
+			toolNames?: string[];
+		};
+		response: {
+			messages: unknown[];
+		};
+		emptyRetries?: number;
+		truncated?: boolean;
+	}>;
+	/**
 	 * Identifiers of the agent session this call wrote to. Surfaced so the
 	 * caller (e.g. the MessageAnAgent node) can link from a workflow execution
 	 * back to the agent session detail view. `null` for inline agents, whose

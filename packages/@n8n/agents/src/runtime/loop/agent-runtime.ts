@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import { incrementMessageCount, incrementTokenCountFromUsage } from './execution-counter';
 import { GenerateSink } from './generate-sink';
 import { hydrateFileParts } from './hydrate-file-parts';
+import { buildModelTurnDebugPayload } from './model-turn-debug';
 import type { RunOutputSink, RunServices } from './run-output-sink';
 import { RuntimeContextBuilder } from './runtime-context';
 import {
@@ -900,17 +901,15 @@ export class AgentRuntime {
 				maxOutputTokens: staticLoopContext.maxOutputTokens,
 				aiSdkOptions: this.buildAiSdkOptions(toolMap, options),
 			};
+			const turnStartedAt = Date.now();
 			let turn = await sink.callModel(modelCallContext);
 
 			// Some providers occasionally return a `stop` turn with no output at
 			// all mid-task, which would silently end the run with work half-done.
 			// Retry the call a bounded number of times before accepting the empty
 			// turn; each discarded attempt still bills its usage.
-			for (
-				let emptyRetry = 0;
-				emptyRetry < MAX_EMPTY_TURN_RETRIES && isEmptyModelTurn(turn);
-				emptyRetry++
-			) {
+			let emptyRetries = 0;
+			for (; emptyRetries < MAX_EMPTY_TURN_RETRIES && isEmptyModelTurn(turn); emptyRetries++) {
 				totalUsage = mergeUsage(totalUsage, turn.usage);
 				incrementTokenCountFromUsage(options?.executionCounter, turn.usage);
 				// Publish before the abort check so a cancel between the empty attempt
@@ -927,6 +926,25 @@ export class AgentRuntime {
 			sink.reportUsage(totalUsage);
 
 			this.assertNotAborted(abortScope);
+
+			if (options?.debugModelIo) {
+				this.eventBus.emit({
+					type: AgentEvent.ModelTurn,
+					...buildModelTurnDebugPayload({
+						turnIndex: iterationCount,
+						timestamp: turnStartedAt,
+						endTime: Date.now(),
+						model: this.modelIdString,
+						finishReason: turn.finishReason,
+						usage: turn.usage,
+						emptyRetries,
+						system: modelCallContext.system,
+						messages: modelCallContext.messages,
+						aiTools: modelCallContext.hasTools ? modelCallContext.aiTools : undefined,
+						responseMessages: turn.newMessages,
+					}),
+				});
+			}
 
 			lastFinishReason = turn.finishReason;
 			list.addResponse(turn.newMessages);

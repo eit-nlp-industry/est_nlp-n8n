@@ -51,6 +51,15 @@ const infoText = computed((): string => {
 		case 'user':
 		case 'agent':
 			return truncate(it.content ?? '', 500);
+		case 'model-turn': {
+			const index = (it.turnIndex ?? 0) + 1;
+			const model = it.modelName ? ` · ${it.modelName}` : '';
+			return (
+				i18n.baseText('agentSessions.timeline.modelTurnIndex', {
+					interpolate: { index: String(index) },
+				}) + model
+			);
+		}
 		case 'tool': {
 			if (isSubAgent.value) return delegateLabel(i18n, it.subAgentName ?? '');
 			return resolveToolNameForDisplay(it.toolName, i18n);
@@ -88,6 +97,8 @@ const label = computed((): string => {
 			return i18n.baseText('agentSessions.timeline.user');
 		case 'agent':
 			return i18n.baseText('agentSessions.timeline.agent');
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurn');
 		case 'tool':
 			return i18n.baseText('agentSessions.timeline.tool');
 		case 'workflow':

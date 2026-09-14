@@ -23,6 +23,7 @@ import type {
 	SubAgentSpawnRequest,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
+import { AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Container, Service } from '@n8n/di';
 import { isRecord } from '@n8n/utils/is-record';
@@ -47,6 +48,7 @@ import { N8NCheckpointStorage } from '../integrations/n8n-checkpoint-storage';
 import { buildProviderToolsForModel } from '../json-config/from-json-config';
 import type { WorkflowToolExecutionMode } from '../tools/workflow-tool-factory';
 import { streamAgentChunks } from '../utils/agent-stream';
+import { debugModelIoOption } from '../utils/debug-model-io-option';
 import { SubAgentSourceResolver } from './sub-agent-source-resolver';
 
 export interface SubAgentRunContext {
@@ -121,6 +123,7 @@ export class SubAgentRunner {
 		private readonly agentExecutionService: AgentExecutionService,
 		private readonly checkpointStorage: N8NCheckpointStorage,
 		private readonly logger: Logger,
+		private readonly agentsConfig: AgentsConfig,
 	) {}
 
 	async run(
@@ -249,6 +252,7 @@ export class SubAgentRunner {
 				...(context.abortSignal !== undefined ? { abortSignal: context.abortSignal } : {}),
 				...(telemetry !== undefined ? { telemetry } : {}),
 				executionCounter: context.executionCounter,
+				...debugModelIoOption(this.agentsConfig.debugModelIo),
 			};
 			const resultStream =
 				operation.type === 'run'

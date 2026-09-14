@@ -6,6 +6,7 @@ import type {
 } from '@n8n/agents';
 import { N8N_CHAT_INTEGRATION_TYPE, type AgentJsonConfig } from '@n8n/api-types';
 import { mockLogger } from '@n8n/backend-test-utils';
+import type { AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { UserError } from 'n8n-workflow';
 import type { Mock } from 'vitest';
@@ -144,6 +145,7 @@ function makeService(sandboxEnabled = false) {
 		externalHooks,
 		agentSandboxRuntimeService,
 		agentRepository,
+		mock<AgentsConfig>({ debugModelIo: false }),
 	);
 
 	return {

@@ -1145,4 +1145,36 @@ describe('ExecutionRecorder — durable timeline events', () => {
 			output: { name: 'Ada' },
 		});
 	});
+
+	it('records model-turn debug snapshots', () => {
+		const recorder = new ExecutionRecorder();
+		recorder.record({
+			type: 'model-turn',
+			turnIndex: 0,
+			timestamp: 100,
+			endTime: 200,
+			model: 'test-model',
+			finishReason: 'stop',
+			usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+			request: {
+				system: { role: 'system', content: 'sys' },
+				messages: [{ role: 'user', content: 'hi' }],
+				toolNames: ['search'],
+			},
+			response: {
+				messages: [{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] }],
+			},
+		});
+
+		const { timeline } = recorder.getMessageRecord();
+		expect(timeline).toEqual([
+			expect.objectContaining({
+				type: 'model-turn',
+				turnIndex: 0,
+				model: 'test-model',
+				finishReason: 'stop',
+				request: expect.objectContaining({ toolNames: ['search'] }),
+			}),
+		]);
+	});
 });

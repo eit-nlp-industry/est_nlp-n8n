@@ -167,6 +167,26 @@ describe('matchesSearch', () => {
 		expect(matchesSearch(toolItem, 'monicasue', labelForKey)).toBe(true);
 		expect(matchesSearch(toolItem, 'uniqIPs', labelForKey)).toBe(true);
 	});
+
+	it('matches model-turn request/response snapshots and model name', () => {
+		const modelTurn = item({
+			kind: 'model-turn',
+			turnIndex: 2,
+			modelName: 'gpt-test',
+			modelRequest: {
+				system: 'You are helpful.',
+				messages: [{ role: 'user', content: 'find-the-needle-prompt' }],
+			},
+			modelResponse: {
+				messages: [{ role: 'assistant', content: 'needle-in-response' }],
+			},
+		});
+
+		expect(matchesSearch(modelTurn, 'gpt-test', labelForKey)).toBe(true);
+		expect(matchesSearch(modelTurn, 'find-the-needle-prompt', labelForKey)).toBe(true);
+		expect(matchesSearch(modelTurn, 'needle-in-response', labelForKey)).toBe(true);
+		expect(matchesSearch(modelTurn, '3', labelForKey)).toBe(true);
+	});
 });
 
 describe('formatDuration', () => {
@@ -599,6 +619,48 @@ describe('flattenExecutionsToTimelineItems', () => {
 			withTimeline([{ type: 'text', content: 'hi there', timestamp: 1234 }]),
 		]);
 		expect(items[0]).toMatchObject({ kind: 'agent', content: 'hi there', timestamp: 1234 });
+	});
+
+	it('maps a model-turn timeline event to kind:model-turn', () => {
+		const items = flattenExecutionsToTimelineItems([
+			withTimeline([
+				{
+					type: 'model-turn',
+					turnIndex: 2,
+					timestamp: 1000,
+					endTime: 1400,
+					model: 'gpt-test',
+					finishReason: 'stop',
+					usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+					request: {
+						system: 'sys',
+						messages: [{ role: 'user', content: 'hi' }],
+						toolNames: ['search'],
+					},
+					response: { messages: [{ role: 'assistant', content: 'ok' }] },
+					emptyRetries: 1,
+					truncated: true,
+				},
+			]),
+		]);
+
+		expect(items[0]).toMatchObject({
+			kind: 'model-turn',
+			turnIndex: 2,
+			timestamp: 1000,
+			endTimestamp: 1400,
+			modelName: 'gpt-test',
+			finishReason: 'stop',
+			modelUsage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+			modelRequest: {
+				system: 'sys',
+				messages: [{ role: 'user', content: 'hi' }],
+				toolNames: ['search'],
+			},
+			modelResponse: { messages: [{ role: 'assistant', content: 'ok' }] },
+			modelIoTruncated: true,
+			emptyRetries: 1,
+		});
 	});
 
 	it('maps a workflow tool-call timeline event to kind:workflow with metadata', () => {

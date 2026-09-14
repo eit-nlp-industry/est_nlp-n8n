@@ -711,6 +711,7 @@ describe('GlobalConfig', () => {
 			tracingEnabled: true,
 			tracingRecordInputs: true,
 			tracingRecordOutputs: true,
+			debugModelIo: false,
 			modules: [],
 			backgroundTasksEnabled: false,
 			sandboxEnabled: false,

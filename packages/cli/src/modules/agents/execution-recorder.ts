@@ -1,4 +1,4 @@
-import type { StreamChunk } from '@n8n/agents';
+import type { ModelTurnDebugPayload, StreamChunk } from '@n8n/agents';
 import {
 	applyForwardedChildChunk,
 	emptyChildTrace,
@@ -267,6 +267,7 @@ export interface RecordedUsage {
 export type TimelineEvent =
 	| { type: 'text'; content: string; timestamp: number; endTime?: number }
 	| { type: 'reasoning'; content: string; timestamp: number; endTime?: number }
+	| ({ type: 'model-turn' } & ModelTurnDebugPayload)
 	| {
 			type: 'tool-call';
 			kind: 'tool' | 'workflow' | 'node';
@@ -473,6 +474,32 @@ export class ExecutionRecorder {
 					...(chunk.suspendPayload !== undefined && {
 						suspendPayload: sanitizeExecutionLogValue(chunk.suspendPayload),
 					}),
+				});
+				break;
+			case 'model-turn':
+				this.flushReasoningBuffer();
+				this.flushTextBuffer();
+				this.appendCompletedEvent({
+					type: 'model-turn',
+					turnIndex: chunk.turnIndex,
+					timestamp: chunk.timestamp,
+					endTime: chunk.endTime,
+					...(chunk.model !== undefined && { model: chunk.model }),
+					...(chunk.finishReason !== undefined && { finishReason: chunk.finishReason }),
+					...(chunk.usage !== undefined && { usage: chunk.usage }),
+					...(chunk.emptyRetries !== undefined &&
+						chunk.emptyRetries > 0 && { emptyRetries: chunk.emptyRetries }),
+					request: {
+						system: sanitizeExecutionLogValue(chunk.request.system),
+						messages: sanitizeExecutionLogValue(chunk.request.messages) as unknown[],
+						...(chunk.request.toolNames !== undefined && {
+							toolNames: chunk.request.toolNames,
+						}),
+					},
+					response: {
+						messages: sanitizeExecutionLogValue(chunk.response.messages) as unknown[],
+					},
+					...(chunk.truncated === true && { truncated: true }),
 				});
 				break;
 			case 'error': {

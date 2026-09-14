@@ -336,6 +336,64 @@ describe('AgentSessionLangSmithExportService', () => {
 		});
 	});
 
+	it('exports model-turn debug snapshots as llm runs', async () => {
+		const { service, agentExecutionService, threadRepository } = setup();
+		agentExecutionService.getThreadDetail.mockResolvedValue({
+			thread: makeThread(),
+			executions: [
+				makeExecution({
+					timeline: [
+						{
+							type: 'model-turn',
+							turnIndex: 1,
+							timestamp: Date.parse('2026-08-14T09:00:00.100Z'),
+							endTime: Date.parse('2026-08-14T09:00:00.250Z'),
+							model: 'anthropic/claude-sonnet',
+							finishReason: 'stop',
+							usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
+							request: {
+								system: 'You are helpful.',
+								messages: [{ role: 'user', content: 'Hello' }],
+								toolNames: ['search'],
+							},
+							response: {
+								messages: [{ role: 'assistant', content: 'Hi' }],
+							},
+							truncated: true,
+						},
+					],
+				}),
+			],
+		});
+		threadRepository.findByParentThreadId.mockResolvedValue([]);
+
+		await service.exportSession(input);
+
+		const modelTurnRun = createRunMock.mock.calls
+			.map(([run]) => run)
+			.find(({ name }) => name === 'Model turn');
+		expect(modelTurnRun).toMatchObject({
+			run_type: 'llm',
+			inputs: {
+				system: 'You are helpful.',
+				messages: [{ role: 'user', content: 'Hello' }],
+				toolNames: ['search'],
+			},
+			outputs: {
+				messages: [{ role: 'assistant', content: 'Hi' }],
+			},
+			extra: {
+				metadata: {
+					turnIndex: 1,
+					model: 'anthropic/claude-sonnet',
+					finishReason: 'stop',
+					usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
+					truncated: true,
+				},
+			},
+		});
+	});
+
 	it('rejects before loading data when the AI proxy is disabled', async () => {
 		const { service, agentExecutionService } = setup({ proxyEnabled: false });
 

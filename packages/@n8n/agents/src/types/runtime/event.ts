@@ -1,5 +1,6 @@
 import type { FinishReason, TokenUsage } from '../sdk/agent';
 import type { AgentMessage, ContentToolCall } from '../sdk/message';
+import type { ModelTurnDebugPayload } from './model-turn-debug';
 
 export type SubAgentLifecycleUsage = Pick<
 	TokenUsage,
@@ -67,6 +68,8 @@ export const enum AgentEvent {
 	AgentEnd = 'agent_end',
 	TurnStart = 'turn_start',
 	TurnEnd = 'turn_end',
+	/** Opt-in debug snapshot of one LLM request/response (see `debugModelIo`). */
+	ModelTurn = 'model_turn',
 	ToolExecutionStart = 'tool_execution_start',
 	ToolExecutionEnd = 'tool_execution_end',
 	SubAgentStarted = 'subagent_started',
@@ -80,6 +83,7 @@ export type AgentEventData =
 	| { type: AgentEvent.AgentEnd; messages: AgentMessage[] }
 	| { type: AgentEvent.TurnStart }
 	| { type: AgentEvent.TurnEnd; message: AgentMessage; toolResults: ContentToolCall[] }
+	| ({ type: AgentEvent.ModelTurn } & ModelTurnDebugPayload)
 	| { type: AgentEvent.ToolExecutionStart; toolCallId: string; toolName: string; args: unknown }
 	| {
 			type: AgentEvent.ToolExecutionEnd;

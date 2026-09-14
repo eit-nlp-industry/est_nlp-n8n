@@ -346,6 +346,25 @@ function buildEventRun(event: TimelineEvent, execution: AgentExecution, path: st
 				metadata: {},
 				children: [],
 			};
+		case 'model-turn':
+			return {
+				path,
+				name: 'Model turn',
+				runType: 'llm',
+				startTime: event.timestamp,
+				endTime: event.endTime,
+				inputs: toRecord(event.request),
+				outputs: toRecord(event.response),
+				metadata: {
+					turnIndex: event.turnIndex,
+					model: event.model,
+					finishReason: event.finishReason,
+					usage: event.usage,
+					emptyRetries: event.emptyRetries,
+					truncated: event.truncated,
+				},
+				children: [],
+			};
 		case 'tool-call':
 			return {
 				path,

@@ -1,6 +1,7 @@
 export type EventKind =
 	| 'user'
 	| 'agent'
+	| 'model-turn'
 	| 'tool'
 	| 'node'
 	| 'workflow'
@@ -61,6 +62,25 @@ export interface TimelineItem {
 	 */
 	subAgentName?: string;
 	resumed?: boolean;
+	/** Present on `kind: 'model-turn'` debug snapshots. */
+	turnIndex?: number;
+	modelName?: string;
+	finishReason?: string;
+	modelUsage?: {
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+	};
+	modelRequest?: {
+		system: unknown;
+		messages: unknown[];
+		toolNames?: string[];
+	};
+	modelResponse?: {
+		messages: unknown[];
+	};
+	modelIoTruncated?: boolean;
+	emptyRetries?: number;
 }
 
 export interface IdleRange {

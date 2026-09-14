@@ -105,7 +105,13 @@ export type {
 export { FINISH_REASONS, isFinishReason } from './types';
 export type { ProviderOptions } from '@ai-sdk/provider-utils';
 export { AgentEvent } from './types';
-export type { AgentEventData, AgentEventHandler } from './types';
+export type {
+	AgentEventData,
+	AgentEventHandler,
+	ModelTurnDebugPayload,
+	ModelTurnDebugRequest,
+	ModelTurnDebugResponse,
+} from './types';
 export {
 	OBSERVATION_LOG_MARKERS,
 	OBSERVATION_LOG_STATUSES,

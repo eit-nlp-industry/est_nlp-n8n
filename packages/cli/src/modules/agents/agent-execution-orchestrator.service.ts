@@ -8,6 +8,7 @@ import {
 import type { AgentPersistedMessageDto } from '@n8n/api-types';
 import { N8N_CHAT_INTEGRATION_TYPE } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
+import { AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Service } from '@n8n/di';
 import { isRecord } from '@n8n/utils/is-record';
@@ -46,6 +47,7 @@ import { createAgentExecutionCounter } from './utils/agent-execution-counter';
 import { getPublishedAgentSnapshot } from './utils/agent-published-snapshot';
 import { buildInboundUserMessage } from './utils/inbound-attachments';
 import { streamAgentChunks } from './utils/agent-stream';
+import { debugModelIoOption } from './utils/debug-model-io-option';
 import { executionsToMessagesDto } from './utils/execution-to-message-mapper';
 
 export interface AgentMemoryScope {
@@ -277,6 +279,7 @@ export class AgentExecutionOrchestratorService {
 		private readonly externalHooks: ExternalHooks,
 		private readonly agentSandboxRuntimeService: AgentSandboxRuntimeService,
 		private readonly agentRepository: AgentRepository,
+		private readonly agentsConfig: AgentsConfig,
 	) {}
 
 	/**
@@ -466,6 +469,7 @@ export class AgentExecutionOrchestratorService {
 				}),
 				...(tracing ? { telemetry: tracing } : {}),
 				...(abortSignal ? { abortSignal } : {}),
+				...debugModelIoOption(this.agentsConfig.debugModelIo),
 			});
 			recorder.recordHitlResponse(toolCallId, resumeData);
 			const startParams: StartExecutionParams = {
@@ -790,6 +794,7 @@ export class AgentExecutionOrchestratorService {
 				}),
 				...(tracing ? { telemetry: tracing } : {}),
 				...(abortSignal ? { abortSignal } : {}),
+				...debugModelIoOption(this.agentsConfig.debugModelIo),
 			});
 			const startParams: StartExecutionParams = {
 				threadId,
