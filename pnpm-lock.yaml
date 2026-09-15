@@ -5037,6 +5037,15 @@ importers:
 
   packages/frontend/@n8n/chat:
     dependencies:
+      '@eit/json-render-element-plus':
+        specifier: link:../../../../../eit-json-render/packages/element-plus
+        version: link:../../../../../eit-json-render/packages/element-plus
+      '@eit/json-render-protocol':
+        specifier: link:../../../../../eit-json-render/packages/protocol
+        version: link:../../../../../eit-json-render/packages/protocol
+      '@eit/json-render-vue':
+        specifier: link:../../../../../eit-json-render/packages/vue
+        version: link:../../../../../eit-json-render/packages/vue
       '@n8n/design-system':
         specifier: workspace:*
         version: link:../design-system

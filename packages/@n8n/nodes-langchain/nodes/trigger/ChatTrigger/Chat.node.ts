@@ -12,6 +12,7 @@ import {
 import {
 	CHAT_TRIGGER_NODE_TYPE,
 	CHAT_WAIT_USER_REPLY,
+	ChatNodeMessageType,
 	FREE_TEXT_CHAT_RESPONSE_TYPE,
 	NodeConnectionTypes,
 	NodeOperationError,
@@ -128,6 +129,29 @@ export class Chat implements INodeType {
 				},
 			},
 			{
+				displayName: 'Response Content Type',
+				name: 'responseContentType',
+				type: 'options',
+				default: 'text',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Text',
+						value: 'text',
+					},
+					{
+						name: 'Dashboard',
+						value: 'dashboard',
+						description: 'Send a json-render dashboard from the previous node output ($json.payload)',
+					},
+				],
+				displayOptions: {
+					show: {
+						'/operation': ['send'],
+					},
+				},
+			},
+			{
 				displayName: 'Message',
 				name: 'message',
 				type: 'string',
@@ -135,6 +159,11 @@ export class Chat implements INodeType {
 				required: true,
 				typeOptions: {
 					rows: 4,
+				},
+				displayOptions: {
+					show: {
+						responseContentType: ['text'],
+					},
 				},
 			},
 			{
@@ -375,7 +404,12 @@ export class Chat implements INodeType {
 		};
 
 		if (this.getNodeParameter('options.autoSaveHighlightedData', 0, true) !== false) {
-			const responseText = typeof message === 'string' ? message : message.text;
+			const responseText =
+				typeof message === 'string'
+					? message
+					: message.type === ChatNodeMessageType.JSON_RENDER
+						? JSON.stringify(message.payload)
+						: message.text;
 			this.customData.set(getHighlightedResponseKey(this.getNode().name), responseText);
 		}
 
@@ -385,7 +419,12 @@ export class Chat implements INodeType {
 				| undefined;
 
 			if (memory) {
-				const text = typeof message === 'string' ? message : message.text;
+				const text =
+					typeof message === 'string'
+						? message
+						: message.type === ChatNodeMessageType.JSON_RENDER
+							? JSON.stringify(message.payload)
+							: message.text;
 				await memory.chatHistory.addAIMessage(text);
 			}
 		}

@@ -39,6 +39,9 @@
     }
   },
   "dependencies": {
+    "@eit/json-render-element-plus": "link:../../../../../eit-json-render/packages/element-plus",
+    "@eit/json-render-protocol": "link:../../../../../eit-json-render/packages/protocol",
+    "@eit/json-render-vue": "link:../../../../../eit-json-render/packages/vue",
     "@n8n/design-system": "workspace:*",
     "@vueuse/core": "catalog:frontend",
     "highlight.js": "catalog:frontend",

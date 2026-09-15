@@ -46,6 +46,7 @@ export type TimelineBlock =
 	| { type: 'text'; key: string; entry: TextEntry }
 	| { type: 'tasks'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'json-render'; key: string; toolCall: InstanceAiToolCallState }
+	| { type: 'json-render-answer'; key: string; toolCalls: InstanceAiToolCallState[] }
 	| { type: 'plan-review'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'mcp-connect'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'questions'; key: string; toolCall: InstanceAiToolCallState }
@@ -277,7 +278,39 @@ export function buildTimelineBlocks(
 		}
 	}
 
-	return blocks;
+	return promoteJsonRenderAnswerZone(blocks);
+}
+
+/** Collect dashboards into a fixed answer zone after the last text block. */
+export function promoteJsonRenderAnswerZone(blocks: TimelineBlock[]): TimelineBlock[] {
+	const dashboards: InstanceAiToolCallState[] = [];
+	const filtered: TimelineBlock[] = [];
+
+	for (const block of blocks) {
+		if (block.type === 'json-render') {
+			dashboards.push(block.toolCall);
+		} else {
+			filtered.push(block);
+		}
+	}
+
+	if (dashboards.length === 0) return blocks;
+
+	let insertAt = filtered.length;
+	for (let i = filtered.length - 1; i >= 0; i--) {
+		if (filtered[i]?.type === 'text') {
+			insertAt = i + 1;
+			break;
+		}
+	}
+
+	filtered.splice(insertAt, 0, {
+		type: 'json-render-answer',
+		key: 'json-render-answer',
+		toolCalls: dashboards,
+	});
+
+	return filtered;
 }
 
 /**

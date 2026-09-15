@@ -464,6 +464,10 @@ export type ChatMessageContentChunk =
 			content: string;
 			buttons: ChatHubMessageButton[];
 			blockUserInput: boolean;
+	  }
+	| {
+			type: 'json-render';
+			payload: Record<string, unknown>;
 	  };
 
 export interface ChatHubMessageDto {
@@ -698,6 +702,13 @@ export const chatHubMessageWithButtonsSchema = z.object({
 });
 
 export type ChatHubMessageWithButtons = z.infer<typeof chatHubMessageWithButtonsSchema>;
+
+export const chatHubMessageJsonRenderSchema = z.object({
+	type: z.literal('json-render'),
+	payload: z.record(z.string(), z.unknown()),
+});
+
+export type ChatHubMessageJsonRender = z.infer<typeof chatHubMessageJsonRenderSchema>;
 
 /**
  * DTO for a configured chat hub tool

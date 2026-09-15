@@ -86,6 +86,14 @@ packages/cli/src/commands/export/outputs
 .superset
 .conductor
 .n8n
+*.log
+
+# Local demo environment (runtime data, not source)
+demo/.n8n-data/
+demo/*.log
+demo/n8n.pid
+demo/l3-status.txt
+
 lefthook-local.yml
 IMPROVEMENTS.md
 .playwright-mcp

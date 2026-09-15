@@ -12,6 +12,7 @@ import {
 import type {
 	ChatNodeMessage,
 	ChatNodeMessageButtonType,
+	IDataObject,
 	IExecuteFunctions,
 	INodeProperties,
 	INodePropertyOptions,
@@ -126,9 +127,26 @@ export const getSendAndWaitPropertiesForChatNode = () => {
 	return filteredProperties;
 };
 
+function getDashboardPayloadFromInput(ctx: IExecuteFunctions): IDataObject {
+	const input = ctx.getInputData()[0]?.json ?? {};
+	if (input.payload && typeof input.payload === 'object') {
+		return input.payload as IDataObject;
+	}
+	return input as IDataObject;
+}
+
 export function getChatMessage(ctx: IExecuteFunctions): ChatNodeMessage {
 	const nodeVersion = ctx.getNode().typeVersion;
 	const message = ctx.getNodeParameter('message', 0, '') as string;
+	const responseContentType = ctx.getNodeParameter('responseContentType', 0, 'text') as string;
+
+	if (responseContentType === 'dashboard') {
+		return {
+			type: ChatNodeMessageType.JSON_RENDER,
+			payload: getDashboardPayloadFromInput(ctx),
+		};
+	}
+
 	if (nodeVersion < 1.1) {
 		return message;
 	}

@@ -1,3 +1,4 @@
+import MessageJsonRender from '@n8n/chat/components/MessageJsonRender.vue';
 import MessageWithButtons from '@n8n/chat/components/MessageWithButtons.vue';
 import { MessageComponentKey } from '@n8n/chat/constants/messageComponents';
 import type { ChatOptions } from '@n8n/chat/types';
@@ -32,6 +33,7 @@ export const defaultOptions: ChatOptions = {
 	enableStreaming: false,
 	messageComponents: {
 		[MessageComponentKey.WITH_BUTTONS]: MessageWithButtons,
+		[MessageComponentKey.JSON_RENDER]: MessageJsonRender,
 	},
 };
 

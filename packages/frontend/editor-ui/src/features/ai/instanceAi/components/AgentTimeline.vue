@@ -22,6 +22,7 @@ import AgentSection from './AgentSection.vue';
 import AnsweredQuestions from './AnsweredQuestions.vue';
 import ArtifactCard from './ArtifactCard.vue';
 import InstanceAiMcpConnect from './InstanceAiMcpConnect.vue';
+import JsonRenderAnswerCards from './JsonRenderAnswerCards.vue';
 import PlanReviewPanel, { type PlannedTaskArg, type PlanReviewStatus } from './PlanReviewPanel.vue';
 import TaskChecklist from './TaskChecklist.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
@@ -288,20 +289,11 @@ function mapTaskItemsToPlannedTasks(tasks?: TaskList): PlannedTaskArg[] | undefi
 
 			<TaskChecklist v-else-if="block.type === 'tasks'" :tasks="props.agentNode.tasks" />
 
-			<N8nAiActivityStep
-				v-else-if="block.type === 'json-render'"
-				:label="getToolLabel(block.toolCall.toolName, block.toolCall.args)"
-				:loading="block.toolCall.isLoading"
-				:error="block.toolCall.error"
-			>
-				<ToolResultJson v-if="block.toolCall.args" :value="block.toolCall.args" />
-				<ToolResultRenderer
-					v-if="block.toolCall.result !== undefined"
-					:result="block.toolCall.result"
-					:tool-name="block.toolCall.toolName"
-					:tool-args="block.toolCall.args"
-				/>
-			</N8nAiActivityStep>
+			<JsonRenderAnswerCards
+				v-else-if="block.type === 'json-render-answer'"
+				:tool-calls="block.toolCalls"
+				:class="$style.timelineItem"
+			/>
 
 			<PlanReviewPanel
 				v-else-if="block.type === 'plan-review'"

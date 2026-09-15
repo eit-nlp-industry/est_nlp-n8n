@@ -318,7 +318,33 @@ describe('buildTimelineBlocks', () => {
 			],
 		);
 
-		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'json-render', 'text']);
+		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'text', 'json-render-answer']);
+	});
+
+	test('multiple render-ui calls stack in one answer zone after text', () => {
+		const blocks = blocksOf(
+			[
+				reasoning('r1'),
+				toolEntry('tc-1', 'r1'),
+				toolEntry('tc-2', 'r1'),
+				text('Here is the comparison.', 'r1'),
+			],
+			[
+				makeToolCall({
+					toolCallId: 'tc-1',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+				makeToolCall({
+					toolCallId: 'tc-2',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'text', 'json-render-answer']);
+		expect(blocks[2]?.type === 'json-render-answer' && blocks[2].toolCalls).toHaveLength(2);
 	});
 
 	test('an mcp connect confirmation renders as a standalone block', () => {

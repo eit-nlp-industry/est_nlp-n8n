@@ -193,6 +193,21 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 					}
 				}
 
+				const isChatContentFrame =
+					frameType === 'json-render' ||
+					frameType === 'with-buttons' ||
+					frameType === 'message' ||
+					frameType === 'error';
+
+				if (isChatContentFrame) {
+					const newMessage = parseBotChatMessageContent(data);
+					chatStore.messages.value.push(newMessage);
+					waitingForChatResponse.value = true;
+					chatStore.waitingForResponse.value = false;
+					chatStore.blockUserInput.value = shouldBlockUserInput(newMessage);
+					return;
+				}
+
 				// A control frame only counts if it matches the mode locked by the first
 				// heartbeat; either protocol is accepted until that lock happens. This
 				// keeps a stray cross-protocol frame from flipping the mode.

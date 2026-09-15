@@ -2,6 +2,7 @@
 import { computed, ref, toRefs, onMounted } from 'vue';
 
 import { useOptions } from '@n8n/chat/composables';
+import { MessageComponentKey } from '@n8n/chat/constants';
 import type { ChatMessage, ChatMessageText } from '@n8n/chat/types';
 
 import ChatFile from './ChatFile.vue';
@@ -31,8 +32,13 @@ const classes = computed(() => {
 		'chat-message-from-user': message.value.sender === 'user',
 		'chat-message-from-bot': message.value.sender === 'bot',
 		'chat-message-transparent': message.value.transparent === true,
+		'chat-message-component': message.value.type === 'component',
+		'chat-message-json-render':
+			message.value.type === 'component' && message.value.key === MessageComponentKey.JSON_RENDER,
 	};
 });
+
+const messageComponents = computed(() => ({ ...(options?.messageComponents ?? {}) }));
 
 const scrollToView = () => {
 	if (messageContainer.value?.scrollIntoView) {
@@ -41,8 +47,6 @@ const scrollToView = () => {
 		});
 	}
 };
-
-const messageComponents = { ...(options?.messageComponents ?? {}) };
 
 defineExpose({ scrollToView });
 
@@ -81,6 +85,9 @@ onMounted(async () => {
 			<template v-if="message.type === 'component' && messageComponents[message.key]">
 				<component :is="messageComponents[message.key]" v-bind="message.arguments" />
 			</template>
+			<div v-else-if="message.type === 'component'" class="chat-message-component-missing">
+				Unsupported chat component: {{ message.key }}
+			</div>
 			<MarkdownRenderer v-else :text="messageText" />
 			<div v-if="(message.files ?? []).length > 0" class="chat-message-files">
 				<div v-for="file in message.files ?? []" :key="file.name" class="chat-message-file">
@@ -146,6 +153,18 @@ onMounted(async () => {
 		}
 		color: var(--chat--message--bot--color);
 		border-bottom-left-radius: 0;
+	}
+
+	&.chat-message-component {
+		max-width: min(100%, 48rem);
+		width: 100%;
+		overflow: visible;
+	}
+
+	&.chat-message-json-render {
+		padding: 0;
+		background: transparent;
+		border: none;
 	}
 
 	&.chat-message-from-user {

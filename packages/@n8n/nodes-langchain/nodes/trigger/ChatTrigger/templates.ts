@@ -163,6 +163,8 @@ export function createShellPage({ iframeSrc }: { iframeSrc: string }) {
 </html>`;
 }
 
+const DEFAULT_CHAT_ASSETS_URL = 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist';
+
 export function createPage({
 	instanceId,
 	webhookUrl,
@@ -176,6 +178,7 @@ export function createPage({
 	customCss,
 	enableStreaming,
 	frameIdentity,
+	chatAssetsUrl = DEFAULT_CHAT_ASSETS_URL,
 }: {
 	instanceId: string;
 	webhookUrl?: string;
@@ -197,6 +200,8 @@ export function createPage({
 	 * own identity in the browser (or has none, under `none`/`basicAuth`).
 	 */
 	frameIdentity?: ChatFrameIdentity;
+	/** Base URL for `@n8n/chat` JS/CSS. Relative paths resolve against the n8n origin. */
+	chatAssetsUrl?: string;
 }) {
 	const validAuthenticationOptions: AuthenticationChatOption[] = [
 		'none',
@@ -225,6 +230,10 @@ export function createPage({
 
 	const sanitizedInitialMessages = getSanitizedInitialMessages(initialMessages);
 	const sanitizedI18nConfig = getSanitizedI18nConfig(en || {});
+
+	const assetsBase = (chatAssetsUrl.replace(/\/$/, '') || DEFAULT_CHAT_ASSETS_URL).trim();
+	const chatStyleHref = escapeForHtmlAttribute(`${assetsBase}/style.css`);
+	const chatBundleSpecifier = escapeForScriptContext(`${assetsBase}/chat.bundle.es.js`);
 
 	const shellInner = frameIdentity !== undefined;
 
@@ -280,7 +289,7 @@ export function createPage({
 			<meta name="viewport" content="width=device-width, initial-scale=1">
 			<title>Chat</title>
 			<link href="https://cdn.jsdelivr.net/npm/normalize.css@8.0.1/normalize.min.css" rel="stylesheet" />
-			<link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+			<link href="${chatStyleHref}" rel="stylesheet" />
 			<style>
 				html,
 				body,
@@ -293,7 +302,7 @@ export function createPage({
 		</head>
 		<body>${shellInner ? innerBootstrapScript : ''}
 			<script type="module">
-				import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+				import { createChat } from ${chatBundleSpecifier};
 
 				(async function () {
 					${identityBootstrap}

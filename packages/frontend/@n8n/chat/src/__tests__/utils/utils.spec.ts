@@ -40,6 +40,33 @@ describe('utils', () => {
 			});
 		});
 
+		it('should parse a json-render dashboard message', () => {
+			const jsonMessage = {
+				type: 'json-render',
+				payload: {
+					format: 'json-render-v1',
+					spec: {
+						root: 'root',
+						elements: {
+							root: { type: 'Card', props: { title: 'Demo' }, children: [] },
+						},
+					},
+				},
+			};
+
+			const message = parseBotChatMessageContent(JSON.stringify(jsonMessage));
+
+			expect(message).toEqual({
+				id: expect.any(String),
+				sender: 'bot',
+				type: 'component',
+				key: MessageComponentKey.JSON_RENDER,
+				arguments: {
+					payload: jsonMessage.payload,
+				},
+			});
+		});
+
 		it('should parse a message with buttons', () => {
 			const jsonMessage = {
 				type: 'with-buttons',

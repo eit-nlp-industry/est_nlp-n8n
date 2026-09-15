@@ -29,6 +29,10 @@ export function createChat(options?: Partial<ChatOptions>) {
 			...defaultOptions.theme,
 			...options?.theme,
 		},
+		messageComponents: {
+			...defaultOptions.messageComponents,
+			...options?.messageComponents,
+		},
 	};
 
 	const mountingTarget = resolvedOptions.target ?? defaultMountingTarget;

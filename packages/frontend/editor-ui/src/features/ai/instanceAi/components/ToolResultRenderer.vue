@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent } from 'vue';
 import type { McpToolCallResult } from '@n8n/api-types';
 import { N8nAiActivityStepResultSection } from '@n8n/design-system';
 import { isRecord } from '@n8n/utils/is-record';
-import { tryParseJsonRenderPayload, type JsonRenderPayload } from '@eit/json-render-protocol';
+import { extractJsonRenderPayload } from '@/features/ai/shared/jsonRender.utils';
 
 import ToolResultJson from './ToolResultJson.vue';
 import ToolResultTable from './ToolResultTable.vue';
@@ -114,12 +114,6 @@ function extractMcpContent(result: unknown): McpToolCallResult['content'] | null
 	}
 
 	return null;
-}
-
-function extractJsonRenderPayload(result: unknown): JsonRenderPayload | null {
-	if (!isRecord(result)) return null;
-	const nested = isRecord(result.payload) ? result.payload : result;
-	return tryParseJsonRenderPayload(nested);
 }
 
 function detectType(result: unknown): ResultType {

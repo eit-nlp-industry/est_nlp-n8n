@@ -309,6 +309,7 @@ describe('GlobalConfig', () => {
 		},
 		chatTrigger: {
 			disablePublicChat: false,
+			chatAssetsUrl: '/n8n-chat-assets',
 		},
 		compressionNode: {
 			maxDecompressedSize: 2 * 1024 * 1024 * 1024,

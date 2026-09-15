@@ -19,6 +19,11 @@ import type {
 	InteractivePayload,
 	ToolCall,
 } from '@/features/ai/shared/agentsChat/types';
+import {
+	collectJsonRenderCards,
+	extractJsonRenderPayload,
+} from '@/features/ai/shared/jsonRender.utils';
+import JsonRenderAnswerCards from '@/features/ai/instanceAi/components/JsonRenderAnswerCards.vue';
 import AiReasoningBlock from '@/features/ai/shared/components/AiReasoningBlock.vue';
 import AiThinkingBlock from '@/features/ai/shared/components/AiThinkingBlock.vue';
 import AgentChatMemoryUsed from './AgentChatMemoryUsed.vue';
@@ -109,7 +114,9 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 
 	if (!message.renderParts?.length) {
 		return [
-			...(message.content ? [{ type: 'text' as const, key: 'text', text: message.content }] : []),
+			...(message.content && !isJsonRenderAssistantText(message.content)
+				? [{ type: 'text' as const, key: 'text', text: message.content }]
+				: []),
 			...renderableInteractives.map((payload) => ({
 				type: 'interactive' as const,
 				key: `interactive-${payload.toolCallId}`,
@@ -122,7 +129,9 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 	const renderedInteractiveIds = new Set<string>();
 	for (const [index, part] of message.renderParts.entries()) {
 		if (part.type === 'text') {
-			if (part.text) items.push({ type: 'text', key: `text-${index}`, text: part.text });
+			if (part.text && !isJsonRenderAssistantText(part.text)) {
+				items.push({ type: 'text', key: `text-${index}`, text: part.text });
+			}
 			continue;
 		}
 
@@ -138,6 +147,21 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 	}
 
 	return items;
+}
+
+function isJsonRenderAssistantText(text: string): boolean {
+	return extractJsonRenderPayload(text) !== null;
+}
+
+function jsonRenderCardsForToolRun(group: Extract<DisplayGroup, { kind: 'toolRun' }>) {
+	return collectJsonRenderCards(group.toolCalls, group.finalMessage?.content);
+}
+
+function jsonRenderCardsForMessage(message: ChatMessage) {
+	return collectJsonRenderCards(
+		message.toolCalls ?? [],
+		message.role === 'assistant' ? message.content : undefined,
+	);
 }
 
 const scrollRef = useTemplateRef<HTMLDivElement>('scrollRef');
@@ -400,7 +424,7 @@ watch(
 		const thinking = getMessageThinkingSegments(last)
 			.map((segment) => segment.content)
 			.join('');
-		return `${last.content}|${last.toolCalls?.length ?? 0}|${getMessageInteractives(last).length}|${thinking}`;
+		return `${last.content}|${last.toolCalls?.map((tc) => `${tc.state}:${tc.output === undefined ? '0' : '1'}`).join(',') ?? ''}|${getMessageInteractives(last).length}|${thinking}`;
 	},
 	autoScrollIfSticky,
 	{ flush: 'post' },
@@ -463,7 +487,7 @@ onBeforeUnmount(() => {
 						/>
 					</div>
 					<div
-						v-if="group.finalMessage?.content"
+						v-if="group.finalMessage?.content && !isJsonRenderAssistantText(group.finalMessage.content)"
 						:class="[
 							$style.chatMessage,
 							{ [$style.chatMessageError]: group.finalMessage.status === 'error' },
@@ -472,6 +496,13 @@ onBeforeUnmount(() => {
 						<div :class="$style.markdownContent">
 							<AgentMarkdownChunk :source="group.finalMessage.content" />
 						</div>
+					</div>
+					<div
+						v-if="jsonRenderCardsForToolRun(group).length"
+						:class="$style.jsonRender"
+						data-testid="agent-chat-json-render"
+					>
+						<JsonRenderAnswerCards :tool-calls="jsonRenderCardsForToolRun(group)" />
 					</div>
 					<AiThinkingBlock
 						v-if="group.thinkingSegments.length"
@@ -581,6 +612,13 @@ onBeforeUnmount(() => {
 							</div>
 						</template>
 					</template>
+					<div
+						v-if="jsonRenderCardsForMessage(group.message).length"
+						:class="$style.jsonRender"
+						data-testid="agent-chat-json-render"
+					>
+						<JsonRenderAnswerCards :tool-calls="jsonRenderCardsForMessage(group.message)" />
+					</div>
 					<AiThinkingBlock
 						v-if="group.thinkingSegments.length"
 						:segments="group.thinkingSegments"
@@ -705,6 +743,12 @@ onBeforeUnmount(() => {
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing--2xs);
+	margin-top: var(--spacing--2xs);
+	margin-bottom: var(--spacing--2xs);
+}
+
+.jsonRender {
+	width: 100%;
 	margin-top: var(--spacing--2xs);
 	margin-bottom: var(--spacing--2xs);
 }

@@ -67,6 +67,15 @@ vi.mock('@/features/agents/components/AgentChatToolSteps.vue', () => ({
 	},
 }));
 
+vi.mock('@/features/ai/instanceAi/components/JsonRenderAnswerCards.vue', () => ({
+	default: {
+		name: 'JsonRenderAnswerCards',
+		props: ['toolCalls'],
+		template:
+			'<div data-testid="json-render-cards-stub" :data-count="String(toolCalls.length)" />',
+	},
+}));
+
 vi.mock('@/features/agents/components/interactive/InteractiveCard.vue', () => ({
 	default: {
 		template:
@@ -744,5 +753,92 @@ describe('AgentChatMessageList', () => {
 		await wrapper.find('[data-test-id="agent-chat-message-copy"]').trigger('click');
 		await flushPromises();
 		expect(copySpy).toHaveBeenCalledWith('First reply\n\nSecond reply');
+	});
+
+	const dashboardPayload = {
+		format: 'json-render-v1',
+		spec: {
+			root: 'root',
+			elements: {
+				root: { type: 'Card', props: { title: 'Weather snapshot' }, children: [] },
+			},
+		},
+	};
+
+	it('renders json-render cards from a Render Dashboard tool result', () => {
+		const wrapper = mount(AgentChatMessageList, {
+			props: {
+				messages: [
+					{
+						id: 'assistant-dash',
+						role: 'assistant',
+						content: '',
+						toolCalls: [
+							{
+								tool: 'Render_Dashboard',
+								toolCallId: 'tc-dash',
+								state: 'done',
+								output: {
+									status: 'success',
+									data: [{ json: { format: 'json-render-v1', payload: dashboardPayload } }],
+								},
+							},
+						],
+						status: 'success',
+					} satisfies ChatMessage,
+				],
+				messagingState: 'idle',
+			},
+		});
+
+		expect(wrapper.find('[data-testid="agent-chat-json-render"]').exists()).toBe(true);
+		expect(wrapper.find('[data-testid="json-render-cards-stub"]').attributes('data-count')).toBe(
+			'1',
+		);
+	});
+
+	it('renders json-render cards from assistant JSON when no dashboard tool ran', () => {
+		const wrapper = mount(AgentChatMessageList, {
+			props: {
+				messages: [
+					{
+						id: 'assistant-json',
+						role: 'assistant',
+						content: JSON.stringify(dashboardPayload),
+						status: 'success',
+					} satisfies ChatMessage,
+				],
+				messagingState: 'idle',
+			},
+		});
+
+		expect(wrapper.find('[data-testid="agent-chat-json-render"]').exists()).toBe(true);
+		expect(wrapper.find('[data-testid="markdown-chunk"]').exists()).toBe(false);
+	});
+
+	it('does not render json-render cards for unrelated tool output', () => {
+		const wrapper = mount(AgentChatMessageList, {
+			props: {
+				messages: [
+					{
+						id: 'assistant-other',
+						role: 'assistant',
+						content: '',
+						toolCalls: [
+							{
+								tool: 'return_and_rest',
+								toolCallId: 'tc-rest',
+								state: 'done',
+								output: { ok: true },
+							},
+						],
+						status: 'success',
+					} satisfies ChatMessage,
+				],
+				messagingState: 'idle',
+			},
+		});
+
+		expect(wrapper.find('[data-testid="agent-chat-json-render"]').exists()).toBe(false);
 	});
 });
