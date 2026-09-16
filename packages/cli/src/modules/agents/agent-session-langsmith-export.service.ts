@@ -353,15 +353,23 @@ function buildEventRun(event: TimelineEvent, execution: AgentExecution, path: st
 				runType: 'llm',
 				startTime: event.timestamp,
 				endTime: event.endTime,
-				inputs: toRecord(event.request),
-				outputs: toRecord(event.response),
+				inputs: {
+					url: event.url,
+					...(event.method !== undefined && { method: event.method }),
+					...(event.requestBody !== undefined && { requestBody: event.requestBody }),
+				},
+				outputs: {
+					...(event.status !== undefined && { status: event.status }),
+					...(event.streamed === true && { streamed: true }),
+					...(event.responseBody !== undefined && { responseBody: event.responseBody }),
+					...(event.error !== undefined && { error: event.error }),
+				},
 				metadata: {
 					turnIndex: event.turnIndex,
 					model: event.model,
 					finishReason: event.finishReason,
 					usage: event.usage,
 					emptyRetries: event.emptyRetries,
-					truncated: event.truncated,
 				},
 				children: [],
 			};

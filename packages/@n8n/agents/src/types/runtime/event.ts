@@ -68,7 +68,7 @@ export const enum AgentEvent {
 	AgentEnd = 'agent_end',
 	TurnStart = 'turn_start',
 	TurnEnd = 'turn_end',
-	/** Opt-in debug snapshot of one LLM request/response (see `debugModelIo`). */
+	/** Opt-in debug record of one LLM HTTP request/response (see `debugModelIo`). */
 	ModelTurn = 'model_turn',
 	ToolExecutionStart = 'tool_execution_start',
 	ToolExecutionEnd = 'tool_execution_end',

@@ -50,8 +50,8 @@ function formatTimelineEvent(event: TimelineEvent): string {
 		const durationMs = event.endTime > 0 ? event.endTime - event.timestamp : null;
 		const headerParts = [`LLM turn ${event.turnIndex + 1}`];
 		if (event.model) headerParts.push(`model=${event.model}`);
+		if (event.url) headerParts.push(`url=${event.url}`);
 		if (durationMs !== null) headerParts.push(`${durationMs}ms`);
-		if (event.truncated) headerParts.push('truncated');
 		return headerParts.join(' | ');
 	}
 	const durationMs = event.endTime > 0 ? event.endTime - event.startTime : null;

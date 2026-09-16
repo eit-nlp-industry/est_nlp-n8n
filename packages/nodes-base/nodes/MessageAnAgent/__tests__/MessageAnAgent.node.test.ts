@@ -132,8 +132,14 @@ describe('MessageAnAgent Node', () => {
 				timestamp: 100,
 				endTime: 200,
 				model: 'test-model',
-				request: { system: 'sys', messages: [{ role: 'user', content: 'hi' }] },
-				response: { messages: [{ role: 'assistant', content: 'ok' }] },
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				requestBody: { messages: [] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+				},
 			},
 		];
 		executeFunctions.executeAgent.mockResolvedValue({ ...mockAgentResult, modelTurns });

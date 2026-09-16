@@ -162,7 +162,7 @@ export type StreamChunk = ContentMetadata &
 		| { type: 'error'; error: unknown }
 		| ({
 				/**
-				 * Opt-in debug snapshot of one LLM request/response. Emitted when
+				 * Opt-in raw HTTP IO for one model call. Emitted when
 				 * `ExecutionOptions.debugModelIo` is set. Not part of the AI SDK stream.
 				 */
 				type: 'model-turn';

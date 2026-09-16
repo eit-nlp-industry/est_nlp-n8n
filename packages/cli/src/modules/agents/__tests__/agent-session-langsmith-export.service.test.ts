@@ -351,15 +351,15 @@ describe('AgentSessionLangSmithExportService', () => {
 							model: 'anthropic/claude-sonnet',
 							finishReason: 'stop',
 							usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
-							request: {
-								system: 'You are helpful.',
-								messages: [{ role: 'user', content: 'Hello' }],
-								toolNames: ['search'],
+							url: 'https://api.anthropic.com/v1/messages',
+							method: 'POST',
+							status: 200,
+							streamed: true,
+							requestBody: { messages: [{ role: 'user', content: 'Hello' }] },
+							responseBody: {
+								object: 'chat.completion',
+								choices: [{ message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' }],
 							},
-							response: {
-								messages: [{ role: 'assistant', content: 'Hi' }],
-							},
-							truncated: true,
 						},
 					],
 				}),
@@ -375,12 +375,17 @@ describe('AgentSessionLangSmithExportService', () => {
 		expect(modelTurnRun).toMatchObject({
 			run_type: 'llm',
 			inputs: {
-				system: 'You are helpful.',
-				messages: [{ role: 'user', content: 'Hello' }],
-				toolNames: ['search'],
+				url: 'https://api.anthropic.com/v1/messages',
+				method: 'POST',
+				requestBody: { messages: [{ role: 'user', content: 'Hello' }] },
 			},
 			outputs: {
-				messages: [{ role: 'assistant', content: 'Hi' }],
+				status: 200,
+				streamed: true,
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' }],
+				},
 			},
 			extra: {
 				metadata: {
@@ -388,7 +393,6 @@ describe('AgentSessionLangSmithExportService', () => {
 					model: 'anthropic/claude-sonnet',
 					finishReason: 'stop',
 					usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
-					truncated: true,
 				},
 			},
 		});

@@ -489,17 +489,14 @@ export class ExecutionRecorder {
 					...(chunk.usage !== undefined && { usage: chunk.usage }),
 					...(chunk.emptyRetries !== undefined &&
 						chunk.emptyRetries > 0 && { emptyRetries: chunk.emptyRetries }),
-					request: {
-						system: sanitizeExecutionLogValue(chunk.request.system),
-						messages: sanitizeExecutionLogValue(chunk.request.messages) as unknown[],
-						...(chunk.request.toolNames !== undefined && {
-							toolNames: chunk.request.toolNames,
-						}),
-					},
-					response: {
-						messages: sanitizeExecutionLogValue(chunk.response.messages) as unknown[],
-					},
-					...(chunk.truncated === true && { truncated: true }),
+					url: chunk.url,
+					...(chunk.method !== undefined && { method: chunk.method }),
+					...(chunk.status !== undefined && { status: chunk.status }),
+					...(chunk.streamed === true && { streamed: true }),
+					// Raw HTTP bodies — no scrub/truncate (debug opt-in only).
+					...(chunk.requestBody !== undefined && { requestBody: chunk.requestBody }),
+					...(chunk.responseBody !== undefined && { responseBody: chunk.responseBody }),
+					...(chunk.error !== undefined && { error: chunk.error }),
 				});
 				break;
 			case 'error': {

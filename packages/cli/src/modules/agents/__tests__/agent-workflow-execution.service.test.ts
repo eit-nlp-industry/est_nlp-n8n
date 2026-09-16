@@ -170,13 +170,14 @@ describe('AgentWorkflowExecutionService', () => {
 				model: 'test-model',
 				finishReason: 'stop',
 				usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
-				request: {
-					system: 'You are helpful.',
-					messages: [{ role: 'user', content: 'hello' }],
-					toolNames: ['lookup'],
-				},
-				response: {
-					messages: [{ role: 'assistant', content: 'hi' }],
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				streamed: true,
+				requestBody: { messages: [{ role: 'user', content: 'hello' }] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
 				},
 			},
 			{ type: 'finish', finishReason: 'stop' },
@@ -202,13 +203,14 @@ describe('AgentWorkflowExecutionService', () => {
 				model: 'test-model',
 				finishReason: 'stop',
 				usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
-				request: {
-					system: 'You are helpful.',
-					messages: [{ role: 'user', content: 'hello' }],
-					toolNames: ['lookup'],
-				},
-				response: {
-					messages: [{ role: 'assistant', content: 'hi' }],
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				streamed: true,
+				requestBody: { messages: [{ role: 'user', content: 'hello' }] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
 				},
 			},
 		]);

@@ -1,16 +1,10 @@
 import type { TokenUsage } from '../sdk/agent';
 
-export interface ModelTurnDebugRequest {
-	system: unknown;
-	messages: unknown[];
-	toolNames?: string[];
-}
-
-export interface ModelTurnDebugResponse {
-	messages: unknown[];
-}
-
-/** Opt-in debug snapshot of one LLM call for Session timeline / stream consumers. */
+/**
+ * Opt-in debug record of one model HTTP call for Session timeline / stream
+ * consumers. Request is parsed JSON. Response is the final aggregated
+ * completion (not the raw SSE transcript). No redaction or truncation.
+ */
 export interface ModelTurnDebugPayload {
 	turnIndex: number;
 	timestamp: number;
@@ -18,9 +12,17 @@ export interface ModelTurnDebugPayload {
 	model?: string;
 	finishReason?: string;
 	usage?: Pick<TokenUsage, 'promptTokens' | 'completionTokens' | 'totalTokens'>;
-	request: ModelTurnDebugRequest;
-	response: ModelTurnDebugResponse;
-	/** Empty model-turn retries discarded before this snapshot (see agent runtime). */
+	/** Empty model-turn retries discarded before this HTTP call (see agent runtime). */
 	emptyRetries?: number;
-	truncated?: boolean;
+	/** Absolute URL of the model HTTP call, as sent. */
+	url: string;
+	method?: string;
+	status?: number;
+	/** True when the response Content-Type looked like an SSE stream. */
+	streamed?: boolean;
+	/** Parsed request JSON (or raw text if not JSON). */
+	requestBody?: unknown;
+	/** Final completion JSON aggregated from the stream (or parsed non-stream body). */
+	responseBody?: unknown;
+	error?: string;
 }

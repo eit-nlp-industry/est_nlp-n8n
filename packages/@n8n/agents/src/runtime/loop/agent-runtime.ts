@@ -6,7 +6,7 @@ import type { z } from 'zod';
 import { incrementMessageCount, incrementTokenCountFromUsage } from './execution-counter';
 import { GenerateSink } from './generate-sink';
 import { hydrateFileParts } from './hydrate-file-parts';
-import { buildModelTurnDebugPayload } from './model-turn-debug';
+import { buildModelTurnDebugPayload, createRawModelHttpIo } from './model-turn-debug';
 import type { RunOutputSink, RunServices } from './run-output-sink';
 import { RuntimeContextBuilder } from './runtime-context';
 import {
@@ -753,12 +753,66 @@ export class AgentRuntime {
 	 * those throws into their terminal contract.
 	 */
 	private async runAgentLoop<T>(ctx: LoopContext, sink: RunOutputSink<T>): Promise<T> {
-		const { list, options, abortScope, pendingResume } = ctx;
+		const { list, options } = ctx;
 		this.context.hydrateDeferredToolsFromList(list);
 		// Inject a model-facing note for any MCP servers that failed to connect
 		// during build(). The agent can mention the outage to the user when
 		// relevant; the note is system-message only and never persisted.
 		list.mcpConnectionNote = formatMcpConnectionNote(this.config.mcpConnectionFailures ?? []);
+
+		// Opt-in: tee each model HTTP call as complete raw request/response text.
+		// Install before createModel so the LanguageModel uses the wrapped fetch.
+		const previousModelFetch = this.config.modelFetch;
+		const httpIo = options?.debugModelIo ? createRawModelHttpIo(previousModelFetch) : undefined;
+		if (httpIo) {
+			this.config.modelFetch = httpIo.fetch;
+		}
+
+		const emitRawHttpModelTurns = async (args: {
+			turnIndex: number;
+			finishReason?: string;
+			usage?: TokenUsage;
+			emptyRetries?: number;
+		}): Promise<void> => {
+			if (!httpIo) return;
+			await httpIo.flush();
+			for (const http of httpIo.drain()) {
+				this.eventBus.emit({
+					type: AgentEvent.ModelTurn,
+					...buildModelTurnDebugPayload(
+						{
+							turnIndex: args.turnIndex,
+							model: this.modelIdString,
+							finishReason: args.finishReason,
+							usage: args.usage,
+							emptyRetries: args.emptyRetries,
+						},
+						http,
+					),
+				});
+			}
+		};
+
+		try {
+			return await this.runAgentLoopBody(ctx, sink, emitRawHttpModelTurns);
+		} finally {
+			if (httpIo) {
+				this.config.modelFetch = previousModelFetch;
+			}
+		}
+	}
+
+	private async runAgentLoopBody<T>(
+		ctx: LoopContext,
+		sink: RunOutputSink<T>,
+		emitRawHttpModelTurns: (args: {
+			turnIndex: number;
+			finishReason?: string;
+			usage?: TokenUsage;
+			emptyRetries?: number;
+		}) => Promise<void>,
+	): Promise<T> {
+		const { list, options, abortScope, pendingResume } = ctx;
 
 		let totalUsage: TokenUsage | undefined;
 		let lastFinishReason: FinishReason = 'stop';
@@ -901,8 +955,12 @@ export class AgentRuntime {
 				maxOutputTokens: staticLoopContext.maxOutputTokens,
 				aiSdkOptions: this.buildAiSdkOptions(toolMap, options),
 			};
-			const turnStartedAt = Date.now();
 			let turn = await sink.callModel(modelCallContext);
+			await emitRawHttpModelTurns({
+				turnIndex: iterationCount,
+				finishReason: turn.finishReason,
+				usage: turn.usage,
+			});
 
 			// Some providers occasionally return a `stop` turn with no output at
 			// all mid-task, which would silently end the run with work half-done.
@@ -917,6 +975,12 @@ export class AgentRuntime {
 				sink.reportUsage(totalUsage);
 				this.assertNotAborted(abortScope);
 				turn = await sink.callModel(modelCallContext);
+				await emitRawHttpModelTurns({
+					turnIndex: iterationCount,
+					finishReason: turn.finishReason,
+					usage: turn.usage,
+					emptyRetries: emptyRetries + 1,
+				});
 			}
 
 			// Fold the just-finished turn's usage in before the abort check so a
@@ -926,25 +990,6 @@ export class AgentRuntime {
 			sink.reportUsage(totalUsage);
 
 			this.assertNotAborted(abortScope);
-
-			if (options?.debugModelIo) {
-				this.eventBus.emit({
-					type: AgentEvent.ModelTurn,
-					...buildModelTurnDebugPayload({
-						turnIndex: iterationCount,
-						timestamp: turnStartedAt,
-						endTime: Date.now(),
-						model: this.modelIdString,
-						finishReason: turn.finishReason,
-						usage: turn.usage,
-						emptyRetries,
-						system: modelCallContext.system,
-						messages: modelCallContext.messages,
-						aiTools: modelCallContext.hasTools ? modelCallContext.aiTools : undefined,
-						responseMessages: turn.newMessages,
-					}),
-				});
-			}
 
 			lastFinishReason = turn.finishReason;
 			list.addResponse(turn.newMessages);

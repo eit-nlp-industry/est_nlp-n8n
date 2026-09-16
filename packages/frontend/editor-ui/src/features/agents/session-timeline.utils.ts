@@ -285,8 +285,12 @@ export function timelineItemSearchText(
 			item.modelName,
 			item.finishReason,
 			item.turnIndex !== undefined ? String(item.turnIndex + 1) : undefined,
-			searchableValueText(item.modelRequest),
-			searchableValueText(item.modelResponse),
+			item.modelUrl,
+			item.modelMethod,
+			item.modelStatus !== undefined ? String(item.modelStatus) : undefined,
+			searchableValueText(item.modelRequestBody),
+			searchableValueText(item.modelResponseBody),
+			item.modelError,
 		);
 	}
 	if (item.toolName) parts.push(formatToolNameForDisplay(item.toolName));
@@ -428,15 +432,13 @@ interface RawModelTurnEvent {
 		completionTokens: number;
 		totalTokens: number;
 	};
-	request: {
-		system: unknown;
-		messages: unknown[];
-		toolNames?: string[];
-	};
-	response: {
-		messages: unknown[];
-	};
-	truncated?: boolean;
+	url: string;
+	method?: string;
+	status?: number;
+	streamed?: boolean;
+	requestBody?: unknown;
+	responseBody?: unknown;
+	error?: string;
 	emptyRetries?: number;
 }
 
@@ -651,9 +653,13 @@ export function flattenExecutionsToTimelineItems(executions: AgentExecution[]): 
 					modelName: event.model,
 					finishReason: event.finishReason,
 					modelUsage: event.usage,
-					modelRequest: event.request,
-					modelResponse: event.response,
-					modelIoTruncated: event.truncated,
+					modelUrl: event.url,
+					modelMethod: event.method,
+					modelStatus: event.status,
+					modelStreamed: event.streamed,
+					modelRequestBody: event.requestBody,
+					modelResponseBody: event.responseBody,
+					modelError: event.error,
 					emptyRetries: event.emptyRetries,
 				});
 			} else if (event.type === 'tool-call') {

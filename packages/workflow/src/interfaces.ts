@@ -2434,16 +2434,14 @@ export interface ExecuteAgentData {
 			completionTokens: number;
 			totalTokens: number;
 		};
-		request: {
-			system: unknown;
-			messages: unknown[];
-			toolNames?: string[];
-		};
-		response: {
-			messages: unknown[];
-		};
 		emptyRetries?: number;
-		truncated?: boolean;
+		url: string;
+		method?: string;
+		status?: number;
+		streamed?: boolean;
+		requestBody?: unknown;
+		responseBody?: unknown;
+		error?: string;
 	}>;
 	/**
 	 * Identifiers of the agent session this call wrote to. Surfaced so the

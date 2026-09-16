@@ -173,12 +173,10 @@ describe('matchesSearch', () => {
 			kind: 'model-turn',
 			turnIndex: 2,
 			modelName: 'gpt-test',
-			modelRequest: {
-				system: 'You are helpful.',
-				messages: [{ role: 'user', content: 'find-the-needle-prompt' }],
-			},
-			modelResponse: {
-				messages: [{ role: 'assistant', content: 'needle-in-response' }],
+			modelUrl: 'https://api.example.com/v1/chat',
+			modelRequestBody: { messages: [{ role: 'user', content: 'find-the-needle-prompt' }] },
+			modelResponseBody: {
+				choices: [{ message: { content: 'needle-in-response' } }],
 			},
 		});
 
@@ -632,14 +630,16 @@ describe('flattenExecutionsToTimelineItems', () => {
 					model: 'gpt-test',
 					finishReason: 'stop',
 					usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
-					request: {
-						system: 'sys',
-						messages: [{ role: 'user', content: 'hi' }],
-						toolNames: ['search'],
+					url: 'https://api.example.com/v1/chat',
+					method: 'POST',
+					status: 200,
+					streamed: true,
+					requestBody: { messages: [{ role: 'user', content: 'hi' }] },
+					responseBody: {
+						object: 'chat.completion',
+						choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
 					},
-					response: { messages: [{ role: 'assistant', content: 'ok' }] },
 					emptyRetries: 1,
-					truncated: true,
 				},
 			]),
 		]);
@@ -652,13 +652,15 @@ describe('flattenExecutionsToTimelineItems', () => {
 			modelName: 'gpt-test',
 			finishReason: 'stop',
 			modelUsage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
-			modelRequest: {
-				system: 'sys',
-				messages: [{ role: 'user', content: 'hi' }],
-				toolNames: ['search'],
+			modelUrl: 'https://api.example.com/v1/chat',
+			modelMethod: 'POST',
+			modelStatus: 200,
+			modelStreamed: true,
+			modelRequestBody: { messages: [{ role: 'user', content: 'hi' }] },
+			modelResponseBody: {
+				object: 'chat.completion',
+				choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
 			},
-			modelResponse: { messages: [{ role: 'assistant', content: 'ok' }] },
-			modelIoTruncated: true,
 			emptyRetries: 1,
 		});
 	});

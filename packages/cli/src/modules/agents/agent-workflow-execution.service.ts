@@ -832,10 +832,14 @@ function modelTurnsFromTimeline(
 		...(event.model !== undefined && { model: event.model }),
 		...(event.finishReason !== undefined && { finishReason: event.finishReason }),
 		...(event.usage !== undefined && { usage: event.usage }),
-		request: event.request,
-		response: event.response,
 		...(event.emptyRetries !== undefined &&
 			event.emptyRetries > 0 && { emptyRetries: event.emptyRetries }),
-		...(event.truncated === true && { truncated: true }),
+		url: event.url,
+		...(event.method !== undefined && { method: event.method }),
+		...(event.status !== undefined && { status: event.status }),
+		...(event.streamed === true && { streamed: true }),
+		...(event.requestBody !== undefined && { requestBody: event.requestBody }),
+		...(event.responseBody !== undefined && { responseBody: event.responseBody }),
+		...(event.error !== undefined && { error: event.error }),
 	}));
 }

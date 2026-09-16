@@ -109,8 +109,6 @@ export type {
 	AgentEventData,
 	AgentEventHandler,
 	ModelTurnDebugPayload,
-	ModelTurnDebugRequest,
-	ModelTurnDebugResponse,
 } from './types';
 export {
 	OBSERVATION_LOG_MARKERS,

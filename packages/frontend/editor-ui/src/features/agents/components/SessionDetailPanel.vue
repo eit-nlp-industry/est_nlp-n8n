@@ -320,6 +320,25 @@ const workflowFormOutput = computed((): { formUrl: string; message: string } | n
 							<dt :class="$style.label">{{ i18n.baseText('agentSessions.timeline.model') }}</dt>
 							<dd :class="$style.value">{{ item.modelName }}</dd>
 						</dl>
+						<dl v-if="item.modelUrl" :class="$style.infoRow">
+							<dt :class="$style.label">{{ i18n.baseText('agentSessions.timeline.modelUrl') }}</dt>
+							<dd :class="$style.value">{{ item.modelUrl }}</dd>
+						</dl>
+						<dl v-if="item.modelMethod || item.modelStatus !== undefined" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelHttp') }}
+							</dt>
+							<dd :class="$style.value">
+								{{
+									[
+										item.modelMethod,
+										item.modelStatus !== undefined ? String(item.modelStatus) : null,
+									]
+										.filter(Boolean)
+										.join(' · ')
+								}}{{ item.modelStreamed ? ' · SSE' : '' }}
+							</dd>
+						</dl>
 						<dl v-if="item.finishReason" :class="$style.infoRow">
 							<dt :class="$style.label">
 								{{ i18n.baseText('agentSessions.timeline.finishReason') }}
@@ -341,6 +360,12 @@ const workflowFormOutput = computed((): { formUrl: string; message: string } | n
 								{{ i18n.baseText('agentSessions.timeline.emptyRetries') }}
 							</dt>
 							<dd :class="$style.value">{{ item.emptyRetries }}</dd>
+						</dl>
+						<dl v-if="item.modelError" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelError') }}
+							</dt>
+							<dd :class="$style.value">{{ item.modelError }}</dd>
 						</dl>
 					</template>
 					<dl
@@ -473,24 +498,17 @@ const workflowFormOutput = computed((): { formUrl: string; message: string } | n
 					</template>
 
 					<template v-else-if="item.kind === 'model-turn'">
-						<N8nCallout
-							v-if="item.modelIoTruncated"
-							theme="warning"
-							data-test-id="model-turn-truncated"
-						>
-							{{ i18n.baseText('agentSessions.timeline.modelTruncated') }}
-						</N8nCallout>
 						<div data-test-id="model-turn-request">
 							<div :class="$style.label">
 								{{ i18n.baseText('agentSessions.timeline.modelRequest') }}
 							</div>
-							<N8nCodeBlock :code="stringifyJson(item.modelRequest)" language="json" />
+							<N8nCodeBlock :code="stringifyJson(item.modelRequestBody)" language="json" />
 						</div>
 						<div data-test-id="model-turn-response">
 							<div :class="$style.label">
 								{{ i18n.baseText('agentSessions.timeline.modelResponse') }}
 							</div>
-							<N8nCodeBlock :code="stringifyJson(item.modelResponse)" language="json" />
+							<N8nCodeBlock :code="stringifyJson(item.modelResponseBody)" language="json" />
 						</div>
 					</template>
 

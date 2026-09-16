@@ -173,14 +173,9 @@ describe('formatPreviewSessionContext', () => {
 						timestamp: 1_000,
 						endTime: 1_400,
 						model: 'gpt-test',
-						truncated: true,
-						request: {
-							system: 'secret-system-prompt',
-							messages: [{ role: 'user', content: 'secret-user-message' }],
-						},
-						response: {
-							messages: [{ role: 'assistant', content: 'secret-assistant-message' }],
-						},
+						url: 'https://api.example.com/v1/chat',
+						requestBody: { secret: 'secret-request-body' },
+						responseBody: { secret: 'secret-response-body' },
 					},
 					toolCallEvent(),
 				],
@@ -189,10 +184,11 @@ describe('formatPreviewSessionContext', () => {
 
 		const block = formatPreviewSessionContext(makeThread(), executions);
 
-		expect(block).toContain('LLM turn 3 | model=gpt-test | 400ms | truncated');
-		expect(block).not.toContain('secret-system-prompt');
-		expect(block).not.toContain('secret-user-message');
-		expect(block).not.toContain('secret-assistant-message');
+		expect(block).toContain(
+			'LLM turn 3 | model=gpt-test | url=https://api.example.com/v1/chat | 400ms',
+		);
+		expect(block).not.toContain('secret-request-body');
+		expect(block).not.toContain('secret-response-body');
 		expect(block).toContain('Tool call: search_orders');
 	});
 

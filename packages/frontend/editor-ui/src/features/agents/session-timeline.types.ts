@@ -71,15 +71,13 @@ export interface TimelineItem {
 		completionTokens: number;
 		totalTokens: number;
 	};
-	modelRequest?: {
-		system: unknown;
-		messages: unknown[];
-		toolNames?: string[];
-	};
-	modelResponse?: {
-		messages: unknown[];
-	};
-	modelIoTruncated?: boolean;
+	modelUrl?: string;
+	modelMethod?: string;
+	modelStatus?: number;
+	modelStreamed?: boolean;
+	modelRequestBody?: unknown;
+	modelResponseBody?: unknown;
+	modelError?: string;
 	emptyRetries?: number;
 }
 
