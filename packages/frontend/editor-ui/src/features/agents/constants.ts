@@ -1,4 +1,6 @@
 export const AGENTS_LIST_VIEW = 'AgentsListView';
+export const DEEPSEEK_HARNESS_LIST_VIEW = 'DeepSeekHarnessListView';
+export const PROJECT_DEEPSEEK_HARNESS = 'ProjectDeepSeekHarness';
 export const AGENT_BUILDER_VIEW = 'AgentBuilderView';
 export const AGENT_PREVIEW_VIEW = 'AgentPreviewView';
 export const AGENT_VIEW = 'AgentView';

@@ -200,6 +200,7 @@ const ACTION_TYPES = {
 	DATA_TABLE: 'dataTable',
 	VARIABLE: 'variable',
 	AGENT: 'agent',
+	DEEPSEEK_HARNESS: 'deepseekHarness',
 } as const;
 type ActionTypes = (typeof ACTION_TYPES)[keyof typeof ACTION_TYPES];
 
@@ -251,6 +252,13 @@ const createAgentButton = computed(() => ({
 	disabled: !canCreateAgent.value,
 }));
 
+const createDeepSeekHarnessButton = computed(() => ({
+	value: ACTION_TYPES.DEEPSEEK_HARNESS,
+	label: i18n.baseText('projects.header.create.deepseekHarness'),
+	size: 'mini' as const,
+	disabled: false,
+}));
+
 const selectedMainButtonType = computed(() => {
 	if (props.mainButton === ACTION_TYPES.AGENT && !settingsStore.isModuleActive('agents')) {
 		return ACTION_TYPES.WORKFLOW;
@@ -268,6 +276,8 @@ const mainButtonConfig = computed(() => {
 			return createVariableButton.value;
 		case ACTION_TYPES.AGENT:
 			return createAgentButton.value;
+		case ACTION_TYPES.DEEPSEEK_HARNESS:
+			return createDeepSeekHarnessButton.value;
 		case ACTION_TYPES.WORKFLOW:
 		default:
 			return createWorkflowButton.value;
@@ -344,6 +354,17 @@ const menu = computed(() => {
 			value: ACTION_TYPES.AGENT,
 			label: i18n.baseText('projects.header.create.agent'),
 			disabled: !canCreateAgent.value,
+		});
+	}
+
+	if (
+		settingsStore.isModuleActive('agents') &&
+		selectedMainButtonType.value !== ACTION_TYPES.DEEPSEEK_HARNESS
+	) {
+		items.push({
+			value: ACTION_TYPES.DEEPSEEK_HARNESS,
+			label: i18n.baseText('projects.header.create.deepseekHarness'),
+			disabled: false,
 		});
 	}
 
@@ -427,6 +448,9 @@ const actions: Record<ActionTypes, (projectId: string, source: CreateSource) => 
 	},
 	[ACTION_TYPES.AGENT]: (projectId, source) => {
 		createAgent(source, projectId);
+	},
+	[ACTION_TYPES.DEEPSEEK_HARNESS]: () => {
+		// The entry is intentionally inactive until Harness agent creation is implemented.
 	},
 } as const;
 

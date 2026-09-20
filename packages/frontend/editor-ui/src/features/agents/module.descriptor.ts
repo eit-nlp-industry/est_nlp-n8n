@@ -7,6 +7,8 @@ import {
 	AGENT_VIEW,
 	AGENT_SESSIONS_LIST_VIEW,
 	AGENT_SESSION_DETAIL_VIEW,
+	DEEPSEEK_HARNESS_LIST_VIEW,
+	PROJECT_DEEPSEEK_HARNESS,
 	PROJECT_AGENTS,
 } from '@/features/agents/constants';
 import { AGENTS_MODALS } from '@/features/agents/modals';
@@ -21,6 +23,8 @@ const AgentSessionsListView = async (): Promise<unknown> =>
 	await import('@/features/agents/views/AgentSessionsListView.vue');
 const AgentSessionTimelineView = async (): Promise<unknown> =>
 	await import('@/features/agents/views/AgentSessionTimelineView.vue');
+const DeepSeekHarnessListView = async (): Promise<unknown> =>
+	await import('@/features/agents/views/DeepSeekHarnessListView.vue');
 
 export const AgentsModule = defineFrontendModule({
 	id: 'agents',
@@ -41,6 +45,23 @@ export const AgentsModule = defineFrontendModule({
 			name: PROJECT_AGENTS,
 			path: 'agents',
 			component: AgentsListView,
+			meta: {
+				projectRoute: true,
+				middleware: ['authenticated', 'custom'],
+			},
+		},
+		{
+			name: DEEPSEEK_HARNESS_LIST_VIEW,
+			path: '/home/deepseek-harness',
+			component: DeepSeekHarnessListView,
+			meta: {
+				middleware: ['authenticated', 'custom'],
+			},
+		},
+		{
+			name: PROJECT_DEEPSEEK_HARNESS,
+			path: 'deepseek-harness',
+			component: DeepSeekHarnessListView,
 			meta: {
 				projectRoute: true,
 				middleware: ['authenticated', 'custom'],
@@ -91,6 +112,15 @@ export const AgentsModule = defineFrontendModule({
 					name: AGENTS_LIST_VIEW,
 				},
 			},
+			{
+				label: 'DeepSeek Harness',
+				value: DEEPSEEK_HARNESS_LIST_VIEW,
+				preview: true,
+				insertAfter: AGENTS_LIST_VIEW,
+				to: {
+					name: DEEPSEEK_HARNESS_LIST_VIEW,
+				},
+			},
 		],
 		project: [
 			{
@@ -100,6 +130,16 @@ export const AgentsModule = defineFrontendModule({
 				insertAfter: VIEWS.PROJECTS_WORKFLOWS,
 				dynamicRoute: {
 					name: PROJECT_AGENTS,
+					includeProjectId: true,
+				},
+			},
+			{
+				label: 'DeepSeek Harness',
+				value: PROJECT_DEEPSEEK_HARNESS,
+				preview: true,
+				insertAfter: PROJECT_AGENTS,
+				dynamicRoute: {
+					name: PROJECT_DEEPSEEK_HARNESS,
 					includeProjectId: true,
 				},
 			},

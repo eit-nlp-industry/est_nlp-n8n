@@ -708,7 +708,7 @@ describe('ProjectHeader', () => {
 			expect(queryByTestId('add-resource-variable')).toBeDisabled();
 		});
 
-		it('should enable agent create button when project scope allows it', () => {
+	it('should enable agent create button when project scope allows it', () => {
 			settingsStore.isModuleActive = vi.fn().mockImplementation((mod) => mod === 'agents');
 			const project = createTestProject({ scopes: ['agent:create'] });
 			projectsStore.currentProject = project;
@@ -717,8 +717,16 @@ describe('ProjectHeader', () => {
 			const { getByTestId } = renderComponent({ props: { mainButton: 'agent' } });
 
 			expect(getByTestId('add-resource-agent')).toBeInTheDocument();
-			expect(getByTestId('add-resource-agent')).toBeEnabled();
-		});
+		expect(getByTestId('add-resource-agent')).toBeEnabled();
+	});
+
+	it('should include DeepSeek Harness in the create menu when Agents is active', () => {
+		settingsStore.isModuleActive = vi.fn().mockImplementation((mod) => mod === 'agents');
+
+		const { getByTestId } = renderComponent({ props: { mainButton: 'agent' } });
+
+		expect(getByTestId('menu-deepseekHarness')).toBeInTheDocument();
+	});
 
 		it('should disable agent create button when no scope allows it', () => {
 			settingsStore.isModuleActive = vi.fn().mockImplementation((mod) => mod === 'agents');
