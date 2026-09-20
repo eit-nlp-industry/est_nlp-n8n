@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - Do not modify the DeepSeek Harness source code.
+- Configure the Harness home root with `N8N_DEEPSEEK_HARNESS_HOME`; default to `~/.dsh`.
 - Keep one writable runtime per `DSH_HOME` directory.
 - Store DeepSeek Harness agents in a dedicated database model.
 - Encrypt connection data through `cipher.encryptV2()` and `cipher.decryptV2()`.
@@ -41,11 +42,12 @@
 - Modify: `packages/frontend/editor-ui/src/features/agents/constants.ts`
 - Modify: `packages/frontend/editor-ui/src/features/agents/module.descriptor.ts`
 - Modify: `packages/frontend/editor-ui/src/features/collaboration/projects/components/ProjectHeader.vue`
+- Modify: `packages/frontend/editor-ui/src/features/collaboration/projects/components/ProjectHeader.test.ts`
 - Modify: `packages/frontend/@n8n/i18n/src/locales/en.json`
 
 **Interfaces:**
 
-- Consumes: `AgentsModule`, `ProjectHeader`, `N8nEmptyState`, and the active `agents` module.
+- Consumes: `AgentsModule`, `ProjectHeader`, `InsightsSummary`, `N8nEmptyState`, and the active `agents` module.
 - Produces: `DeepSeekHarnessListView` and `ProjectDeepSeekHarness` route names.
 
 - [x] **Step 1: Write the failing entry test**
@@ -67,6 +69,34 @@ Register both routes in `AgentsModule`. Reuse `ResourcesListLayout` and `Project
 Run: `pnpm.cmd --filter n8n-editor-ui exec vitest run src/features/agents/__tests__/DeepSeekHarnessEntry.test.ts`
 
 Expected result: two tests pass.
+
+### Task 1.5: Add the Harness home environment configuration
+
+**Status:** Completed on 2026-09-20.
+
+**Files:**
+
+- Create: `packages/@n8n/config/src/configs/deepseek-harness.config.ts`
+- Create: `packages/@n8n/config/test/deepseek-harness.config.test.ts`
+- Modify: `packages/@n8n/config/src/index.ts`
+- Modify: `packages/@n8n/config/test/config.test.ts`
+
+**Interfaces:**
+
+- Consumes: `N8N_DEEPSEEK_HARNESS_HOME`.
+- Produces: `GlobalConfig.deepSeekHarness.home`, with a default value of `~/.dsh`.
+
+- [x] **Step 1: Write the failing configuration test**
+
+Assert the native default and the explicit Windows path from `N8N_DEEPSEEK_HARNESS_HOME`.
+
+- [x] **Step 2: Implement and export the nested configuration**
+
+Register `DeepSeekHarnessConfig` in `GlobalConfig` without adding a database migration or frontend setting.
+
+- [x] **Step 3: Verify the focused checks**
+
+Run the focused config test, package typecheck, and package lint. The full config test command currently has unrelated Windows temporary-directory fixture failures.
 
 ### Task 2: Persist DeepSeek Harness agent identities
 

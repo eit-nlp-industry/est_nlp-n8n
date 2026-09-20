@@ -15,6 +15,7 @@ import { CompressionNodeConfig } from './configs/compression.config';
 import { CredentialsConfig } from './configs/credentials.config';
 import { DataTableConfig } from './configs/data-table.config';
 import { DatabaseConfig } from './configs/database.config';
+import { DeepSeekHarnessConfig } from './configs/deepseek-harness.config';
 import { DeploymentConfig } from './configs/deployment.config';
 import { DiagnosticsConfig } from './configs/diagnostics.config';
 import { DynamicBannersConfig } from './configs/dynamic-banners.config';
@@ -60,6 +61,7 @@ import { Config, Env, Nested } from './decorators';
 export { Config, Env, Nested } from './decorators';
 export { AiConfig } from './configs/ai.config';
 export { DatabaseConfig, SqliteConfig } from './configs/database.config';
+export { DeepSeekHarnessConfig } from './configs/deepseek-harness.config';
 export { InstanceSettingsConfig } from './configs/instance-settings-config';
 export { InstanceSettingsLoaderConfig } from './configs/instance-settings-loader.config';
 export { sampleRateSchema } from './configs/sentry.config';
@@ -320,6 +322,9 @@ export class GlobalConfig {
 
 	@Nested
 	agents: AgentsConfig;
+
+	@Nested
+	deepSeekHarness: DeepSeekHarnessConfig;
 
 	@Nested
 	expressionEngine: ExpressionEngineConfig;

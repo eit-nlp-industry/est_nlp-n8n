@@ -733,6 +733,9 @@ describe('GlobalConfig', () => {
 			sandboxEphemeral: false,
 			channelReconcileIntervalSeconds: 60,
 		},
+		deepSeekHarness: {
+			home: '~/.dsh',
+		},
 	} satisfies GlobalConfigShape;
 
 	it('should use all default values when no env variables are defined', () => {
