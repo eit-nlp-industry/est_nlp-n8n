@@ -52,9 +52,9 @@ The native Harness Studio remains the preferred configuration UI. It is not part
 
 When Studio support is added, n8n opens Studio for the selected profile only. The runtime manager must pass the profile-specific `DSH_HOME` and a scoped Studio access URL. A Studio page must never point to another profile.
 
-## Current Delivery: Entry Page and Environment Configuration
+## Current Delivery: Create an Isolated Harness Profile
 
-The current delivery contains the frontend entry and the n8n environment configuration. It does not create, store, run, or configure a Harness agent yet.
+The current delivery contains the frontend entry, project-scoped creation, persistence, and isolated Harness home creation. It does not start a Harness process or open Studio.
 
 Implemented behavior:
 
@@ -63,32 +63,51 @@ Implemented behavior:
 - Show the Agent-style empty state with an active `Create DeepSeek Harness` action.
 - Show the existing Insights summary on the Overview page.
 - Show `DeepSeek Harness` in the project-header create menu.
-- Keep the action as a no-op until creation is implemented.
 - Use `Create DeepSeek Harness` consistently for the header and empty-state actions.
 - Read `N8N_DEEPSEEK_HARNESS_HOME`, defaulting to `~/.dsh`.
+  - Create a Harness agent with a workflow-style unique default name.
+  - Open the created agent detail page with a `Personal / Agent name` breadcrumb.
+  - Rename the agent from the breadcrumb. The profile directory follows the new name.
+  - Reserve the detail page body for the future native Harness Studio surface.
+  - Create the isolated home at `<N8N_DEEPSEEK_HARNESS_HOME>/<userName>/<agentName>-<agentId>`.
+- List the created Harness agents for the current project.
 
-The entry belongs to the existing `AgentsModule`. This is deliberate. The project header shows custom tabs only for active frontend modules. Reusing the active Agents module makes the entry visible without adding a backend module or database migration.
+The entry belongs to the existing `AgentsModule`. This is deliberate. The project header shows custom tabs only for active frontend modules. The creation and persistence logic uses a dedicated backend module and table.
 
 ## Persistence Boundary
 
-The current entry page has no database changes.
+The Harness agent uses the dedicated `deepseek_harness_agents` table. It does not reuse the native `agents` table.
 
-When users can create Harness agents, n8n must add a dedicated persistence model. It must not reuse the native `agents` table. The new model must keep the agent identity, project ownership, profile directory identity, lifecycle state, and encrypted connection data separate from native n8n Agent data.
+  The table stores the agent ID, project ID, account email, name, status, and timestamps. A unique `(projectId, name)` constraint prevents duplicate names inside one project. The project foreign key cascades when the project is deleted.
+
+  The server derives the profile directory from the authenticated n8n account email, the persisted agent name, and the persisted agent ID. The API never accepts a client-provided filesystem path. If home creation fails, the database row is not left behind. Legacy records keep the original `<root>/agents/<agentId>` location until they are deleted.
+
+  Renaming an account-scoped agent moves its profile directory before the database update. If the database update fails, the directory move is rolled back.
+
+The current REST contract is:
+
+```text
+POST /projects/:projectId/deepseek-harness/agents
+GET  /projects/:projectId/deepseek-harness/agents
+GET  /projects/:projectId/deepseek-harness/agents/:agentId
+```
+
+  Creation accepts an empty object and returns the agent ID, project ID, generated name, status, and timestamps. The generated name uses the existing n8n naming rule: the base name is used when available, otherwise the highest numeric suffix is incremented. Names can be reused after deletion, matching workflow behavior.
+
+  `PATCH /projects/:projectId/deepseek-harness/agents/:agentId` accepts `{ name }` and updates the display name. The name must be non-empty and is limited to 128 characters.
 
 ## Non-goals of the Current Delivery
 
 - No DeepSeek Harness source change.
 - No Harness container or process startup.
 - No Studio launch.
-- No database migration.
 - No n8n workflow node.
-- No user-created Harness agent.
+- No runtime manager or idle shutdown policy.
 
 ## Open Product Decisions
 
 The following decisions need a separate requirement before implementation:
 
-- The exact agent creation form and fields.
 - The runtime-manager deployment service and authentication model.
 - The Studio reverse-proxy and scoped access-token design.
 - The idle timeout and capacity policy.

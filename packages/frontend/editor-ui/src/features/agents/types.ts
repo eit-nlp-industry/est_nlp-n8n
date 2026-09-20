@@ -1,4 +1,5 @@
 import type { BaseResource } from '@/Interface';
+import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
 import type {
 	AgentJsonToolConfig,
 	AgentReasoningLevel,
@@ -44,10 +45,16 @@ export type AgentResource = BaseResource &
 		resourceType: 'agent';
 	};
 
+export type DeepSeekHarnessResource = BaseResource &
+	Pick<DeepSeekHarnessAgentDto, 'projectId' | 'status' | 'createdAt' | 'updatedAt'> & {
+		resourceType: 'deepseekHarness';
+	};
+
 // Extend the ModuleResources interface to include Agent
 declare module '@/Interface' {
 	interface ModuleResources {
 		agent: AgentResource;
+		deepseekHarness: DeepSeekHarnessResource;
 	}
 }
 

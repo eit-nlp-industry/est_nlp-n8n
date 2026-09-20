@@ -6,9 +6,33 @@ import {
 	DEEPSEEK_HARNESS_LIST_VIEW,
 	PROJECT_AGENTS,
 	PROJECT_DEEPSEEK_HARNESS,
+	PROJECT_DEEPSEEK_HARNESS_AGENT,
 } from '../constants';
 import { AgentsModule } from '../module.descriptor';
 import DeepSeekHarnessListView from '../views/DeepSeekHarnessListView.vue';
+
+const routerPush = vi.fn();
+
+vi.mock('vue-router', () => ({
+	useRoute: () => ({ params: {} }),
+	useRouter: () => ({ push: routerPush }),
+}));
+
+vi.mock('../composables/useDeepSeekHarnessApi', () => ({
+	useDeepSeekHarnessApi: () => ({
+		createAgent: vi.fn().mockResolvedValue({ id: 'agent-1' }),
+		listAgents: vi.fn().mockResolvedValue([]),
+		deleteAgent: vi.fn(),
+	}),
+}));
+
+vi.mock('../composables/useAgentConfirmationModal', () => ({
+	useAgentConfirmationModal: () => ({ openAgentConfirmationModal: vi.fn() }),
+}));
+
+vi.mock('@/features/collaboration/projects/projects.store', () => ({
+	useProjectsStore: () => ({ currentProject: null, personalProject: { id: 'personal-project' } }),
+}));
 
 vi.mock('@/features/collaboration/projects/components/ProjectHeader.vue', async () => {
 	const { defineComponent } = await import('vue');
@@ -61,11 +85,12 @@ vi.mock('@n8n/design-system', async () => {
 	return {
 		N8nEmptyState: defineComponent({
 			props: ['heading', 'description', 'buttonText', 'buttonDisabled', 'calloutText'],
+			emits: ['click:button'],
 			template: `
 				<div>
 					<h1>{{ heading }}</h1>
 					<p>{{ description }}</p>
-					<button :disabled="buttonDisabled">{{ buttonText }}</button>
+					<button :disabled="buttonDisabled" @click="$emit('click:button')">{{ buttonText }}</button>
 			<p v-if="calloutText">{{ calloutText }}</p>
 				</div>
 			`,
@@ -113,11 +138,11 @@ describe('DeepSeek Harness entry', () => {
 
 	it('shows the active creation action in the Agent-style empty state', () => {
 		const wrapper = mount(DeepSeekHarnessListView);
-		expect(wrapper.get('[data-test-id="resources-list-layout"]').exists()).toBe(true);
+		expect(wrapper.find('[data-test-id="resources-list-layout"]').exists()).toBe(true);
 		expect(wrapper.get('[data-test-id="project-header"]').attributes('data-main-button')).toBe(
 			'deepseekHarness',
 		);
-		expect(wrapper.get('[data-test-id="insights-summary"]').exists()).toBe(true);
+		expect(wrapper.find('[data-test-id="insights-summary"]').exists()).toBe(true);
 		expect(wrapper.get('h1').text()).toBe('Create your first DeepSeek Harness');
 		expect(wrapper.findAll('p')[0].text()).toBe(
 			'Create a DeepSeek Harness agent to configure and run it in n8n.',
@@ -125,5 +150,16 @@ describe('DeepSeek Harness entry', () => {
 		expect(wrapper.get('button').text()).toBe('Create DeepSeek Harness');
 		expect(wrapper.get('button').attributes('disabled')).toBeUndefined();
 		expect(wrapper.findAll('p')).toHaveLength(1);
+	});
+
+	it('creates an agent and opens its detail route', async () => {
+		const wrapper = mount(DeepSeekHarnessListView);
+
+		await wrapper.get('button').trigger('click');
+
+		expect(routerPush).toHaveBeenCalledWith({
+			name: PROJECT_DEEPSEEK_HARNESS_AGENT,
+			params: { projectId: 'personal-project', agentId: 'agent-1' },
+		});
 	});
 });

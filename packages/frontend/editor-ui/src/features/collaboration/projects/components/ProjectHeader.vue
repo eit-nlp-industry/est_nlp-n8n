@@ -2,7 +2,20 @@
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useElementSize, useResizeObserver } from '@vueuse/core';
-import type { TabOptions, UserAction } from '@n8n/design-system';
+import {
+	N8nButton,
+	N8nHeading,
+	N8nIcon,
+	N8nIconButton,
+	N8nLink,
+	N8nText,
+	N8nTooltip,
+	isIconOrEmoji,
+	type IconName,
+	type IconOrEmoji,
+	type TabOptions,
+	type UserAction,
+} from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { ProjectTypes } from '../projects.types';
 import { useProjectsStore } from '../projects.store';
@@ -16,9 +29,7 @@ import { useRootStore } from '@n8n/stores/useRootStore';
 import { useSettingsStore } from '@n8n/stores/settings.store';
 import { useProjectPages } from '@/features/collaboration/projects/composables/useProjectPages';
 import { truncateTextToFitWidth } from '@/app/utils/formatters/textFormatter';
-import { type IconName } from '@n8n/design-system';
 import type { IUser } from 'n8n-workflow';
-import { type IconOrEmoji, isIconOrEmoji } from '@n8n/design-system';
 import { useUIStore } from '@/app/stores/ui.store';
 import { PROJECT_DATA_TABLES } from '@/features/core/dataTable/constants';
 import { useAgentPermissions } from '@/features/agents/composables/useAgentPermissions';
@@ -27,20 +38,13 @@ import { usePromotionsEnabled } from '@/features/shared/promotions/usePromotions
 import { PROMOTION_SELECT_MODAL_KEY } from '@/features/integrations/promotions.ee/promotions.constants';
 import { getPromotableChanges } from '@/features/integrations/promotions.ee/promotions.api';
 
-import {
-	N8nButton,
-	N8nHeading,
-	N8nIcon,
-	N8nIconButton,
-	N8nLink,
-	N8nText,
-	N8nTooltip,
-} from '@n8n/design-system';
 import { VARIABLE_MODAL_KEY } from '@/features/settings/environments.ee/environments.constants';
 import { useTelemetry } from '@n8n/composables/useTelemetry';
 import { useCreateAgent } from '@/features/agents/composables/useCreateAgent';
 import { useUsersStore } from '@n8n/stores/users.store';
 import { useFavoritesStore } from '@/app/stores/favorites.store';
+import { PROJECT_DEEPSEEK_HARNESS_AGENT } from '@/features/agents/constants';
+import { useDeepSeekHarnessApi } from '@/features/agents/composables/useDeepSeekHarnessApi';
 
 const route = useRoute();
 const router = useRouter();
@@ -51,6 +55,7 @@ const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
 const telemetry = useTelemetry();
 const { createAgent } = useCreateAgent();
+const { createAgent: createDeepSeekHarness } = useDeepSeekHarnessApi();
 const usersStore = useUsersStore();
 const favoritesStore = useFavoritesStore();
 const { isEnabled: isPromotionsEnabled } = usePromotionsEnabled();
@@ -410,7 +415,7 @@ function getUIContext(routeName: string) {
 
 type CreateSource = 'button' | 'dropdown';
 
-const actions: Record<ActionTypes, (projectId: string, source: CreateSource) => void> = {
+const actions: Record<ActionTypes, (projectId: string, source: CreateSource) => void | Promise<void>> = {
 	[ACTION_TYPES.WORKFLOW]: (projectId: string) => {
 		void router.push({
 			name: VIEWS.NEW_WORKFLOW,
@@ -449,8 +454,12 @@ const actions: Record<ActionTypes, (projectId: string, source: CreateSource) => 
 	[ACTION_TYPES.AGENT]: (projectId, source) => {
 		createAgent(source, projectId);
 	},
-	[ACTION_TYPES.DEEPSEEK_HARNESS]: () => {
-		// The entry is intentionally inactive until Harness agent creation is implemented.
+	[ACTION_TYPES.DEEPSEEK_HARNESS]: async (projectId) => {
+		const agent = await createDeepSeekHarness(projectId);
+		await router.push({
+			name: PROJECT_DEEPSEEK_HARNESS_AGENT,
+			params: { projectId, agentId: agent.id },
+		});
 	},
 } as const;
 

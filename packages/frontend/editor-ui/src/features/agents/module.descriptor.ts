@@ -9,6 +9,7 @@ import {
 	AGENT_SESSION_DETAIL_VIEW,
 	DEEPSEEK_HARNESS_LIST_VIEW,
 	PROJECT_DEEPSEEK_HARNESS,
+	PROJECT_DEEPSEEK_HARNESS_AGENT,
 	PROJECT_AGENTS,
 } from '@/features/agents/constants';
 import { AGENTS_MODALS } from '@/features/agents/modals';
@@ -62,6 +63,16 @@ export const AgentsModule = defineFrontendModule({
 			name: PROJECT_DEEPSEEK_HARNESS,
 			path: 'deepseek-harness',
 			component: DeepSeekHarnessListView,
+			meta: {
+				projectRoute: true,
+				middleware: ['authenticated', 'custom'],
+			},
+		},
+		{
+			name: PROJECT_DEEPSEEK_HARNESS_AGENT,
+			path: 'deepseek-harness/:agentId',
+			component: async (): Promise<unknown> =>
+				await import('@/features/agents/views/DeepSeekHarnessDetailView.vue'),
 			meta: {
 				projectRoute: true,
 				middleware: ['authenticated', 'custom'],

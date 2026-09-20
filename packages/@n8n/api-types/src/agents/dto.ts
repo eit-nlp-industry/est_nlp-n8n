@@ -136,6 +136,23 @@ export class CreateAgentDto extends Z.class({
 	skills: z.record(agentSkillSchema).optional(),
 }) {}
 
+export class CreateDeepSeekHarnessAgentDto extends Z.class({}, { strict: true }) {}
+
+export class UpdateDeepSeekHarnessAgentDto extends Z.class({
+	name: z.string().trim().min(1).max(128),
+}) {}
+
+export type DeepSeekHarnessAgentStatus = 'created';
+
+export type DeepSeekHarnessAgentDto = {
+	id: string;
+	projectId: string;
+	name: string;
+	status: DeepSeekHarnessAgentStatus;
+	createdAt: Date;
+	updatedAt: Date;
+};
+
 export class UpdateAgentConfigDto extends Z.class({
 	config: z.record(z.unknown()),
 	/** Hash of the config the edit was made against (`null` when the agent had none). */

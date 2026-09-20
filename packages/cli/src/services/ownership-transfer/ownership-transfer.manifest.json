@@ -93,6 +93,11 @@
 			"name": "AiPreference",
 			"path": "packages/@n8n/db/src/entities/ai-preference.ts",
 			"reason": "Project-scoped AI preferences describe how to work inside the deleted project; dropped via FK cascade, like Variables. Personal and global preferences carry no projectId."
+		},
+		{
+			"name": "DeepSeekHarnessAgent",
+			"path": "packages/cli/src/modules/deepseek-harness/entities/deepseek-harness-agent.entity.ts",
+			"reason": "Harness agent configuration is scoped to its project and is dropped with the project."
 		}
 	]
 }
