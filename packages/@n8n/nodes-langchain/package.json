@@ -237,7 +237,7 @@
     "vitest-mock-extended": "catalog:"
   },
   "dependencies": {
-    "@eit/json-render-protocol": "link:../../../../eit-json-render/packages/protocol",
+    "@eit/json-render-protocol": "git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol",
     "@aws-sdk/client-bedrock-runtime": "3.938.0",
     "@aws-sdk/client-sso-oidc": "3.808.0",
     "@aws-sdk/credential-providers": "3.808.0",

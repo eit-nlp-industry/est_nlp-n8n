@@ -39,9 +39,9 @@
     }
   },
   "dependencies": {
-    "@eit/json-render-element-plus": "link:../../../../../eit-json-render/packages/element-plus",
-    "@eit/json-render-protocol": "link:../../../../../eit-json-render/packages/protocol",
-    "@eit/json-render-vue": "link:../../../../../eit-json-render/packages/vue",
+    "@eit/json-render-element-plus": "git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus",
+    "@eit/json-render-protocol": "git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol",
+    "@eit/json-render-vue": "git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue",
     "@n8n/design-system": "workspace:*",
     "@vueuse/core": "catalog:frontend",
     "element-plus": "catalog:frontend",

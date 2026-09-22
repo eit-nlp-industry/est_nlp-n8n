@@ -18,17 +18,51 @@ const { t } = useI18n();
 const instanceId = `chat-widget-json-render-interaction-${uuidv4()}`;
 const submitted = ref(Boolean(props.resolved));
 const submittedValues = ref<Record<string, unknown> | undefined>(props.resolved?.value);
+const pendingBody = ref<string>();
+const pendingApproval = ref(false);
+const sending = ref(false);
+const sendFailed = ref(false);
 const status = ref<'open' | 'submitted' | 'cancelled'>(
 	props.resolved ? (props.resolved.approved ? 'submitted' : 'cancelled') : 'open',
 );
+
+async function sendDecision() {
+	if (!pendingBody.value || sending.value) return;
+	sending.value = true;
+	sendFailed.value = false;
+	try {
+		if (chat.ws) {
+			if (chat.ws.readyState !== WebSocket.OPEN) throw new Error('Chat connection is not open');
+			chat.ws.send(
+				JSON.stringify({
+					sessionId: chat.currentSessionId.value,
+					action: 'sendMessage',
+					chatInput: pendingBody.value,
+				}),
+			);
+			chat.waitingForResponse.value = true;
+			chat.blockUserInput.value = false;
+		} else {
+			await chat.sendMessage(pendingBody.value, [], {
+				addToTranscript: false,
+				throwOnError: true,
+			});
+		}
+		status.value = pendingApproval.value ? 'submitted' : 'cancelled';
+	} catch {
+		sendFailed.value = true;
+	} finally {
+		sending.value = false;
+	}
+}
 
 async function submitDecision(approved: boolean, value?: Record<string, unknown>) {
 	if (submitted.value) return;
 	submitted.value = true;
 	submittedValues.value = approved ? value : undefined;
-	status.value = approved ? 'submitted' : 'cancelled';
+	pendingApproval.value = approved;
 
-	const body = JSON.stringify({
+	pendingBody.value = JSON.stringify({
 		type: 'json-render-interaction-response',
 		approved,
 		value: approved ? value : undefined,
@@ -40,31 +74,43 @@ async function submitDecision(approved: boolean, value?: Record<string, unknown>
 		sender: 'user',
 	});
 
-	if (chat.ws) {
-		chat.ws.send(
-			JSON.stringify({
-				sessionId: chat.currentSessionId.value,
-				action: 'sendMessage',
-				chatInput: body,
-			}),
-		);
-		chat.waitingForResponse.value = true;
-		chat.blockUserInput.value = false;
-		return;
-	}
-
-	await chat.sendMessage(body, [], { addToTranscript: false });
+	await sendDecision();
 }
 </script>
 
 <template>
-	<JsonRenderInteraction
-		:payload="payload"
-		:instance-id="instanceId"
-		:values="submittedValues"
-		:read-only="submitted"
-		:status="status"
-		@submit="submitDecision(true, $event)"
-		@cancel="submitDecision(false)"
-	/>
+	<div>
+		<JsonRenderInteraction
+			:payload="payload"
+			:instance-id="instanceId"
+			:values="submittedValues"
+			:read-only="submitted"
+			:status="status"
+			@submit="submitDecision(true, $event)"
+			@cancel="submitDecision(false)"
+		/>
+		<div v-if="sendFailed" class="json-render-interaction-retry" role="alert">
+			<span>{{ t('jsonRenderSendFailed') }}</span>
+			<button
+				type="button"
+				data-test-id="retry-interaction"
+				:disabled="sending"
+				@click="sendDecision"
+			>
+				{{ t('jsonRenderRetry') }}
+			</button>
+		</div>
+	</div>
 </template>
+
+<style scoped>
+.json-render-interaction-retry {
+	color: var(--color--danger, var(--el-color-danger, #f56c6c));
+}
+
+.json-render-interaction-retry button {
+	margin-left: var(--spacing--xs, 0.75rem);
+	color: inherit;
+	text-decoration: underline;
+}
+</style>

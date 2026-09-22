@@ -6,7 +6,12 @@ import type { StreamingEventHandlers } from '@n8n/chat/api/message';
 import { localStorageSessionIdKey } from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import { ChatPlugin } from '@n8n/chat/plugins/chat';
-import type { Chat, ChatOptions, LoadPreviousSessionResponse, SendMessageResponse } from '@n8n/chat/types';
+import type {
+	Chat,
+	ChatOptions,
+	LoadPreviousSessionResponse,
+	SendMessageResponse,
+} from '@n8n/chat/types';
 
 // Mock dependencies
 vi.mock('@n8n/chat/api');
@@ -103,10 +108,11 @@ describe('ChatPlugin', () => {
 			});
 
 			expect(api.sendMessage).toHaveBeenCalledOnce();
-			expect(chatStore.messages.value.map((message) => message.type === 'component' ? message.key : message.text)).toEqual([
-				'Submitted decision',
-				'Continuing',
-			]);
+			expect(
+				chatStore.messages.value.map((message) =>
+					message.type === 'component' ? message.key : message.text,
+				),
+			).toEqual(['Submitted decision', 'Continuing']);
 		});
 
 		it('should handle empty response gracefully', async () => {
@@ -179,6 +185,23 @@ describe('ChatPlugin', () => {
 				text: 'Error: Failed to receive response',
 				sender: 'bot',
 			});
+
+			consoleErrorSpy.mockRestore();
+		});
+
+		it('lets an interaction caller detect a failed send while preserving the default error message', async () => {
+			vi.mocked(api.sendMessage).mockRejectedValueOnce(new Error('Network error'));
+			const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+			await expect(
+				chatStore.sendMessage('decision', [], {
+					addToTranscript: false,
+					throwOnError: true,
+				}),
+			).rejects.toThrow('Network error');
+			expect(chatStore.messages.value).toEqual([
+				expect.objectContaining({ sender: 'bot', text: 'Error: Failed to receive response' }),
+			]);
 
 			consoleErrorSpy.mockRestore();
 		});
@@ -346,16 +369,35 @@ describe('ChatPlugin', () => {
 		});
 
 		it('restores submitted interaction cards as read-only with their values', async () => {
-			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce('existing-session');
+			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+				'existing-session',
+			);
 			vi.mocked(api.loadPreviousSession).mockResolvedValueOnce({
 				data: [
 					{
-						id: ['AIMessage'], type: 'AIMessage', lc: 1,
-						kwargs: { content: JSON.stringify({ type: 'json-render-interaction', payload: { format: 'json-render-v1' } }), additional_kwargs: {} },
+						id: ['AIMessage'],
+						type: 'AIMessage',
+						lc: 1,
+						kwargs: {
+							content: JSON.stringify({
+								type: 'json-render-interaction',
+								payload: { format: 'json-render-v1' },
+							}),
+							additional_kwargs: {},
+						},
 					},
 					{
-						id: ['HumanMessage'], type: 'HumanMessage', lc: 1,
-						kwargs: { content: JSON.stringify({ type: 'json-render-interaction-response', approved: true, value: { destination: 'Lab' } }), additional_kwargs: {} },
+						id: ['HumanMessage'],
+						type: 'HumanMessage',
+						lc: 1,
+						kwargs: {
+							content: JSON.stringify({
+								type: 'json-render-interaction-response',
+								approved: true,
+								value: { destination: 'Lab' },
+							}),
+							additional_kwargs: {},
+						},
 					},
 				],
 			});
@@ -367,17 +409,33 @@ describe('ChatPlugin', () => {
 				arguments: { resolved: { approved: true, value: { destination: 'Lab' } } },
 			});
 			expect(chatStore.messages.value[1]).toMatchObject({ sender: 'user' });
-			expect(chatStore.messages.value[1]).not.toHaveProperty('text', expect.stringContaining('json-render-interaction-response'));
+			expect(chatStore.messages.value[1]).not.toHaveProperty(
+				'text',
+				expect.stringContaining('json-render-interaction-response'),
+			);
 			expect(chatStore.blockUserInput.value).toBe(false);
 		});
 
 		it('keeps text input blocked for an unresolved restored interaction', async () => {
-			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce('existing-session');
+			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+				'existing-session',
+			);
 			vi.mocked(api.loadPreviousSession).mockResolvedValueOnce({
-				data: [{
-					id: ['AIMessage'], type: 'AIMessage', lc: 1,
-					kwargs: { content: JSON.stringify({ type: 'json-render-interaction', payload: { format: 'json-render-v1' }, blockUserInput: true }), additional_kwargs: {} },
-				}],
+				data: [
+					{
+						id: ['AIMessage'],
+						type: 'AIMessage',
+						lc: 1,
+						kwargs: {
+							content: JSON.stringify({
+								type: 'json-render-interaction',
+								payload: { format: 'json-render-v1' },
+								blockUserInput: true,
+							}),
+							additional_kwargs: {},
+						},
+					},
+				],
 			});
 
 			await chatStore.loadPreviousSession?.();

@@ -345,6 +345,10 @@ catalogs:
     undici: ^7.29.0
 
 overrides:
+  '@eit/json-render-element-plus': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus'
+  '@eit/json-render-protocol': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol'
+  '@eit/json-render-vue': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue'
+  '@eit/json-render-protocol>zod': ^4.4.3
   libphonenumber-js: npm:empty-npm-package@1.0.0
   '@browserbasehq/stagehand': npm:empty-npm-package@1.0.0
   sharp: npm:empty-npm-package@1.0.0
@@ -482,6 +486,9 @@ patchedDependencies:
   '@confluentinc/kafka-javascript@1.9.1': patches/@confluentinc__kafka-javascript@1.9.1.patch
 
 allowBuilds:
+  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#f95165c8eaade5591b9578d09cd4a59252947f4d&path:packages/element-plus': true
+  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#f95165c8eaade5591b9578d09cd4a59252947f4d&path:packages/protocol': true
+  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#f95165c8eaade5591b9578d09cd4a59252947f4d&path:packages/vue': true
   '@biomejs/biome': false
   '@confluentinc/kafka-javascript': true
   '@jitsi/robotjs': false

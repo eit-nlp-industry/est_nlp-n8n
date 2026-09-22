@@ -2,7 +2,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { type Plugin, computed, nextTick, ref, type Ref } from 'vue';
 
 import * as api from '@n8n/chat/api';
-import { ChatOptionsSymbol, ChatSymbol, MessageComponentKey, localStorageSessionIdKey } from '@n8n/chat/constants';
+import {
+	ChatOptionsSymbol,
+	ChatSymbol,
+	MessageComponentKey,
+	localStorageSessionIdKey,
+} from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import type {
 	ChatMessage,
@@ -271,7 +276,7 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 		async function sendMessage(
 			text: string,
 			files: File[] = [],
-			sendOptions: { addToTranscript?: boolean } = {},
+			sendOptions: { addToTranscript?: boolean; throwOnError?: boolean } = {},
 		): Promise<SendMessageResponse | null> {
 			if (sendOptions.addToTranscript !== false) {
 				messages.value.push(createUserMessage(text, files));
@@ -334,6 +339,7 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 				}
 			} catch (error) {
 				handleMessageError({ error, receivedMessage, messages });
+				if (sendOptions.throwOnError) throw error;
 			} finally {
 				waitingForResponse.value = false;
 			}
@@ -368,17 +374,23 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 				if (isHuman) {
 					const decision = parseInteractionResponse(content);
 					if (decision) {
-						const card = [...restored].reverse().find(
-							(item) => item.type === 'component' && item.key === MessageComponentKey.JSON_RENDER_INTERACTION && !item.arguments.resolved,
-						);
-						if (card?.type === 'component') card.arguments = { ...card.arguments, resolved: decision };
+						const card = [...restored]
+							.reverse()
+							.find(
+								(item) =>
+									item.type === 'component' &&
+									item.key === MessageComponentKey.JSON_RENDER_INTERACTION &&
+									!item.arguments.resolved,
+							);
+						if (card?.type === 'component')
+							card.arguments = { ...card.arguments, resolved: decision };
 						const labels = options.i18n?.[options.defaultLanguage ?? 'en'];
 						restored.push({
 							id: `${index}`,
 							sender: 'user',
 							text: decision.approved
-								? labels?.jsonRenderSubmittedDecision ?? 'Submitted decision'
-								: labels?.jsonRenderCancelled ?? 'Cancelled',
+								? (labels?.jsonRenderSubmittedDecision ?? 'Submitted decision')
+								: (labels?.jsonRenderCancelled ?? 'Cancelled'),
 						});
 						continue;
 					}
@@ -389,11 +401,14 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 			}
 			messages.value = restored;
 			const lastBotMessage = [...restored].reverse().find((message) => message.sender === 'bot');
-			blockUserInput.value = lastBotMessage?.type === 'component' &&
+			blockUserInput.value =
+				lastBotMessage?.type === 'component' &&
 				lastBotMessage.key === MessageComponentKey.JSON_RENDER_INTERACTION &&
 				lastBotMessage.arguments.resolved
-				? false
-				: lastBotMessage ? shouldBlockUserInput(lastBotMessage) : false;
+					? false
+					: lastBotMessage
+						? shouldBlockUserInput(lastBotMessage)
+						: false;
 
 			// Always set currentSessionId to preserve manually set sessionIds
 			currentSessionId.value = sessionId;

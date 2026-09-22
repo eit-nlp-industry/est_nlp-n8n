@@ -15,7 +15,7 @@ export interface Chat {
 	sendMessage: (
 		text: string,
 		files?: File[],
-		options?: { addToTranscript?: boolean },
+		options?: { addToTranscript?: boolean; throwOnError?: boolean },
 	) => Promise<SendMessageResponse | null>;
 	ws?: WebSocket | null;
 }

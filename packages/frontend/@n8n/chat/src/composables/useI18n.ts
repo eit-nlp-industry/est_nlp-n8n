@@ -1,7 +1,7 @@
 import { isRef } from 'vue';
 
 import { useOptions } from '@n8n/chat/composables/useOptions';
-import { defaultOptions } from '@n8n/chat/constants/defaults';
+import { defaultI18n } from '@n8n/chat/constants/defaultI18n';
 
 export function useI18n() {
 	const { options } = useOptions();
@@ -14,7 +14,7 @@ export function useI18n() {
 		}
 		if (typeof fromOptions === 'string') return fromOptions;
 
-		const fromDefaults = defaultOptions.i18n?.[language]?.[key] ?? defaultOptions.i18n?.en?.[key];
+		const fromDefaults = defaultI18n[language]?.[key] ?? defaultI18n.en?.[key];
 		if (isRef(fromDefaults)) {
 			return fromDefaults.value as string;
 		}
@@ -24,8 +24,8 @@ export function useI18n() {
 	function te(key: string): boolean {
 		return (
 			!!options?.i18n?.[language]?.[key] ||
-			!!defaultOptions.i18n?.[language]?.[key] ||
-			!!defaultOptions.i18n?.en?.[key]
+			!!defaultI18n[language]?.[key] ||
+			!!defaultI18n.en?.[key]
 		);
 	}
 

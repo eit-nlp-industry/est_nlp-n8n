@@ -142,13 +142,13 @@ export class Chat implements INodeType {
 					{
 						name: 'Dashboard',
 						value: 'dashboard',
-						description: 'Send a json-render dashboard from the previous node output ($json.payload)',
+						description: "Send a dashboard from the previous node's payload field",
 					},
 					{
 						name: 'Interaction',
 						value: 'interaction',
 						description:
-							'Send a json-render interaction form from the previous node output ($json.payload) and wait for submission',
+							"Send an interaction form from the previous node's payload field and wait for submission",
 					},
 				],
 				displayOptions: {
