@@ -168,6 +168,7 @@
       "dist/nodes/text_splitters/TextSplitterRecursiveCharacterTextSplitter/TextSplitterRecursiveCharacterTextSplitter.node.js",
       "dist/nodes/text_splitters/TextSplitterTokenSplitter/TextSplitterTokenSplitter.node.js",
       "dist/nodes/tools/RenderDashboard/RenderDashboard.node.js",
+      "dist/nodes/tools/RenderInteraction/RenderInteraction.node.js",
       "dist/nodes/tools/ToolCalculator/ToolCalculator.node.js",
       "dist/nodes/tools/ToolCode/ToolCode.node.js",
       "dist/nodes/tools/ToolHttpRequest/ToolHttpRequest.node.js",
@@ -236,6 +237,7 @@
     "vitest-mock-extended": "catalog:"
   },
   "dependencies": {
+    "@eit/json-render-protocol": "link:../../../../eit-json-render/packages/protocol",
     "@aws-sdk/client-bedrock-runtime": "3.938.0",
     "@aws-sdk/client-sso-oidc": "3.808.0",
     "@aws-sdk/credential-providers": "3.808.0",

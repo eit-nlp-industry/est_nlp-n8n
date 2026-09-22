@@ -1,11 +1,12 @@
 import { executeTool } from '../../../__tests__/tool-test-utils';
 import { buildRenderUiDashboardPayload } from '../render-ui.payload';
 import { createRenderUiTool } from '../render-ui.tool';
+import type { RenderUiOutput } from '../render-ui.schema';
 
 describe('render-ui tool', () => {
 	it('returns a json-render-v1 Card + Metric + Table payload', async () => {
 		const tool = createRenderUiTool();
-		const result = await executeTool(tool, {
+		const result = await executeTool<RenderUiOutput>(tool, {
 			title: 'Weather snapshot',
 			description: 'Demo cities',
 			metrics: [{ label: 'Shanghai', value: '22°C', trend: 'up', trendLabel: '+2°' }],
@@ -31,6 +32,6 @@ describe('render-ui tool', () => {
 			metrics: [{ label: 'Total', value: '10' }],
 		});
 		expect(payload.spec.elements.description).toBeUndefined();
-		expect(payload.spec.elements.metrics?.children).toEqual(['metric-0']);
+		expect(payload.spec.elements.metrics).toMatchObject({ children: ['metric-0'] });
 	});
 });

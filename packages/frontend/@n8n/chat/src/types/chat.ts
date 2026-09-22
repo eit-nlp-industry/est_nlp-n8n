@@ -12,6 +12,10 @@ export interface Chat {
 	blockUserInput: Ref<boolean>;
 	loadPreviousSession?: () => Promise<string | undefined>;
 	startNewSession?: () => Promise<void>;
-	sendMessage: (text: string, files?: File[]) => Promise<SendMessageResponse | null>;
+	sendMessage: (
+		text: string,
+		files?: File[],
+		options?: { addToTranscript?: boolean },
+	) => Promise<SendMessageResponse | null>;
 	ws?: WebSocket | null;
 }

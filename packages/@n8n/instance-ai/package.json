@@ -63,6 +63,7 @@
     }
   },
   "dependencies": {
+    "@eit/json-render-protocol": "link:../../../../eit-json-render/packages/protocol",
     "@daytona/sdk": "catalog:",
     "@e965/xlsx": "catalog:",
     "@n8n/agents": "workspace:*",

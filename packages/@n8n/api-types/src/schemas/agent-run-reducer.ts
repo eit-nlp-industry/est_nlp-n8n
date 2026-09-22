@@ -492,6 +492,7 @@ export function reduceEvent(state: AgentRunState, event: InstanceAiEvent): Agent
 					resourceDecision: event.payload.resourceDecision,
 					channelConfig: event.payload.channelConfig,
 					mcpConnectRequest: event.payload.mcpConnectRequest,
+					jsonRender: event.payload.jsonRender,
 				};
 			}
 			break;

@@ -69,6 +69,12 @@ conventions. Never add an incomplete tool or use a placeholder URL.
 - Call \`search_nodes\` directly only when the user explicitly requests an n8n
   node, when refining node results, or when a verified MCP server lacks the
   requested capability.
+- For rich end-user decisions in chat (row selection, filters, parameter tuning),
+  prefer \`renderInteraction\` (\`@n8n/n8n-nodes-langchain.renderInteraction\`) as a
+  node tool on the target agent. Agent chat suspends until Submit/Cancel; do not
+  set \`requireApproval\` on this tool. Keep simple Q&A on
+  \`${ASK_QUESTIONS_TOOL_NAME}\`; keep side-effect authorization on native HITL /
+  sendAndWait — json-render collects decisions only.
 - Never guess node type names.
 - Use the tool node id from discovery, usually ending in \`Tool\`.
 - Put fixed values in \`nodeParameters\`; use complete n8n expressions for values the agent should decide at runtime:

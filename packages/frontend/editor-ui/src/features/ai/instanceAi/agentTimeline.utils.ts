@@ -8,6 +8,26 @@ import { isActiveBuilderAgent, isBuilderAgent } from './builderAgents';
 /** Tool calls that are internal bookkeeping and should not be shown to the user. */
 export const HIDDEN_TOOLS = new Set(['updateWorkingMemory']);
 
+export function getResolvedInteractionDecision(
+	toolCall: InstanceAiToolCallState,
+	local?: { status: 'submitted' | 'cancelled'; values?: Record<string, unknown> },
+) {
+	if (local) return local;
+	const result = toolCall.result;
+	if (result && typeof result === 'object' && !Array.isArray(result)) {
+		if ('decided' in result && result.decided === false) return { status: 'cancelled' as const };
+		if ('decided' in result && result.decided === true && 'value' in result) {
+			const values = result.value;
+			if (values && typeof values === 'object' && !Array.isArray(values)) {
+				return { status: 'submitted' as const, values: { ...values } };
+			}
+		}
+	}
+	if (toolCall.confirmationStatus === 'approved') return { status: 'submitted' as const };
+	if (toolCall.confirmationStatus === 'denied') return { status: 'cancelled' as const };
+	return undefined;
+}
+
 /** Render hints whose tool calls produce no output in the timeline — they are
  *  represented elsewhere (child agent sections, artifact cards). */
 const INVISIBLE_RENDER_HINTS = new Set(['data-table', 'eval-setup']);
@@ -46,6 +66,7 @@ export type TimelineBlock =
 	| { type: 'text'; key: string; entry: TextEntry }
 	| { type: 'tasks'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'json-render'; key: string; toolCall: InstanceAiToolCallState }
+	| { type: 'json-render-interaction'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'json-render-answer'; key: string; toolCalls: InstanceAiToolCallState[] }
 	| { type: 'plan-review'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'mcp-connect'; key: string; toolCall: InstanceAiToolCallState }
@@ -57,6 +78,7 @@ type ToolCallKind =
 	| 'hidden'
 	| 'tasks'
 	| 'json-render'
+	| 'json-render-interaction'
 	| 'plan-review'
 	| 'mcp-connect'
 	| 'questions'
@@ -76,6 +98,8 @@ function classifyToolCall(tc: InstanceAiToolCallState): ToolCallKind {
 	if (HIDDEN_TOOLS.has(tc.toolName)) return 'hidden';
 	if (tc.renderHint === 'tasks') return 'tasks';
 	if (tc.renderHint === 'json-render' || tc.toolName === 'render-ui') return 'json-render';
+	if (tc.confirmation?.inputType === 'json-render' && tc.confirmation.jsonRender)
+		return 'json-render-interaction';
 	if (tc.renderHint === 'builder' && tc.toolName.endsWith('-with-agent')) return 'hidden';
 	if (tc.renderHint && INVISIBLE_RENDER_HINTS.has(tc.renderHint)) return 'hidden';
 	if (tc.confirmation?.inputType === 'plan-review') return 'plan-review';
@@ -224,6 +248,9 @@ export function buildTimelineBlocks(
 				return;
 			case 'json-render':
 				pushStandalone({ type: 'json-render', key: `json-render-${idx}`, toolCall: tc });
+				return;
+			case 'json-render-interaction':
+				pushStandalone({ type: 'json-render-interaction', key: `json-render-interaction-${idx}`, toolCall: tc });
 				return;
 			case 'plan-review':
 				pushStandalone({ type: 'plan-review', key: `plan-${idx}`, toolCall: tc });

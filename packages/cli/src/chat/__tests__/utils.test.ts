@@ -488,6 +488,30 @@ describe('shouldResumeImmediately', () => {
 		expect(result).toBe(true);
 	});
 
+	it('should return false when Chat send uses json-render interaction', () => {
+		const node = createMockNode({
+			type: CHAT_NODE_TYPE,
+			parameters: {
+				operation: 'send',
+				responseContentType: 'interaction',
+			},
+		});
+		const result = shouldResumeImmediately(node);
+		expect(result).toBe(false);
+	});
+
+	it('should return false when Chat tool send uses json-render interaction', () => {
+		const node = createMockNode({
+			type: CHAT_TOOL_NODE_TYPE,
+			parameters: {
+				operation: 'send',
+				responseContentType: 'interaction',
+			},
+		});
+		const result = shouldResumeImmediately(node);
+		expect(result).toBe(false);
+	});
+
 	it('should return true operation is not SEND_AND_WAIT_OPERATION and node type is CHAT_TOOL_NODE_TYPE', () => {
 		const node = createMockNode({
 			type: CHAT_TOOL_NODE_TYPE,

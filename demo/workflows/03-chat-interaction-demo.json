@@ -1,0 +1,114 @@
+{
+	"name": "Chat Interaction Demo",
+	"nodes": [
+		{
+			"parameters": {
+				"options": {
+					"responseMode": "responseNodes"
+				}
+			},
+			"type": "@n8n/n8n-nodes-langchain.chatTrigger",
+			"typeVersion": 1.4,
+			"position": [0, 0],
+			"id": "chat-trigger",
+			"name": "When chat message received"
+		},
+		{
+			"parameters": {
+				"title": "Failed executions",
+				"description": "Review the failures below, then choose which executions to retry.",
+				"metrics": {
+					"metrics": [
+						{
+							"label": "Failed (24h)",
+							"value": "12",
+							"trend": "down",
+							"trendLabel": "-3"
+						},
+						{
+							"label": "Affected workflows",
+							"value": "4",
+							"trend": "neutral"
+						}
+					]
+				},
+				"tableColumns": ["ID", "Workflow", "Error"],
+				"tableRows": "[[\"ex-101\",\"Orders sync\",\"Timeout\"],[\"ex-102\",\"Inventory\",\"Auth failed\"],[\"ex-103\",\"Reports\",\"Rate limit\"]]",
+				"fields": {
+					"field": [
+						{
+							"key": "executionIds",
+							"label": "Executions to retry",
+							"type": "multipleSelect",
+							"options": {
+								"option": [
+									{ "value": "ex-101", "label": "ex-101 — Orders sync" },
+									{ "value": "ex-102", "label": "ex-102 — Inventory" },
+									{ "value": "ex-103", "label": "ex-103 — Reports" }
+								]
+							},
+							"defaultValues": "[\"ex-101\"]"
+						},
+						{
+							"key": "maxRetries",
+							"label": "Max retries",
+							"type": "inputNumber",
+							"defaultValue": "2"
+						}
+					]
+				}
+			},
+			"type": "@n8n/n8n-nodes-langchain.renderInteraction",
+			"typeVersion": 1,
+			"position": [260, 0],
+			"id": "render-interaction",
+			"name": "Render Interaction"
+		},
+		{
+			"parameters": {
+				"responseContentType": "interaction"
+			},
+			"type": "@n8n/n8n-nodes-langchain.chat",
+			"typeVersion": 1.3,
+			"position": [520, 0],
+			"id": "chat-interaction",
+			"name": "Chat Interaction"
+		},
+		{
+			"parameters": {
+				"jsCode": "const raw = $json.chatInput ?? '';\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch {\n  return [{ json: { approved: false, summary: 'Could not parse interaction response.' } }];\n}\n\nif (!parsed.approved) {\n  return [{ json: { approved: false, summary: 'Decision cancelled — no retries scheduled.' } }];\n}\n\nconst ids = parsed.value?.executionIds ?? [];\nconst retries = parsed.value?.maxRetries ?? 0;\n\nreturn [{\n  json: {\n    approved: true,\n    executionIds: ids,\n    maxRetries: retries,\n    summary: `Decision recorded: retry ${ids.join(', ') || '(none)'} up to ${retries} time(s). (Demo only — no executions were started.)`\n  }\n}];"
+			},
+			"type": "n8n-nodes-base.code",
+			"typeVersion": 2,
+			"position": [780, 0],
+			"id": "parse-decision",
+			"name": "Parse Decision"
+		},
+		{
+			"parameters": {
+				"message": "={{ $json.summary }}"
+			},
+			"type": "@n8n/n8n-nodes-langchain.chat",
+			"typeVersion": 1.3,
+			"position": [1040, 0],
+			"id": "chat-summary",
+			"name": "Chat Summary"
+		}
+	],
+	"connections": {
+		"When chat message received": {
+			"main": [[{ "node": "Render Interaction", "type": "main", "index": 0 }]]
+		},
+		"Render Interaction": {
+			"main": [[{ "node": "Chat Interaction", "type": "main", "index": 0 }]]
+		},
+		"Chat Interaction": {
+			"main": [[{ "node": "Parse Decision", "type": "main", "index": 0 }]]
+		},
+		"Parse Decision": {
+			"main": [[{ "node": "Chat Summary", "type": "main", "index": 0 }]]
+		}
+	},
+	"active": false,
+	"pinData": {}
+}

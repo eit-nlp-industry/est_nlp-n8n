@@ -26,7 +26,12 @@ export function extractJsonRenderPayload(result: unknown): JsonRenderPayload | n
 }
 
 export function isJsonRenderToolName(toolName: string): boolean {
-	return /render[_-]?dashboard|render[_-]?ui/i.test(toolName);
+	return /render[_-]?dashboard|render[_-]?ui|render[_-]?interaction/i.test(toolName);
+}
+
+function isJsonRenderInteractionToolCall(toolCall: ToolCall): boolean {
+	if (/render[_-]?interaction/i.test(toolCall.tool)) return true;
+	return isRecord(toolCall.suspendPayload) && toolCall.suspendPayload.type === 'json-render-interaction';
 }
 
 export function collectJsonRenderCards(
@@ -36,6 +41,8 @@ export function collectJsonRenderCards(
 	const cards: JsonRenderCardToolCall[] = [];
 
 	for (const toolCall of toolCalls) {
+		if (isJsonRenderInteractionToolCall(toolCall)) continue;
+
 		const payload = extractJsonRenderPayload(toolCall.output);
 		const named = isJsonRenderToolName(toolCall.tool);
 		const loading =
@@ -65,7 +72,7 @@ export function collectJsonRenderCards(
 }
 
 function unwrapJsonRenderPayload(value: unknown, depth: number): JsonRenderPayload | null {
-	if (depth > MAX_UNWRAP_DEPTH || value == null) return null;
+	if (depth > MAX_UNWRAP_DEPTH || value === null || value === undefined) return null;
 
 	if (typeof value === 'string') {
 		const trimmed = value.trim();

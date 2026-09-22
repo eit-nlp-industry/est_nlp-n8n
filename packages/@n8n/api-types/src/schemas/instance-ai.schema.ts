@@ -643,6 +643,7 @@ export const confirmationInputTypeSchema = z.enum([
 	'plan-review',
 	'resource-decision',
 	'continue',
+	'json-render',
 ]);
 export type InstanceAiConfirmationInputType = z.infer<typeof confirmationInputTypeSchema>;
 
@@ -739,6 +740,10 @@ export const confirmationRequestPayloadSchema = z.object({
 	mcpConnectRequest: mcpConnectRequestSchema
 		.optional()
 		.describe('When present, renders the inline "Available tools" MCP connect card'),
+	jsonRender: z
+		.record(z.string(), z.unknown())
+		.optional()
+		.describe('json-render payload for decision UI (inputType=json-render)'),
 });
 export type InstanceAiConfirmationRequestPayload = z.infer<typeof confirmationRequestPayloadSchema>;
 
@@ -786,6 +791,8 @@ export function isDisplayableConfirmationRequest(
 			return hasItems(payload.planItems) || argsContainPlannedTasks(payload.args);
 		case 'resource-decision':
 			return payload.resourceDecision !== undefined;
+		case 'json-render':
+			return payload.jsonRender !== undefined;
 		default:
 			return assertNever(inputType);
 	}
@@ -1384,7 +1391,14 @@ export interface InstanceAiConfirmation {
 	credentialRequests?: InstanceAiCredentialRequest[];
 	requireUserSelection?: boolean;
 	projectId?: string;
-	inputType?: 'approval' | 'text' | 'questions' | 'plan-review' | 'resource-decision' | 'continue';
+	inputType?:
+		| 'approval'
+		| 'text'
+		| 'questions'
+		| 'plan-review'
+		| 'resource-decision'
+		| 'continue'
+		| 'json-render';
 	domainAccess?: DomainAccessMeta;
 	webSearch?: WebSearchMeta;
 	credentialFlow?: InstanceAiCredentialFlow;
@@ -1402,6 +1416,7 @@ export interface InstanceAiConfirmation {
 	resourceDecision?: GatewayConfirmationRequiredPayload;
 	channelConfig?: InstanceAiChannelConfig;
 	mcpConnectRequest?: InstanceAiMcpConnectRequest;
+	jsonRender?: Record<string, unknown>;
 	expired?: boolean;
 }
 

@@ -44,6 +44,7 @@
     "@eit/json-render-vue": "link:../../../../../eit-json-render/packages/vue",
     "@n8n/design-system": "workspace:*",
     "@vueuse/core": "catalog:frontend",
+    "element-plus": "catalog:frontend",
     "highlight.js": "catalog:frontend",
     "markdown-it": "catalog:",
     "markdown-it-link-attributes": "catalog:",

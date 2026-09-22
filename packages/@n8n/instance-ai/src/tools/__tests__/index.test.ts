@@ -239,6 +239,10 @@ describe('domain tool construction', () => {
 		expect(ALWAYS_LOADED_TOOL_NAMES.has('render-ui')).toBe(true);
 	});
 
+	it('never defers collect-decision behind search_tools', () => {
+		expect(ALWAYS_LOADED_TOOL_NAMES.has('collect-decision')).toBe(true);
+	});
+
 	it('registers create-tasks but not the removed plan orchestration tool', () => {
 		const context = makeContext({
 			workflowTaskService: {},

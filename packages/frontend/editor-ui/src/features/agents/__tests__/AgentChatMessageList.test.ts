@@ -638,6 +638,74 @@ describe('AgentChatMessageList', () => {
 		expect(cards[0].attributes('data-run-id')).toBe('run-active');
 	});
 
+	it('renders an open json-render form even when the resume run id is missing', () => {
+		const wrapper = mount(AgentChatMessageList, {
+			props: {
+				messages: [
+					{
+						id: 'assistant-json-render-open',
+						role: 'assistant',
+						content: '',
+						interactives: [
+							{
+								toolName: 'json-render-interaction',
+								toolCallId: 'tc-json-render-open',
+								input: {
+									type: 'json-render-interaction',
+									jsonRender: {
+										format: 'json-render-v1',
+										spec: { root: 'root', elements: {} },
+									},
+								},
+							},
+						],
+						status: 'awaitingUser',
+					} satisfies ChatMessage,
+				],
+				messagingState: 'idle',
+			},
+		});
+
+		const cards = wrapper.findAll('[data-testid="interactive-card-stub"]');
+		expect(cards).toHaveLength(1);
+		expect(cards[0].attributes('data-tool-call-id')).toBe('tc-json-render-open');
+	});
+
+	it('retains resolved json-render interaction cards in the transcript', () => {
+		const wrapper = mount(AgentChatMessageList, {
+			props: {
+				messages: [
+					{
+						id: 'assistant-json-render-resolved',
+						role: 'assistant',
+						content: '',
+						interactives: [
+							{
+								toolName: 'json-render-interaction',
+								toolCallId: 'tc-json-render-resolved',
+								resolvedAt: 1,
+								resolvedValue: { approved: true, value: { destination: 'Lab' } },
+								input: {
+									type: 'json-render-interaction',
+									jsonRender: {
+										format: 'json-render-v1',
+										spec: { root: 'root', elements: {} },
+									},
+								},
+							},
+						],
+						status: 'success',
+					} satisfies ChatMessage,
+				],
+				messagingState: 'idle',
+			},
+		});
+
+		expect(wrapper.find('[data-testid="interactive-card-stub"]').attributes('data-tool-call-id')).toBe(
+			'tc-json-render-resolved',
+		);
+	});
+
 	it('does not render external-wait notice for suspended chat_action tool (toolRun path)', () => {
 		// isGroupable: role=assistant, toolCalls.length>0, content is empty → toolRun group
 		const wrapper = mount(AgentChatMessageList, {

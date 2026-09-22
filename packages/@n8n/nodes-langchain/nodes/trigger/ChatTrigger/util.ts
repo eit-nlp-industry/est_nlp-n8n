@@ -147,6 +147,14 @@ export function getChatMessage(ctx: IExecuteFunctions): ChatNodeMessage {
 		};
 	}
 
+	if (responseContentType === 'interaction') {
+		return {
+			type: ChatNodeMessageType.JSON_RENDER_INTERACTION,
+			payload: getDashboardPayloadFromInput(ctx),
+			blockUserInput: true,
+		};
+	}
+
 	if (nodeVersion < 1.1) {
 		return message;
 	}

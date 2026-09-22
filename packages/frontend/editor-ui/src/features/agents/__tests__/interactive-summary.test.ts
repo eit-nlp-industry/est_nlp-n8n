@@ -108,3 +108,18 @@ describe('summariseToolCall — n8n_chat_action', () => {
 		expect(summariseToolCall(N8N_CHAT_ACTION_TOOL_NAME, { ok: true }, cardInput)).toBeUndefined();
 	});
 });
+
+describe('summariseToolCall — json-render interaction', () => {
+	it('summarises submitted form values', () => {
+		expect(
+			summariseToolCall('render_interaction', {
+				decided: true,
+				value: { next_action: 'go', destination: '110实验室' },
+			}),
+		).toBe('next_action=go, destination=110实验室');
+	});
+
+	it('summarises a cancelled decision', () => {
+		expect(summariseToolCall('render_interaction', { decided: false })).toBe('Cancelled');
+	});
+});

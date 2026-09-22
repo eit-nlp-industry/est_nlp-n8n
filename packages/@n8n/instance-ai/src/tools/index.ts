@@ -77,6 +77,10 @@ const loadAskUserTool = lazyMod(
 const loadRenderUiTool = lazyMod(
 	() => require('./render-ui/render-ui.tool') as typeof import('./render-ui/render-ui.tool'),
 );
+const loadCollectDecisionTool = lazyMod(
+	() =>
+		require('./collect-decision/collect-decision.tool') as typeof import('./collect-decision/collect-decision.tool'),
+);
 const loadTaskControlTool = lazyMod(
 	() => require('./task-control.tool') as typeof import('./task-control.tool'),
 );
@@ -112,6 +116,7 @@ export function createAllTools(context: InstanceAiContext): InstanceAiToolRegist
 		[DOMAIN_TOOL_IDS.NODES, loadNodesTool().createNodesTool(context)],
 		[DOMAIN_TOOL_IDS.ASK_USER, loadAskUserTool().createAskUserTool()],
 		[DOMAIN_TOOL_IDS.RENDER_UI, loadRenderUiTool().createRenderUiTool()],
+		[DOMAIN_TOOL_IDS.COLLECT_DECISION, loadCollectDecisionTool().createCollectDecisionTool()],
 		[DOMAIN_TOOL_IDS.BUILD_WORKFLOW, loadBuildWorkflowTool().createBuildWorkflowTool(context)],
 	];
 
@@ -146,6 +151,7 @@ export function createOrchestratorDomainTools(context: InstanceAiContext): Insta
 		[DOMAIN_TOOL_IDS.NODES, loadNodesTool().createNodesTool(context)],
 		[DOMAIN_TOOL_IDS.ASK_USER, loadAskUserTool().createAskUserTool()],
 		[DOMAIN_TOOL_IDS.RENDER_UI, loadRenderUiTool().createRenderUiTool()],
+		[DOMAIN_TOOL_IDS.COLLECT_DECISION, loadCollectDecisionTool().createCollectDecisionTool()],
 		[DOMAIN_TOOL_IDS.BUILD_WORKFLOW, loadBuildWorkflowTool().createBuildWorkflowTool(context)],
 	];
 

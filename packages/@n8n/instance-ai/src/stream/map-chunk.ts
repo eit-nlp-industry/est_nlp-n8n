@@ -219,7 +219,8 @@ type ConfirmationInputType =
 	| 'questions'
 	| 'plan-review'
 	| 'resource-decision'
-	| 'continue';
+	| 'continue'
+	| 'json-render';
 
 /** A non-empty string, or undefined for anything else (matches the legacy `value ? value : undefined` gate). */
 function presentString(value: unknown): string | undefined {
@@ -256,6 +257,7 @@ function parseInputType(value: unknown): ConfirmationInputType | undefined {
 		'plan-review',
 		'resource-decision',
 		'continue',
+		'json-render',
 	] as const;
 	return (valid as readonly string[]).includes(raw ?? '')
 		? (raw as (typeof valid)[number])
@@ -350,6 +352,7 @@ function mapSuspendedChunk(
 		suspendPayload.mcpConnectRequest,
 		mcpConnectRequestSchema,
 	);
+	const jsonRender = isRecord(suspendPayload.jsonRender) ? suspendPayload.jsonRender : undefined;
 	const targetApprovalResult = isRecord(suspendPayload.builderCheckpoint)
 		? APPROVAL_SUSPEND_SCHEMA.safeParse(suspendPayload)
 		: undefined;
@@ -393,6 +396,7 @@ function mapSuspendedChunk(
 			...(resourceDecision ? { resourceDecision } : {}),
 			...(channelConfig ? { channelConfig } : {}),
 			...(mcpConnectRequest ? { mcpConnectRequest } : {}),
+			...(jsonRender ? { jsonRender } : {}),
 		},
 	};
 }

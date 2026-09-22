@@ -144,6 +144,12 @@ export class Chat implements INodeType {
 						value: 'dashboard',
 						description: 'Send a json-render dashboard from the previous node output ($json.payload)',
 					},
+					{
+						name: 'Interaction',
+						value: 'interaction',
+						description:
+							'Send a json-render interaction form from the previous node output ($json.payload) and wait for submission',
+					},
 				],
 				displayOptions: {
 					show: {
@@ -407,7 +413,8 @@ export class Chat implements INodeType {
 			const responseText =
 				typeof message === 'string'
 					? message
-					: message.type === ChatNodeMessageType.JSON_RENDER
+					: message.type === ChatNodeMessageType.JSON_RENDER ||
+							message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
 						? JSON.stringify(message.payload)
 						: message.text;
 			this.customData.set(getHighlightedResponseKey(this.getNode().name), responseText);
@@ -422,7 +429,8 @@ export class Chat implements INodeType {
 				const text =
 					typeof message === 'string'
 						? message
-						: message.type === ChatNodeMessageType.JSON_RENDER
+						: message.type === ChatNodeMessageType.JSON_RENDER ||
+								message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
 							? JSON.stringify(message.payload)
 							: message.text;
 				await memory.chatHistory.addAIMessage(text);

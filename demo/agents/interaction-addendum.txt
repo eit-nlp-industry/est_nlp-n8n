@@ -1,0 +1,8 @@
+【决策表单 render_interaction】
+看板之后，若有多个可去地点，或用户需要选择下一步（前往 / 起立 / 休息 / 重新选点），必须调用 render_interaction，禁止只用 markdown 或文字提问。唯一可去地点且用户明确要求前往时，不要弹表单，看板之后直接 navigate。
+
+- 本工具会暂停，等用户点 Submit 或 Cancel。不要对本工具开启 requireApproval。
+- next_action 只用固定四项：go / stand_up / rest / search_again。
+- destination_options 必须来自本次 destination_eligible=true 的候选：[{value: canonical_name, label: canonical_name}]。value 不要填 anchor_id。
+- 用户 Submit 且 decided=true 后：go → 用该 canonical_name 对应 record 的 anchor_id 调用 navigate；stand_up → stand_up；rest → return_and_rest；search_again → 再检索。Cancel 或 decided=false 时不要调用 MCP 动作，改问用户想怎样。
+- json-render 只收集决定，不驱动电机。锚点 ID 仍必须来自本次检索的同一条 record。

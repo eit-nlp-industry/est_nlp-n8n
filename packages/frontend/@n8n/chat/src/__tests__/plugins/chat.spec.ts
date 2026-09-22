@@ -6,7 +6,7 @@ import type { StreamingEventHandlers } from '@n8n/chat/api/message';
 import { localStorageSessionIdKey } from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import { ChatPlugin } from '@n8n/chat/plugins/chat';
-import type { Chat, ChatOptions, LoadPreviousSessionResponse } from '@n8n/chat/types';
+import type { Chat, ChatOptions, LoadPreviousSessionResponse, SendMessageResponse } from '@n8n/chat/types';
 
 // Mock dependencies
 vi.mock('@n8n/chat/api');
@@ -94,6 +94,21 @@ describe('ChatPlugin', () => {
 			});
 		});
 
+		it('sends an interaction response without adding its transport envelope to the transcript', async () => {
+			vi.mocked(api.sendMessage).mockResolvedValueOnce({ output: 'Continuing' });
+			chatStore.messages.value.push({ id: 'decision', sender: 'user', text: 'Submitted decision' });
+
+			await chatStore.sendMessage('{"type":"json-render-interaction-response"}', [], {
+				addToTranscript: false,
+			});
+
+			expect(api.sendMessage).toHaveBeenCalledOnce();
+			expect(chatStore.messages.value.map((message) => message.type === 'component' ? message.key : message.text)).toEqual([
+				'Submitted decision',
+				'Continuing',
+			]);
+		});
+
 		it('should handle empty response gracefully', async () => {
 			const mockResponse = {};
 			vi.mocked(api.sendMessage).mockResolvedValueOnce(mockResponse);
@@ -117,6 +132,33 @@ describe('ChatPlugin', () => {
 				text: 'Response text',
 				sender: 'bot',
 			});
+		});
+
+		it('should render a json-render-interaction HTTP response as a component', async () => {
+			const mockResponse = {
+				type: 'json-render-interaction',
+				blockUserInput: true,
+				payload: {
+					format: 'json-render-v1',
+					spec: { root: 'root', elements: { root: { type: 'Card', props: { title: 'Demo' } } } },
+				},
+			};
+			vi.mocked(api.sendMessage).mockResolvedValueOnce(
+				mockResponse as unknown as SendMessageResponse,
+			);
+
+			await chatStore.sendMessage('show failed executions');
+
+			expect(chatStore.messages.value[1]).toMatchObject({
+				sender: 'bot',
+				type: 'component',
+				key: 'json-render-interaction',
+				arguments: {
+					payload: mockResponse.payload,
+					blockUserInput: true,
+				},
+			});
+			expect(chatStore.blockUserInput.value).toBe(true);
 		});
 
 		it('should handle errors during message sending', async () => {
@@ -294,13 +336,54 @@ describe('ChatPlugin', () => {
 			expect(chatStore.messages.value).toHaveLength(2);
 			expect(chatStore.messages.value[0]).toMatchObject({
 				text: 'Previous user message',
-				sender: 'bot', // Both will be 'bot' because id is an array, not a string
+				sender: 'user',
 			});
 			expect(chatStore.messages.value[1]).toMatchObject({
 				text: 'Previous bot message',
 				sender: 'bot',
 			});
 			expect(chatStore.currentSessionId.value).toBe(mockSessionId);
+		});
+
+		it('restores submitted interaction cards as read-only with their values', async () => {
+			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce('existing-session');
+			vi.mocked(api.loadPreviousSession).mockResolvedValueOnce({
+				data: [
+					{
+						id: ['AIMessage'], type: 'AIMessage', lc: 1,
+						kwargs: { content: JSON.stringify({ type: 'json-render-interaction', payload: { format: 'json-render-v1' } }), additional_kwargs: {} },
+					},
+					{
+						id: ['HumanMessage'], type: 'HumanMessage', lc: 1,
+						kwargs: { content: JSON.stringify({ type: 'json-render-interaction-response', approved: true, value: { destination: 'Lab' } }), additional_kwargs: {} },
+					},
+				],
+			});
+
+			await chatStore.loadPreviousSession?.();
+
+			expect(chatStore.messages.value[0]).toMatchObject({
+				type: 'component',
+				arguments: { resolved: { approved: true, value: { destination: 'Lab' } } },
+			});
+			expect(chatStore.messages.value[1]).toMatchObject({ sender: 'user' });
+			expect(chatStore.messages.value[1]).not.toHaveProperty('text', expect.stringContaining('json-render-interaction-response'));
+			expect(chatStore.blockUserInput.value).toBe(false);
+		});
+
+		it('keeps text input blocked for an unresolved restored interaction', async () => {
+			(window.localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValueOnce('existing-session');
+			vi.mocked(api.loadPreviousSession).mockResolvedValueOnce({
+				data: [{
+					id: ['AIMessage'], type: 'AIMessage', lc: 1,
+					kwargs: { content: JSON.stringify({ type: 'json-render-interaction', payload: { format: 'json-render-v1' }, blockUserInput: true }), additional_kwargs: {} },
+				}],
+			});
+
+			await chatStore.loadPreviousSession?.();
+
+			expect(chatStore.messages.value[0]).toMatchObject({ type: 'component' });
+			expect(chatStore.blockUserInput.value).toBe(true);
 		});
 
 		it('should create new session if no previous session exists', async () => {

@@ -30,7 +30,7 @@
 			// `.d.ts` and reintroduces the "two unrelated VectorStore types" error.
 			"@langchain/core/vectorstores": ["./node_modules/@langchain/core/dist/vectorstores.d.cts"],
 			"@eit/json-render-protocol": [
-				"../../../../eit-json-render/packages/protocol/src/index.ts"
+				"../../../../eit-json-render/packages/protocol/dist/index.d.ts"
 			]
 		},
 		"emitDecoratorMetadata": true,

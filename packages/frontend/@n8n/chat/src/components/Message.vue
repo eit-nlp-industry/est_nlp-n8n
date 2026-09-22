@@ -34,7 +34,9 @@ const classes = computed(() => {
 		'chat-message-transparent': message.value.transparent === true,
 		'chat-message-component': message.value.type === 'component',
 		'chat-message-json-render':
-			message.value.type === 'component' && message.value.key === MessageComponentKey.JSON_RENDER,
+			message.value.type === 'component' &&
+			(message.value.key === MessageComponentKey.JSON_RENDER ||
+				message.value.key === MessageComponentKey.JSON_RENDER_INTERACTION),
 	};
 });
 

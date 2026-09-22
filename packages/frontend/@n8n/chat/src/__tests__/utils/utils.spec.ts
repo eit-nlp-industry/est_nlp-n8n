@@ -67,6 +67,31 @@ describe('utils', () => {
 			});
 		});
 
+		it('should parse a json-render interaction message', () => {
+			const jsonMessage = {
+				type: 'json-render-interaction',
+				blockUserInput: true,
+				payload: {
+					format: 'json-render-v1',
+					meta: { dynamicForm: { fields: [] } },
+					spec: { root: 'root', elements: { root: { type: 'Card', props: { title: 'Demo' } } } },
+				},
+			};
+
+			const message = parseBotChatMessageContent(JSON.stringify(jsonMessage));
+
+			expect(message).toEqual({
+				id: expect.any(String),
+				sender: 'bot',
+				type: 'component',
+				key: MessageComponentKey.JSON_RENDER_INTERACTION,
+				arguments: {
+					payload: jsonMessage.payload,
+					blockUserInput: true,
+				},
+			});
+		});
+
 		it('should parse a message with buttons', () => {
 			const jsonMessage = {
 				type: 'with-buttons',
@@ -117,6 +142,18 @@ describe('utils', () => {
 
 			const result = shouldBlockUserInput(message);
 			expect(result).toBe(false);
+		});
+
+		it('should return true for json-render interaction messages', () => {
+			const message = {
+				id: '1',
+				sender: 'bot' as const,
+				type: 'component' as const,
+				key: MessageComponentKey.JSON_RENDER_INTERACTION,
+				arguments: { blockUserInput: true },
+			};
+
+			expect(shouldBlockUserInput(message)).toBe(true);
 		});
 
 		it('should return false for regular message', () => {

@@ -39,18 +39,16 @@ This duplicates default-value handling, option resolution, submission behavior, 
 
 ## Compatibility strategy
 
-This is a backward-compatible `json-render-v1` runtime enhancement and a producer migration to the canonical spec-based form representation.
+This is a `json-render-v1` cleanup and runtime enhancement that makes the canonical spec-based form representation the only supported form representation.
 
 - The canonical form representation is `spec.elements.DynamicForm.props.fields` plus spec action bindings such as `form.submit` and `form.cancel`.
-- New and updated producers stop emitting `meta.dynamicForm`.
-- Keep `meta.dynamicForm` accepted by the v1 schema and supported through an explicit legacy normalization helper so saved conversations and waiting executions remain readable.
-- Mark the `meta.dynamicForm` API and related fallback helpers deprecated.
-- Do not remove the v1 compatibility reader in this change. Physical removal belongs to a future v2/major migration or to a separately approved change after the product's persisted-history compatibility window has elapsed.
+- Remove `meta.dynamicForm` from the v1 schema, builders, helpers, runtimes, demos, tests, and all n8n producers/consumers.
+- Do not add a legacy normalizer or fallback reader. Payloads must contain a canonical `DynamicForm` element to render an interaction.
 - Keep current node input schemas and node output envelopes valid.
 - Do not require the robot-dog Agent configuration to change.
 - Add new public runtime and registry APIs without removing existing exports.
 
-Existing saved conversations and waiting executions must continue to render after deployment.
+Existing display-only payloads continue to render. Historical interaction payloads that only contain `meta.dynamicForm` are intentionally unsupported after this migration.
 
 ## eit-json-render changes
 
@@ -59,7 +57,7 @@ Existing saved conversations and waiting executions must continue to render afte
 Add framework-independent helpers and constants for interaction rendering:
 
 - standardized action names for form submit and cancel;
-- a collision-safe legacy normalizer that converts `meta.dynamicForm` to canonical `DynamicForm` spec elements when reading old payloads;
+- a collision-safe helper that appends canonical `DynamicForm` elements and actions to a spec;
 - helpers to merge submitted values into `/form` state;
 - helpers to collect the current form values for event payloads;
 - a non-mutating presentation helper that applies submitted values and an explicitly requested read-only mode to a payload;
@@ -67,7 +65,7 @@ Add framework-independent helpers and constants for interaction rendering:
 
 The presentation helper is framework-independent. A host can request read-only rendering with one option; by default payloads remain editable. In read-only mode it disables form fields and hides or disables submit/cancel actions without changing the persisted document.
 
-The existing v1 payload schema remains accepted. Any new optional field properties must be backward compatible. New builders emit forms in `spec` and do not populate `meta.dynamicForm`.
+The v1 payload schema no longer accepts `meta.dynamicForm`. New builders emit forms in `spec` only.
 
 ### Vue runtime package
 
@@ -116,8 +114,8 @@ No n8n package or n8n Design System dependency is added to eit-json-render.
 The React runtime and Ant Design registry already render canonical `DynamicForm` spec elements. Their default rendering and event behavior remain unchanged.
 
 - Do not rewrite the React state or action runtime as part of this work.
-- Retain its deprecated `meta.dynamicForm` fallback for old payloads during the v1 compatibility period.
-- Add regression coverage proving canonical forms and legacy forms still render.
+- Remove its `meta.dynamicForm` runtime fallback and render canonical forms only.
+- Add regression coverage proving canonical forms still render with unchanged default behavior.
 - Hosts using React may opt into the same protocol presentation helper for submitted values and read-only display, but no existing consumer is switched automatically.
 
 ## n8n host migration
@@ -191,11 +189,11 @@ Resolved cards must never emit another resume request.
 
 ### eit-json-render
 
-- protocol tests for legacy form normalization, collision-safe keys, state merging, read-only presentation, and events;
+- protocol tests for canonical form generation, collision-safe keys, state merging, read-only presentation, and events;
 - Vue runtime tests for reactive binding, prepared submitted state, Submit, and Cancel;
 - Element Plus registry tests for all supported current form field types;
-- backward-compatibility test using an existing `meta.dynamicForm` payload.
-- React/Ant Design regression tests proving canonical spec forms remain unchanged and the deprecated meta fallback still renders.
+- parser tests proving `meta.dynamicForm` is stripped or rejected according to the strict parse API contract.
+- React/Ant Design regression tests proving canonical spec forms remain unchanged after fallback removal.
 
 ### n8n
 
@@ -222,12 +220,12 @@ Docker service containers do not need to restart because no database, Redis, mai
 - Dashboard rendering is unchanged.
 - Interaction display content and form fields are rendered by one `JsonRenderPanel` and one registry path.
 - New n8n interaction payloads contain canonical `DynamicForm` spec elements and do not emit `meta.dynamicForm`.
-- Legacy v1 payloads containing `meta.dynamicForm` still render through the deprecated compatibility path.
+- No protocol, runtime, demo, test fixture, or n8n host uses `meta.dynamicForm`.
 - Existing React behavior is unchanged.
 - No n8n host manually switches over form field types.
 - All three hosts map the same standardized json-render events into their existing lifecycle contracts.
 - Submitted and cancelled interactions remain visible as non-interactive historical cards.
 - Read-only presentation is host-controlled and defaults to editable when not requested.
-- Existing saved `json-render-v1` interactions still render.
+- Existing canonical `json-render-v1` interactions still render; meta-only interaction payloads are intentionally unsupported.
 - Robot-dog tool names, tool schemas, instructions, selection logic, MCP calls, and suspend/resume result shapes are unchanged.
 - A full n8n build succeeds, affected tests pass, and the three manual host flows pass.

@@ -7,6 +7,7 @@ import type {
 import {
 	buildTimelineBlocks,
 	extractArtifacts,
+	getResolvedInteractionDecision,
 	isStreamingTimelineEntry,
 } from '../agentTimeline.utils';
 
@@ -267,6 +268,20 @@ describe('extractArtifacts', () => {
 	});
 });
 
+describe('getResolvedInteractionDecision', () => {
+	test('reconstructs submitted values from the persisted tool result after reload', () => {
+		expect(
+			getResolvedInteractionDecision(
+				makeToolCall({ result: { decided: true, value: { destination: 'Lab' } }, confirmationStatus: 'approved' }),
+			),
+		).toEqual({ status: 'submitted', values: { destination: 'Lab' } });
+	});
+
+	test('keeps the immediate local decision before the tool result arrives', () => {
+		expect(getResolvedInteractionDecision(makeToolCall({ isLoading: true }), { status: 'cancelled' })).toEqual({ status: 'cancelled' });
+	});
+});
+
 describe('buildTimelineBlocks', () => {
 	const reasoning = (responseId?: string): InstanceAiTimelineEntry => ({
 		type: 'reasoning',
@@ -319,6 +334,30 @@ describe('buildTimelineBlocks', () => {
 		);
 
 		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'text', 'json-render-answer']);
+	});
+
+	test('json-render confirmations retain a separate transcript slot after resolution', () => {
+		const blocks = blocksOf(
+			[reasoning('r1'), toolEntry('tc-1', 'r1'), text('Decision received.', 'r1')],
+			[
+				makeToolCall({
+					confirmationStatus: 'approved',
+					confirmation: {
+						requestId: 'request-1',
+						severity: 'info',
+						message: 'Choose an action',
+						inputType: 'json-render',
+						jsonRender: { format: 'json-render-v1' },
+					},
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual([
+			'thinking',
+			'json-render-interaction',
+			'text',
+		]);
 	});
 
 	test('multiple render-ui calls stack in one answer zone after text', () => {

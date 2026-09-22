@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { type Plugin, computed, nextTick, ref, type Ref } from 'vue';
 
 import * as api from '@n8n/chat/api';
-import { ChatOptionsSymbol, ChatSymbol, localStorageSessionIdKey } from '@n8n/chat/constants';
+import { ChatOptionsSymbol, ChatSymbol, MessageComponentKey, localStorageSessionIdKey } from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import type {
 	ChatMessage,
@@ -10,6 +10,7 @@ import type {
 	ChatMessageText,
 	SendMessageResponse,
 } from '@n8n/chat/types';
+import { parseBotChatMessageContent, shouldBlockUserInput } from '@n8n/chat/utils';
 import { StreamingMessageManager, createBotMessage } from '@n8n/chat/utils/streaming';
 import {
 	handleStreamingChunk,
@@ -54,6 +55,49 @@ function processMessageResponse(response: SendMessageResponse): string {
 	}
 
 	return textMessage as string;
+}
+
+function isStructuredChatFrame(response: SendMessageResponse): boolean {
+	const type = 'type' in response ? (response as { type?: unknown }).type : undefined;
+	return (
+		type === 'json-render' ||
+		type === 'json-render-interaction' ||
+		type === 'with-buttons' ||
+		type === 'message' ||
+		type === 'error'
+	);
+}
+
+function botMessageFromResponse(response: SendMessageResponse): ChatMessage {
+	if (isStructuredChatFrame(response)) {
+		return parseBotChatMessageContent(JSON.stringify(response));
+	}
+
+	return parseBotChatMessageContent(processMessageResponse(response));
+}
+
+function parseInteractionResponse(content: string) {
+	try {
+		const parsed: unknown = JSON.parse(content);
+		if (
+			isRecord(parsed) &&
+			parsed.type === 'json-render-interaction-response' &&
+			typeof parsed.approved === 'boolean'
+		) {
+			const value = parsed.value;
+			return {
+				approved: parsed.approved,
+				...(isRecord(value) ? { value } : {}),
+			};
+		}
+	} catch {
+		// Other user messages are plain text.
+	}
+	return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 interface EmptyStreamConfig {
@@ -192,7 +236,7 @@ interface NonStreamingMessageConfig {
  */
 async function handleNonStreamingMessage(
 	config: NonStreamingMessageConfig,
-): Promise<{ response?: SendMessageResponse; botMessage?: ChatMessageText }> {
+): Promise<{ response?: SendMessageResponse; botMessage?: ChatMessage }> {
 	const { text, files, sessionId, options } = config;
 
 	const sendMessageResponse = await api.sendMessage(text, files, sessionId, options);
@@ -201,9 +245,10 @@ async function handleNonStreamingMessage(
 		return { response: sendMessageResponse };
 	}
 
-	const receivedMessage = createBotMessage();
-	receivedMessage.text = processMessageResponse(sendMessageResponse);
-	return { response: sendMessageResponse, botMessage: receivedMessage };
+	return {
+		response: sendMessageResponse,
+		botMessage: botMessageFromResponse(sendMessageResponse),
+	};
 }
 
 export const ChatPlugin: Plugin<ChatOptions> = {
@@ -226,10 +271,11 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 		async function sendMessage(
 			text: string,
 			files: File[] = [],
+			sendOptions: { addToTranscript?: boolean } = {},
 		): Promise<SendMessageResponse | null> {
-			// Create and add user message
-			const sentMessage = createUserMessage(text, files);
-			messages.value.push(sentMessage);
+			if (sendOptions.addToTranscript !== false) {
+				messages.value.push(createUserMessage(text, files));
+			}
 			waitingForResponse.value = true;
 
 			void nextTick(() => {
@@ -278,8 +324,8 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 					}
 
 					if (result.botMessage) {
-						receivedMessage.value = result.botMessage;
 						messages.value.push(result.botMessage);
+						blockUserInput.value = shouldBlockUserInput(result.botMessage);
 					}
 
 					if (options.afterMessageSent) {
@@ -315,11 +361,39 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 
 			const previousMessagesResponse = await api.loadPreviousSession(sessionId, options);
 
-			messages.value = (previousMessagesResponse?.data || []).map((message, index) => ({
-				id: `${index}`,
-				text: message.kwargs.content,
-				sender: message.id.includes('HumanMessage') ? 'user' : 'bot',
-			}));
+			const restored: ChatMessage[] = [];
+			for (const [index, message] of (previousMessagesResponse?.data ?? []).entries()) {
+				const isHuman = message.type === 'HumanMessage' || message.id.includes('HumanMessage');
+				const content = message.kwargs.content;
+				if (isHuman) {
+					const decision = parseInteractionResponse(content);
+					if (decision) {
+						const card = [...restored].reverse().find(
+							(item) => item.type === 'component' && item.key === MessageComponentKey.JSON_RENDER_INTERACTION && !item.arguments.resolved,
+						);
+						if (card?.type === 'component') card.arguments = { ...card.arguments, resolved: decision };
+						const labels = options.i18n?.[options.defaultLanguage ?? 'en'];
+						restored.push({
+							id: `${index}`,
+							sender: 'user',
+							text: decision.approved
+								? labels?.jsonRenderSubmittedDecision ?? 'Submitted decision'
+								: labels?.jsonRenderCancelled ?? 'Cancelled',
+						});
+						continue;
+					}
+					restored.push({ id: `${index}`, sender: 'user', text: content });
+				} else {
+					restored.push({ ...parseBotChatMessageContent(content), id: `${index}` });
+				}
+			}
+			messages.value = restored;
+			const lastBotMessage = [...restored].reverse().find((message) => message.sender === 'bot');
+			blockUserInput.value = lastBotMessage?.type === 'component' &&
+				lastBotMessage.key === MessageComponentKey.JSON_RENDER_INTERACTION &&
+				lastBotMessage.arguments.resolved
+				? false
+				: lastBotMessage ? shouldBlockUserInput(lastBotMessage) : false;
 
 			// Always set currentSessionId to preserve manually set sessionIds
 			currentSessionId.value = sessionId;

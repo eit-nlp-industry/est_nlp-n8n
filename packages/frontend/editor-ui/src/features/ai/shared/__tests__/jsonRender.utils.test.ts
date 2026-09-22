@@ -69,7 +69,7 @@ describe('extractJsonRenderPayload', () => {
 });
 
 describe('isJsonRenderToolName', () => {
-	it.each(['Render_Dashboard', 'renderDashboard', 'render-ui', 'render_ui'])(
+	it.each(['Render_Dashboard', 'renderDashboard', 'render-ui', 'render_ui', 'render_interaction'])(
 		'matches %s',
 		(name) => {
 			expect(isJsonRenderToolName(name)).toBe(true);
@@ -127,6 +127,22 @@ describe('collectJsonRenderCards', () => {
 					toolCallId: 'tc-rest',
 					state: TOOL_CALL_STATE.DONE,
 					output: { ok: true },
+				},
+			]),
+		).toEqual([]);
+	});
+
+	it('does not collect Render Interaction tools as display cards', () => {
+		expect(
+			collectJsonRenderCards([
+				{
+					tool: 'render_interaction',
+					toolCallId: 'tc-form',
+					state: TOOL_CALL_STATE.SUSPENDED,
+					suspendPayload: {
+						type: 'json-render-interaction',
+						jsonRender: dashboardPayload,
+					},
 				},
 			]),
 		).toEqual([]);

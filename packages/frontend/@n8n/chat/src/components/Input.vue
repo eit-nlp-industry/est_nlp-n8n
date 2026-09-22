@@ -195,6 +195,7 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 
 				const isChatContentFrame =
 					frameType === 'json-render' ||
+					frameType === 'json-render-interaction' ||
 					frameType === 'with-buttons' ||
 					frameType === 'message' ||
 					frameType === 'error';

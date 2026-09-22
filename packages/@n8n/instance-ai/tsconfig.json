@@ -11,7 +11,7 @@
 		"paths": {
 			"@/*": ["./src/*"],
 			"@eit/json-render-protocol": [
-				"../../../../eit-json-render/packages/protocol/src/index.ts"
+				"../../../../eit-json-render/packages/protocol/dist/index.d.ts"
 			]
 		},
 		"types": ["node", "vitest/globals", "vite/client"]

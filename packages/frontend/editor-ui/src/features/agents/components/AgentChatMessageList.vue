@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { N8nText } from '@n8n/design-system';
 import { useSpeechSynthesis } from '@vueuse/core';
-import { N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
+import { JSON_RENDER_INTERACTION_TOOL_NAME, N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
 import { isAwaitingCard } from '@/features/ai/shared/agentsChat/n8nChatInteraction';
 import { useI18n } from '@n8n/i18n';
 import {
@@ -88,12 +88,15 @@ function externalWaitPlatform(tc: ToolCall): string | undefined {
 }
 
 /**
- * Open cards always render. Once resolved, answered interactive cards clear
- * from the chat (both approval and n8n chat cards collapse into their
- * tool-step summary) — but display-only n8n chat cards persist: they are
- * content, and being born resolved they would otherwise never render at all.
+ * Open approval and chat cards render only when they still have a run to
+ * resume. An open json-render form is the turn's content: hiding it leaves
+ * the composer waiting on a card that is not on screen. Resolved json-render
+ * cards stay in the transcript. Other resolved cards clear, except
+ * display-only n8n chat cards, which are born resolved and would otherwise
+ * never render.
  */
 function shouldRenderInteractive(payload: InteractivePayload): boolean {
+	if (payload.toolName === JSON_RENDER_INTERACTION_TOOL_NAME) return true;
 	if (!payload.resolvedAt) return !!payload.runId;
 	return payload.toolName === N8N_CHAT_ACTION_TOOL_NAME && !isAwaitingCard(payload.input.card);
 }
@@ -478,14 +481,6 @@ onBeforeUnmount(() => {
 							}}
 						</N8nText>
 					</template>
-					<div v-if="group.interactives.some(shouldRenderInteractive)" :class="$style.interactives">
-						<InteractiveCard
-							v-for="payload in group.interactives.filter(shouldRenderInteractive)"
-							:key="payload.toolCallId"
-							:payload="payload"
-							@submit="onInteractiveSubmit(payload, $event)"
-						/>
-					</div>
 					<div
 						v-if="group.finalMessage?.content && !isJsonRenderAssistantText(group.finalMessage.content)"
 						:class="[
@@ -503,6 +498,15 @@ onBeforeUnmount(() => {
 						data-testid="agent-chat-json-render"
 					>
 						<JsonRenderAnswerCards :tool-calls="jsonRenderCardsForToolRun(group)" />
+					</div>
+					<!-- Decision forms stay last in the turn so they sit above the composer. -->
+					<div v-if="group.interactives.some(shouldRenderInteractive)" :class="$style.interactives">
+						<InteractiveCard
+							v-for="payload in group.interactives.filter(shouldRenderInteractive)"
+							:key="payload.toolCallId"
+							:payload="payload"
+							@submit="onInteractiveSubmit(payload, $event)"
+						/>
 					</div>
 					<AiThinkingBlock
 						v-if="group.thinkingSegments.length"
@@ -745,6 +749,7 @@ onBeforeUnmount(() => {
 	gap: var(--spacing--2xs);
 	margin-top: var(--spacing--2xs);
 	margin-bottom: var(--spacing--2xs);
+	overflow: visible;
 }
 
 .jsonRender {

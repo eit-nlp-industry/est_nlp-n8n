@@ -1,4 +1,5 @@
 import MessageJsonRender from '@n8n/chat/components/MessageJsonRender.vue';
+import MessageJsonRenderInteraction from '@n8n/chat/components/MessageJsonRenderInteraction.vue';
 import MessageWithButtons from '@n8n/chat/components/MessageWithButtons.vue';
 import { MessageComponentKey } from '@n8n/chat/constants/messageComponents';
 import type { ChatOptions } from '@n8n/chat/types';
@@ -27,6 +28,10 @@ export const defaultOptions: ChatOptions = {
 			closeButtonTooltip: 'Close chat',
 			repostButton: 'Repost message',
 			reuseButton: 'Reuse message',
+			jsonRenderSubmitted: 'Submitted',
+			jsonRenderCancelled: 'Cancelled',
+			jsonRenderSubmittedDecision: 'Submitted decision',
+			jsonRenderInvalidPayload: 'Invalid json-render payload',
 		},
 	},
 	theme: {},
@@ -34,6 +39,7 @@ export const defaultOptions: ChatOptions = {
 	messageComponents: {
 		[MessageComponentKey.WITH_BUTTONS]: MessageWithButtons,
 		[MessageComponentKey.JSON_RENDER]: MessageJsonRender,
+		[MessageComponentKey.JSON_RENDER_INTERACTION]: MessageJsonRenderInteraction,
 	},
 };
 

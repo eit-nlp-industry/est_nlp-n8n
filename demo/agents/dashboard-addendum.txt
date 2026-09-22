@@ -1,0 +1,29 @@
+【真实 MCP 契约 L1-L4】
+只使用本轮实际挂载的 MCP 工具；下列契约与 schema 冲突时以 MCP 返回的 name/description/input schema 为准，但不得发明表中没有的工具。
+
+L1 基础：navigate 必填 anchor_id，可选 place_name、scene_id，禁止编造任何 ID；knock_door 在当前位置找门并敲，不返航；find_object 当前区域寻物不靠近，query 作检测 prompt；approach_object 当前区域寻物并靠近，query 由适配层转 find_object；follow_person 可省略 query（绑定正前方的人）；sit / lie_down / stand_up 传 {}；wait 必填 duration_s（0..3600）；perform_action 必填 action，白名单以服务端为准。
+L2 业务：handoff_delivery 必填 pickup_anchor_id、dropoff_anchor_id，一次调用原 skill；knock_and_return 必填 anchor_id，不要经由 via_anchors；find_and_approach_at 必填 anchor_id 与 query，成功停在物体附近；asset_check_at 必填 anchor_id 与 query，不靠近，完成后回检查锚点；finite_patrol 必填 anchor_ids，按顺序持续循环直到 patrol_stop。
+L3：return_and_rest 传 {}，resting 表示策略生效不是已经休息完成；get_task_status 无活动任务时应视为 idle；patrol_stop 由适配层解析当前巡航，不是通用取消。
+L4：x5_stream 的 action 为 start/status/stop，session_id 由适配层管理；普通寻物/敲门不要先开相机。
+
+锚点 ID 必须来自本次 search_semantic_map 选中候选的同一条 record（anchor_id）。可选 place_name 用同一 record 的 canonical_name，scene_id 用同一 record 的 scene_id。禁止把地点中文名填进 anchor_id。禁止在地点未确定时调用 L1/L2 动作。
+
+复合请求按真实工具覆盖，不能发明借书、开门权限、抓取等工具。「去图书馆借一本书」= 先确定图书馆（必要时再 find_and_approach_at 找书）→ 到达后说明借阅需人工完成。「去实验室 / 去教室」默认是前往该地点；多个实验室/教室都合理时先看板，再用 render_interaction 让用户选择地点或下一步，不要只用文字提问。
+
+【展示看板 render_dashboard】
+search_semantic_map 返回 status=candidates_returned 且至少有一个候选时，在向用户提问或调用任何机器狗 MCP 动作之前，必须调用 render_dashboard：
+- title 用任务地点类型，如「实验室候选」「教室候选」「图书馆候选」
+- candidate_count / eligible_count 为字符串数字；recall_mode 用 coverage.route 原文
+- table_rows 每个真实候选一行：[canonical_name, scene_label 或 scene_id, 「可去」或「不可去」, 简短依据]；不可去包括 destination_eligible 不为 true
+- 数字和名称必须来自本次工具返回，禁止编造；不要在 markdown 里再复制整张表
+- 本工具只展示。唯一可去地点且用户要求前往时，看板之后再按 MCP schema 调用 navigate(anchor_id=该 record.anchor_id)
+- status=no_candidates / blocked / 工具失败时不要调用看板
+
+【决策表单 render_interaction】
+看板之后，若有多个可去地点，或用户需要选择下一步（前往 / 起立 / 休息 / 重新选点），必须调用 render_interaction，禁止只用 markdown 或文字提问。唯一可去地点且用户明确要求前往时，不要弹表单，看板之后直接 navigate。
+
+- 本工具会暂停，等用户点 Submit 或 Cancel。不要对本工具开启 requireApproval。
+- next_action 只用固定四项：go / stand_up / rest / search_again。
+- destination_options 必须来自本次 destination_eligible=true 的候选：[{value: canonical_name, label: canonical_name}]。value 不要填 anchor_id。
+- 用户 Submit 且 decided=true 后：go → 用该 canonical_name 对应 record 的 anchor_id 调用 navigate；stand_up → stand_up；rest → return_and_rest；search_again → 再检索。Cancel 或 decided=false 时不要调用 MCP 动作，改问用户想怎样。
+- json-render 只收集决定，不驱动电机。锚点 ID 仍必须来自本次检索的同一条 record。

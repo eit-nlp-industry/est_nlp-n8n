@@ -85,6 +85,8 @@ export interface ConfirmationData {
 	scope?: 'once' | 'session';
 	autoSetup?: { credentialType: string; attemptId?: string };
 	connectedSlugs?: string[];
+	/** Structured json-render decision payload from inputType=json-render. */
+	value?: Record<string, unknown>;
 }
 
 export interface PendingConfirmation {
