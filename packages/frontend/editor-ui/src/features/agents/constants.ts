@@ -1,13 +1,16 @@
-export const AGENTS_LIST_VIEW = 'AgentsListView';
+export {
+	AGENTS_LIST_VIEW,
+	AGENT_BUILDER_VIEW,
+	AGENT_PREVIEW_VIEW,
+	AGENT_VIEW,
+	AGENT_SESSIONS_LIST_VIEW,
+	AGENT_SESSION_DETAIL_VIEW,
+	PROJECT_AGENTS,
+} from '@n8n/frontend-constants/agents';
+
 export const DEEPSEEK_HARNESS_LIST_VIEW = 'DeepSeekHarnessListView';
 export const PROJECT_DEEPSEEK_HARNESS = 'ProjectDeepSeekHarness';
 export const PROJECT_DEEPSEEK_HARNESS_AGENT = 'ProjectDeepSeekHarnessAgent';
-export const AGENT_BUILDER_VIEW = 'AgentBuilderView';
-export const AGENT_PREVIEW_VIEW = 'AgentPreviewView';
-export const AGENT_VIEW = 'AgentView';
-export const AGENT_SESSIONS_LIST_VIEW = 'AgentSessionsListView';
-export const AGENT_SESSION_DETAIL_VIEW = 'AgentSessionDetailView';
-export const PROJECT_AGENTS = 'ProjectAgents';
 
 export const AGENTS_MODULE_NAME = 'agents';
 
