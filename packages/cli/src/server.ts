@@ -555,5 +555,12 @@ export class Server extends AbstractServer {
 		if (Container.get(ModuleRegistry).isActive('instance-ai')) {
 			Container.get(BrowserUseServer).setup(server, app);
 		}
+		if (Container.get(ModuleRegistry).isActive('deepseek-harness')) {
+			void import('@/modules/deepseek-harness/deepseek-harness-studio-proxy.controller.js').then(
+				({ DeepSeekHarnessStudioProxyController }) => {
+					DeepSeekHarnessStudioProxyController.attachWebSocketUpgrade(server);
+				},
+			);
+		}
 	}
 }

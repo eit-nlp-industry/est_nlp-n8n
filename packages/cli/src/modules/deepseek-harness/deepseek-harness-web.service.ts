@@ -55,6 +55,13 @@ export class DeepSeekHarnessWebService {
 		private readonly fetchFn: Fetch = fetch,
 	) {}
 
+	/** Origin of a live Studio process, or null when none is running. */
+	getRunningOrigin(projectId: string, agentId: string): string | null {
+		const running = this.processes.get(`${projectId}:${agentId}`);
+		if (!running || running.child.killed) return null;
+		return new URL(running.url).origin;
+	}
+
 	async startForAgent(agentId: string, projectId: string): Promise<WebRuntime> {
 		const key = `${projectId}:${agentId}`;
 		const running = this.processes.get(key);
@@ -135,11 +142,7 @@ export class DeepSeekHarnessWebService {
 		);
 		const workspacePath = registeredDefault
 			? undefined
-			: await this.homeService.createDefaultWorkspace(
-					agent.userName,
-				agent.name,
-				agent.id,
-			);
+			: await this.homeService.createDefaultWorkspace(agent.userName, agent.name, agent.id);
 		const invocation = getWebProcessInvocation(harnessPath, profile);
 		await this.repository.updateRuntimeState(agentId, {
 			status: 'starting',
@@ -193,7 +196,8 @@ export class DeepSeekHarnessWebService {
 
 				try {
 					const workspaceId =
-						registeredDefault?.id ?? (await this.registerDefaultWorkspace(match[1], workspacePath!));
+						registeredDefault?.id ??
+						(await this.registerDefaultWorkspace(match[1], workspacePath!));
 					const entry = { child, url: match[1], workspaceId };
 					await this.repository.updateRuntimeState(agentId, {
 						status: 'running',

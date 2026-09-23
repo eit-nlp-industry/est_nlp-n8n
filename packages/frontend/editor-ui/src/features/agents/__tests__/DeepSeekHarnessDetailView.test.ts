@@ -5,8 +5,12 @@ import { vi } from 'vitest';
 import DeepSeekHarnessDetailView from '../views/DeepSeekHarnessDetailView.vue';
 
 const getAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Agent' });
-const startStudio = vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43123/?token=x' });
-const restartStudio = vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43124/?token=y' });
+const startStudio = vi
+	.fn()
+	.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=x' });
+const restartStudio = vi
+	.fn()
+	.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=y' });
 const updateAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Renamed' });
 
 vi.mock('vue-router', () => ({
@@ -73,7 +77,7 @@ describe('DeepSeekHarnessDetailView', () => {
 			'studioContainer',
 		);
 		expect(wrapper.get('[data-test-id="deepseek-harness-studio"]').attributes('src')).toBe(
-			'http://localhost:43123/?token=x',
+			'/deepseek-harness-studio/project-1/agent-1/?token=x',
 		);
 	});
 
@@ -90,7 +94,7 @@ describe('DeepSeekHarnessDetailView', () => {
 		expect(updateAgent).toHaveBeenCalledWith('project-1', 'agent-1', 'Renamed');
 		expect(startStudio).toHaveBeenCalledTimes(2);
 		expect(wrapper.get('[data-test-id="deepseek-harness-studio"]').attributes('src')).toBe(
-			'http://localhost:43123/?token=x',
+			'/deepseek-harness-studio/project-1/agent-1/?token=x',
 		);
 	});
 });

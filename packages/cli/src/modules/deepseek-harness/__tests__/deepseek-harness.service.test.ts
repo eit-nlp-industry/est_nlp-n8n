@@ -211,7 +211,7 @@ describe('DeepSeekHarnessService', () => {
 		);
 
 		await expect(service.restartStudioForProject('agent-1', 'project-1')).resolves.toEqual({
-			url: 'http://127.0.0.1:43124/?token=y',
+			url: '/deepseek-harness-studio/project-1/agent-1/?token=y',
 		});
 		expect(order).toEqual(['stop', 'start']);
 		expect(webService.stopForAgent).toHaveBeenCalledWith('agent-1', 'project-1');

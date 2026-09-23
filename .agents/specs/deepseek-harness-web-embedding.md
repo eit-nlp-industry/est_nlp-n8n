@@ -70,12 +70,19 @@ process. Repeated requests for the same agent reuse the running process.
 
 ## Deliberate MVP limits
 
-- The browser connects to the native Harness port through the iframe. n8n does
-  not proxy the Studio yet.
-- The first version is intended for local same-host access. Remote deployments
-  still need the planned same-origin proxy.
 - Idle process shutdown is a follow-up task.
 - n8n does not restore an old process from persisted PID or port data.
+
+## Same-origin Studio proxy
+
+- Studio launch APIs return `/deepseek-harness-studio/:projectId/:agentId/?…`
+  instead of the Harness loopback URL.
+- n8n proxies HTTP and WebSocket traffic to the agent process on `127.0.0.1`.
+- Absolute `/api` literals in HTML/JS responses are rewritten to the proxy base.
+- `Set-Cookie` `Path` values are rewritten to the proxy base so Harness auth
+  cookies stay under the iframe origin path.
+- The proxy itself is unauthenticated; access still requires the Harness launch
+  token from the scoped studio API.
 
 ## Implementation TODO
 
@@ -88,3 +95,4 @@ process. Repeated requests for the same agent reuse the running process.
 - [x] Persist runtime state and summary fields.
 - [x] Persist publish state and restore published processes on startup.
 - [x] Add a detail-page restart control that stops then starts the Web process.
+- [x] Add same-origin Studio reverse proxy for HTTPS deployments.

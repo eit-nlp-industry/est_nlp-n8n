@@ -6,10 +6,9 @@ import type { ChunkType } from 'n8n-workflow';
 
 import { ConflictError } from '@/errors/response-errors/conflict.error';
 
-import {
-	DeepSeekHarnessHomeService,
-} from './deepseek-harness-home.service';
+import { DeepSeekHarnessHomeService } from './deepseek-harness-home.service';
 import { DeepSeekHarnessCliService } from './deepseek-harness-cli.service';
+import { buildStudioProxyUrl } from './deepseek-harness-studio-proxy';
 import { DeepSeekHarnessWebService } from './deepseek-harness-web.service';
 import { DeepSeekHarnessRpcService } from './deepseek-harness-rpc.service';
 import { DeepSeekHarnessAgent } from './entities/deepseek-harness-agent.entity';
@@ -19,13 +18,16 @@ const DEFAULT_AGENT_NAME = 'DeepSeek Harness';
 
 @Service()
 export class DeepSeekHarnessService {
-	private readonly agentLocks = new Map<string, {
-		lifecycleTail: Promise<void>;
-		lifecyclePending: number;
-		activeExecutions: number;
-		executionDrain: Promise<void>;
-		resolveExecutionDrain: () => void;
-	}>();
+	private readonly agentLocks = new Map<
+		string,
+		{
+			lifecycleTail: Promise<void>;
+			lifecyclePending: number;
+			activeExecutions: number;
+			executionDrain: Promise<void>;
+			resolveExecutionDrain: () => void;
+		}
+	>();
 
 	constructor(
 		private readonly repository: DeepSeekHarnessAgentRepository,
@@ -65,7 +67,10 @@ export class DeepSeekHarnessService {
 				lock.lifecyclePending--;
 				return await operation();
 			});
-		lock.lifecycleTail = current.then(() => undefined, () => undefined);
+		lock.lifecycleTail = current.then(
+			() => undefined,
+			() => undefined,
+		);
 		try {
 			return await current;
 		} finally {
@@ -104,14 +109,17 @@ export class DeepSeekHarnessService {
 		sendResponseChunk?: (type: ChunkType, content?: string) => Promise<void>,
 		workspaceId?: string,
 	) {
-		return await this.withAgentExecution(agentId, projectId, async () =>
-			await Container.get(DeepSeekHarnessRpcService).execute(
-				agentId,
-				projectId,
-				message,
-				sessionId,
-				{ allowUnpublished, sendResponseChunk, workspaceId },
-			),
+		return await this.withAgentExecution(
+			agentId,
+			projectId,
+			async () =>
+				await Container.get(DeepSeekHarnessRpcService).execute(
+					agentId,
+					projectId,
+					message,
+					sessionId,
+					{ allowUnpublished, sendResponseChunk, workspaceId },
+				),
 		);
 	}
 
@@ -122,16 +130,18 @@ export class DeepSeekHarnessService {
 	}
 
 	async startStudioForProject(agentId: string, projectId: string): Promise<{ url: string }> {
-		return await this.withAgentLifecycleLock(agentId, projectId, async () =>
-			await this.webService.startForAgent(agentId, projectId),
-		);
+		return await this.withAgentLifecycleLock(agentId, projectId, async () => {
+			const runtime = await this.webService.startForAgent(agentId, projectId);
+			return { url: this.toStudioProxyUrl(projectId, agentId, runtime.url) };
+		});
 	}
 
 	/** Stop then start so on-disk profile edits are picked up. */
 	async restartStudioForProject(agentId: string, projectId: string): Promise<{ url: string }> {
 		return await this.withAgentLifecycleLock(agentId, projectId, async () => {
 			await this.webService.stopForAgent(agentId, projectId);
-			return await this.webService.startForAgent(agentId, projectId);
+			const runtime = await this.webService.startForAgent(agentId, projectId);
+			return { url: this.toStudioProxyUrl(projectId, agentId, runtime.url) };
 		});
 	}
 
@@ -258,83 +268,88 @@ export class DeepSeekHarnessService {
 		name: string,
 	): Promise<DeepSeekHarnessAgentDto | null> {
 		return await this.withAgentLifecycleLock(id, projectId, async () => {
-		const agent = await this.repository.findByIdAndProjectId(id, projectId);
-		if (!agent) return null;
+			const agent = await this.repository.findByIdAndProjectId(id, projectId);
+			if (!agent) return null;
 
-		const newName = name.trim();
-		if (!newName) throw new Error('DeepSeek Harness agent name cannot be empty');
-		if (newName === agent.name) return this.toDto(agent);
-		const oldName = agent.name;
-		const shouldRestart =
-			agent.published || agent.runtimeStatus === 'running' || agent.runtimeStatus === 'starting';
-		let stopped = false;
-		let renamed = false;
-		let saved = false;
-		let migrated = false;
+			const newName = name.trim();
+			if (!newName) throw new Error('DeepSeek Harness agent name cannot be empty');
+			if (newName === agent.name) return this.toDto(agent);
+			const oldName = agent.name;
+			const shouldRestart =
+				agent.published || agent.runtimeStatus === 'running' || agent.runtimeStatus === 'starting';
+			let stopped = false;
+			let renamed = false;
+			let saved = false;
+			let migrated = false;
 
-		try {
-			if (agent.userName) {
-				await this.webService.stopForAgent(id, projectId);
-				stopped = true;
-				await this.homeService.renameHome(agent.userName, oldName, newName, agent.id);
-				renamed = true;
-				await this.homeService.migrateWorkspacePaths(
-					this.homeService.getHome(agent.userName, oldName, agent.id),
-					this.homeService.getHome(agent.userName, newName, agent.id),
-					agent.id,
-				);
-				migrated = true;
-			}
-
-			agent.name = newName;
-			const persisted = await this.repository.save(agent);
-			saved = true;
-			if (agent.userName && shouldRestart) {
-				await this.webService.startForAgent(id, projectId);
-			}
-			return this.toDto(persisted);
-		} catch (error) {
-			const rollbackErrors: unknown[] = [];
-			if (saved) {
-				agent.name = oldName;
-				await this.repository.save(agent).catch((rollbackError: unknown) => {
-					rollbackErrors.push(rollbackError);
-				});
-			}
-			if (agent.userName && migrated) {
-				await this.homeService
-					.migrateWorkspacePaths(
-						this.homeService.getHome(agent.userName, newName, agent.id),
+			try {
+				if (agent.userName) {
+					await this.webService.stopForAgent(id, projectId);
+					stopped = true;
+					await this.homeService.renameHome(agent.userName, oldName, newName, agent.id);
+					renamed = true;
+					await this.homeService.migrateWorkspacePaths(
 						this.homeService.getHome(agent.userName, oldName, agent.id),
+						this.homeService.getHome(agent.userName, newName, agent.id),
 						agent.id,
-					)
-					.catch((rollbackError: unknown) => {
+					);
+					migrated = true;
+				}
+
+				agent.name = newName;
+				const persisted = await this.repository.save(agent);
+				saved = true;
+				if (agent.userName && shouldRestart) {
+					await this.webService.startForAgent(id, projectId);
+				}
+				return this.toDto(persisted);
+			} catch (error) {
+				const rollbackErrors: unknown[] = [];
+				if (saved) {
+					agent.name = oldName;
+					await this.repository.save(agent).catch((rollbackError: unknown) => {
 						rollbackErrors.push(rollbackError);
 					});
+				}
+				if (agent.userName && migrated) {
+					await this.homeService
+						.migrateWorkspacePaths(
+							this.homeService.getHome(agent.userName, newName, agent.id),
+							this.homeService.getHome(agent.userName, oldName, agent.id),
+							agent.id,
+						)
+						.catch((rollbackError: unknown) => {
+							rollbackErrors.push(rollbackError);
+						});
+				}
+				if (agent.userName && renamed) {
+					await this.homeService
+						.renameHome(agent.userName, newName, oldName, agent.id)
+						.catch((rollbackError: unknown) => {
+							rollbackErrors.push(rollbackError);
+						});
+				}
+				if (agent.userName && stopped && shouldRestart) {
+					await this.webService.startForAgent(id, projectId).catch(() => undefined);
+				}
+				if (isUniqueConstraintError(error)) {
+					throw new ConflictError(`A DeepSeek Harness agent named "${newName}" already exists`);
+				}
+				if (rollbackErrors.length > 0) {
+					const details = rollbackErrors
+						.map((rollbackError) =>
+							rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+						)
+						.join('; ');
+					throw new Error(
+						`DeepSeek Harness rename failed and rollback was incomplete: ${details}`,
+						{
+							cause: error,
+						},
+					);
+				}
+				throw error;
 			}
-			if (agent.userName && renamed) {
-				await this.homeService
-					.renameHome(agent.userName, newName, oldName, agent.id)
-					.catch((rollbackError: unknown) => {
-						rollbackErrors.push(rollbackError);
-					});
-			}
-			if (agent.userName && stopped && shouldRestart) {
-				await this.webService.startForAgent(id, projectId).catch(() => undefined);
-			}
-			if (isUniqueConstraintError(error)) {
-				throw new ConflictError(`A DeepSeek Harness agent named "${newName}" already exists`);
-			}
-			if (rollbackErrors.length > 0) {
-				const details = rollbackErrors
-					.map((rollbackError) => (rollbackError instanceof Error ? rollbackError.message : String(rollbackError)))
-					.join('; ');
-				throw new Error(`DeepSeek Harness rename failed and rollback was incomplete: ${details}`, {
-					cause: error,
-				});
-			}
-			throw error;
-		}
 		});
 	}
 
@@ -384,6 +399,10 @@ export class DeepSeekHarnessService {
 				cause: new AggregateError([cause, rollbackError]),
 			});
 		}
+	}
+
+	private toStudioProxyUrl(projectId: string, agentId: string, runtimeUrl: string): string {
+		return buildStudioProxyUrl(projectId, agentId, runtimeUrl);
 	}
 
 	private toDto(agent: DeepSeekHarnessAgent): DeepSeekHarnessAgentDto {
