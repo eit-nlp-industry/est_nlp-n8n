@@ -127,6 +127,14 @@ export class DeepSeekHarnessService {
 		);
 	}
 
+	/** Stop then start so on-disk profile edits are picked up. */
+	async restartStudioForProject(agentId: string, projectId: string): Promise<{ url: string }> {
+		return await this.withAgentLifecycleLock(agentId, projectId, async () => {
+			await this.webService.stopForAgent(agentId, projectId);
+			return await this.webService.startForAgent(agentId, projectId);
+		});
+	}
+
 	async publishForProject(id: string, projectId: string): Promise<DeepSeekHarnessAgentDto | null> {
 		return await this.withAgentLifecycleLock(id, projectId, async () => {
 			const agent = await this.repository.findByIdAndProjectId(id, projectId);

@@ -192,6 +192,32 @@ describe('DeepSeekHarnessService', () => {
 		expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ published: true }));
 	});
 
+	it('restarts Studio by stopping then starting the Web process', async () => {
+		const order: string[] = [];
+		const webService = {
+			stopForAgent: vi.fn().mockImplementation(async () => {
+				order.push('stop');
+			}),
+			startForAgent: vi.fn().mockImplementation(async () => {
+				order.push('start');
+				return { url: 'http://127.0.0.1:43124/?token=y' };
+			}),
+		};
+		const service = new DeepSeekHarnessService(
+			{} as never,
+			{} as never,
+			{} as never,
+			webService as never,
+		);
+
+		await expect(service.restartStudioForProject('agent-1', 'project-1')).resolves.toEqual({
+			url: 'http://127.0.0.1:43124/?token=y',
+		});
+		expect(order).toEqual(['stop', 'start']);
+		expect(webService.stopForAgent).toHaveBeenCalledWith('agent-1', 'project-1');
+		expect(webService.startForAgent).toHaveBeenCalledWith('agent-1', 'project-1');
+	});
+
 	it('serializes lifecycle operations for the same agent', async () => {
 		let releaseStart!: () => void;
 		const start = new Promise<void>((resolve) => {

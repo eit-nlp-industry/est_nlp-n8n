@@ -29,16 +29,21 @@ feature adds a small Web bootstrap hook in Harness.
 
 `GET /projects/:projectId/deepseek-harness/agents/:agentId/studio`
 
+`POST /projects/:projectId/deepseek-harness/agents/:agentId/restart`
+
 `POST /projects/:projectId/deepseek-harness/agents/:agentId/publish`
 
 `POST /projects/:projectId/deepseek-harness/agents/:agentId/unpublish`
 
-The endpoint requires the existing `agent:read` project access and returns:
+`GET /studio` requires `agent:read` and returns:
 
 ```ts
 { url: string }
 ```
 
+`POST /restart` requires `agent:update`. It stops the running Web process (if
+any), starts a fresh one, and returns the same `{ url: string }` shape so the
+detail page can reload the iframe after local profile edits.
 Agent list and detail responses also include the last persisted runtime summary:
 `runtimeStatus`, `runtimePort`, `runtimeUrl`, and `runtimeError`.
 They also include the persisted `published` flag.
@@ -82,3 +87,4 @@ process. Repeated requests for the same agent reuse the running process.
 - [x] Verify startup and shutdown behavior on Windows command resolution.
 - [x] Persist runtime state and summary fields.
 - [x] Persist publish state and restore published processes on startup.
+- [x] Add a detail-page restart control that stops then starts the Web process.

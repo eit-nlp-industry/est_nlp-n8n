@@ -15,9 +15,11 @@ const route = useRoute();
 const router = useRouter();
 const i18n = useI18n();
 const toast = useToast();
-const { getAgent, updateAgent, startStudio, publishAgent, unpublishAgent } = useDeepSeekHarnessApi();
+const { getAgent, updateAgent, startStudio, restartStudio, publishAgent, unpublishAgent } =
+	useDeepSeekHarnessApi();
 const agent = ref<DeepSeekHarnessAgentDto | null>(null);
 const isLoading = ref(true);
+const isRestarting = ref(false);
 const studioUrl = ref<string>();
 const studioError = ref(false);
 const renameInput = useTemplateRef<InstanceType<typeof N8nInlineTextEdit>>('renameInput');
@@ -85,6 +87,23 @@ const onUnpublish = async () => {
 	agent.value = await unpublishAgent(projectId.value, agentId.value);
 };
 
+const onRestart = async () => {
+	if (!projectId.value || !agentId.value || isRestarting.value) return;
+	isRestarting.value = true;
+	studioUrl.value = undefined;
+	studioError.value = false;
+	try {
+		studioUrl.value = useCurrentHost(
+			(await restartStudio(projectId.value, agentId.value)).url,
+		);
+	} catch (error) {
+		studioError.value = true;
+		toast.showError(error, i18n.baseText('deepseekHarness.studio.restart.error'));
+	} finally {
+		isRestarting.value = false;
+	}
+};
+
 onMounted(async () => {
 	if (!projectId.value || !agentId.value) return;
 	try {
@@ -129,8 +148,10 @@ onMounted(async () => {
 			<DeepSeekHarnessPublishActions
 				v-if="agent"
 				:agent="agent"
+				:restarting="isRestarting"
 				:on-publish="onPublish"
 				:on-unpublish="onUnpublish"
+				:on-restart="onRestart"
 			/>
 		</div>
 

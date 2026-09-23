@@ -6,6 +6,7 @@ import DeepSeekHarnessDetailView from '../views/DeepSeekHarnessDetailView.vue';
 
 const getAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Agent' });
 const startStudio = vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43123/?token=x' });
+const restartStudio = vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43124/?token=y' });
 const updateAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Renamed' });
 
 vi.mock('vue-router', () => ({
@@ -17,7 +18,7 @@ vi.mock('vue-router', () => ({
 }));
 
 vi.mock('../composables/useDeepSeekHarnessApi', () => ({
-	useDeepSeekHarnessApi: () => ({ getAgent, updateAgent, startStudio }),
+	useDeepSeekHarnessApi: () => ({ getAgent, updateAgent, startStudio, restartStudio }),
 }));
 
 vi.mock('@n8n/i18n', () => ({

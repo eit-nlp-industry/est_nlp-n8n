@@ -59,6 +59,14 @@ export function useDeepSeekHarnessApi() {
 		);
 	};
 
+	const restartStudio = async (projectId: string, agentId: string): Promise<{ url: string }> => {
+		return await makeRestApiRequest<{ url: string }>(
+			rootStore.restApiContext,
+			'POST',
+			`/projects/${projectId}/deepseek-harness/agents/${agentId}/restart`,
+		);
+	};
+
 	const publishAgent = async (
 		projectId: string,
 		agentId: string,
@@ -88,6 +96,7 @@ export function useDeepSeekHarnessApi() {
 		deleteAgent,
 		updateAgent,
 		startStudio,
+		restartStudio,
 		publishAgent,
 		unpublishAgent,
 	};

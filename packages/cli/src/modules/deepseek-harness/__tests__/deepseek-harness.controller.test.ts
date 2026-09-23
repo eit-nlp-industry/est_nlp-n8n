@@ -55,6 +55,21 @@ describe('DeepSeekHarnessController', () => {
 		expect(service.startStudioForProject).toHaveBeenCalledWith('agent-1', 'project-1');
 	});
 
+	it('restarts the native Studio for the requested project agent', async () => {
+		const service = {
+			restartStudioForProject: vi
+				.fn()
+				.mockResolvedValue({ url: 'http://127.0.0.1:43124/?token=y' }),
+		};
+		const controller = new DeepSeekHarnessController(service as never);
+
+		await expect(
+			controller.restart({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
+		).resolves.toEqual({ url: 'http://127.0.0.1:43124/?token=y' });
+
+		expect(service.restartStudioForProject).toHaveBeenCalledWith('agent-1', 'project-1');
+	});
+
 	it('publishes the requested project agent', async () => {
 		const service = {
 			publishForProject: vi.fn().mockResolvedValue({ id: 'agent-1', published: true }),

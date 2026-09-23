@@ -49,6 +49,16 @@ export class DeepSeekHarnessController {
 		return await this.service.startStudioForProject(agentId, req.params.projectId);
 	}
 
+	@Post('/:agentId/restart')
+	@ProjectScope('agent:update')
+	async restart(
+		req: AuthenticatedRequest<{ projectId: string }>,
+		_res: unknown,
+		@Param('agentId') agentId: string,
+	): Promise<{ url: string }> {
+		return await this.service.restartStudioForProject(agentId, req.params.projectId);
+	}
+
 	@Post('/:agentId/publish')
 	@ProjectScope('agent:update')
 	async publish(

@@ -3,6 +3,7 @@ import {
 	N8nActionDropdown,
 	N8nButton,
 	N8nIconButton,
+	N8nTooltip,
 	type ActionDropdownItem,
 } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
@@ -10,8 +11,10 @@ import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
 
 const props = defineProps<{
 	agent: DeepSeekHarnessAgentDto;
+	restarting?: boolean;
 	onPublish: () => Promise<void>;
 	onUnpublish: () => Promise<void>;
+	onRestart: () => Promise<void>;
 }>();
 
 const i18n = useI18n();
@@ -39,6 +42,10 @@ async function unpublish() {
 	await props.onUnpublish();
 }
 
+async function restart() {
+	await props.onRestart();
+}
+
 function onSelect(action: 'publish' | 'unpublish') {
 	if (action === 'publish') void publish();
 	if (action === 'unpublish') void unpublish();
@@ -46,44 +53,76 @@ function onSelect(action: 'publish' | 'unpublish') {
 </script>
 
 <template>
-	<div :class="$style.publishButtonWrapper" data-test-id="deepseek-harness-publish-actions">
-		<div :class="$style.buttonGroup">
-			<N8nButton
-				:class="$style.groupButtonLeft"
+	<div :class="$style.actions" data-test-id="deepseek-harness-publish-actions">
+		<N8nTooltip :show-after="300">
+			<template #content>
+				{{ i18n.baseText('deepseekHarness.studio.restart.tooltip') }}
+			</template>
+			<N8nIconButton
+				:class="$style.restartButton"
 				variant="ghost"
-				data-test-id="deepseek-harness-publish-button"
-				@click="publish"
-			>
-				<div :class="$style.flex">
-					<span
-						v-if="props.agent.published"
-						data-test-id="deepseek-harness-published-indicator"
-						:class="$style.indicatorDot"
-					/>
-					{{ props.agent.published ? i18n.baseText('generic.published') : i18n.baseText('workflows.publish') }}
-				</div>
-			</N8nButton>
-			<N8nActionDropdown
-				:items="actions"
-				placement="bottom-end"
-				data-test-id="deepseek-harness-publish-menu"
-				@select="onSelect"
-			>
-				<template #activator>
-					<N8nIconButton
-						:class="$style.groupButtonRight"
-						variant="ghost"
-						icon="chevron-down"
-						:aria-label="i18n.baseText('node.moreActions')"
-						data-test-id="deepseek-harness-publish-menu-button"
-					/>
-				</template>
-			</N8nActionDropdown>
+				icon="refresh-cw"
+				:loading="props.restarting"
+				:disabled="props.restarting"
+				:aria-label="i18n.baseText('deepseekHarness.studio.restart')"
+				data-test-id="deepseek-harness-restart-button"
+				@click="restart"
+			/>
+		</N8nTooltip>
+		<div :class="$style.publishButtonWrapper">
+			<div :class="$style.buttonGroup">
+				<N8nButton
+					:class="$style.groupButtonLeft"
+					variant="ghost"
+					data-test-id="deepseek-harness-publish-button"
+					@click="publish"
+				>
+					<div :class="$style.flex">
+						<span
+							v-if="props.agent.published"
+							data-test-id="deepseek-harness-published-indicator"
+							:class="$style.indicatorDot"
+						/>
+						{{
+							props.agent.published
+								? i18n.baseText('generic.published')
+								: i18n.baseText('workflows.publish')
+						}}
+					</div>
+				</N8nButton>
+				<N8nActionDropdown
+					:items="actions"
+					placement="bottom-end"
+					data-test-id="deepseek-harness-publish-menu"
+					@select="onSelect"
+				>
+					<template #activator>
+						<N8nIconButton
+							:class="$style.groupButtonRight"
+							variant="ghost"
+							icon="chevron-down"
+							:aria-label="i18n.baseText('node.moreActions')"
+							data-test-id="deepseek-harness-publish-menu-button"
+						/>
+					</template>
+				</N8nActionDropdown>
+			</div>
 		</div>
 	</div>
 </template>
 
 <style lang="scss" module>
+.actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--spacing--2xs);
+}
+
+.restartButton {
+	border: var(--border);
+	border-radius: var(--radius--3xs);
+}
+
 .publishButtonWrapper {
 	position: relative;
 	display: inline-flex;
