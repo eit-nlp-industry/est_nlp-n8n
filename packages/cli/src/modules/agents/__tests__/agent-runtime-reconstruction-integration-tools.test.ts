@@ -3,7 +3,7 @@ import { type AgentJsonConfig } from '@n8n/api-types';
 import type { Logger } from '@n8n/backend-common';
 import type { CustomFetch, HttpTransport, OutboundHttp } from '@n8n/backend-network';
 import { mockLogger } from '@n8n/backend-test-utils';
-import type { GlobalConfig } from '@n8n/config';
+import type { GlobalConfig, AgentsConfig } from '@n8n/config';
 import type {
 	User,
 	CredentialsEntity,
@@ -24,7 +24,6 @@ import type { OauthService } from '@/oauth/oauth.service';
 import type { Publisher } from '@/scaling/pubsub/publisher.service';
 import type { AiGatewayService } from '@/services/ai-gateway.service';
 import type { AiService } from '@/services/ai.service';
-import type { UrlService } from '@/services/url.service';
 import type { Telemetry } from '@/telemetry';
 import type { WorkflowFinderService } from '@/workflows/workflow-finder.service';
 
@@ -66,7 +65,7 @@ import type { AgentTaskSnapshotRepository } from '../repositories/agent-task-sna
 import type { AgentTaskRepository } from '../repositories/agent-task.repository';
 import type { AgentRepository } from '../repositories/agent.repository';
 import type { AgentSecureRuntime } from '../runtime/agent-secure-runtime';
-import { SubAgentForegroundRunner } from '../sub-agents/sub-agent-foreground-runner';
+import { SubAgentRunner } from '../sub-agents/sub-agent-runner';
 import type { SubAgentCleanupService } from '../sub-agents/sub-agent-cleanup.service';
 
 const agentId = 'agent-1';
@@ -119,12 +118,12 @@ function makeRuntimeReconstructionService(
 		mock<AgentFileRepository>(),
 		mock<ActiveExecutions>(),
 		mock<WorkflowRepository>(),
-		mock<UrlService>(),
 		mock<N8NCheckpointStorage>(),
 		mock<AgentSecureRuntime>(),
 		mock<EphemeralNodeExecutor>(),
 		mock<N8nMemory>(),
 		mock<OauthService>(),
+		mock(),
 		mock<AgentSandboxRuntimeService>(),
 		mock<AiService>(),
 		outboundHttp,
@@ -273,6 +272,8 @@ describe('AgentRuntimeReconstructionService integration tools', () => {
 			mock<AgentRunTracingService>(),
 			mock<ExternalHooks>(),
 			agentSandboxRuntimeService,
+			agentRepository,
+			mock<AgentsConfig>({ debugModelIo: false }),
 		);
 		agentIntegrationPersistenceService = new AgentIntegrationPersistenceService(
 			agentRepository,
@@ -344,7 +345,7 @@ describe('AgentRuntimeReconstructionService integration tools', () => {
 
 	describe('integration runtime tools', () => {
 		beforeEach(() => {
-			Container.set(SubAgentForegroundRunner, mock<SubAgentForegroundRunner>());
+			Container.set(SubAgentRunner, mock<SubAgentRunner>());
 		});
 
 		it('injects each credential integration context/action tool only once', async () => {

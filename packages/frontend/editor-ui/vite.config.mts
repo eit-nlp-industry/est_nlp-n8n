@@ -1,7 +1,6 @@
 // Each import in this file must resolve with no build step.
 // Put an import that needs a `dist` in `vitest.config.mts`.
 import vue from '@vitejs/plugin-vue';
-import { existsSync } from 'node:fs';
 import { resolve } from 'path';
 import { defineConfig, type UserConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -16,7 +15,7 @@ import legacy from '@vitejs/plugin-legacy';
 import browserslist from 'browserslist';
 import { isLocaleFile, sendLocaleUpdate } from './vite/i18n-locales-hmr-helpers';
 import { nodePopularityPlugin } from './vite/vite-plugin-node-popularity.mjs';
-import { editorUiAliases, jsonRenderRoot } from './vite/aliases.mjs';
+import { editorUiAliases } from './vite/aliases.mjs';
 import { DEFAULT_BACKEND_PORT, devServerPlugin, readDevPort } from './vite/dev-ports.mjs';
 // Imported from source, not from `@n8n/constants`: this file must resolve with no build step.
 import { HTML_NONCE_PLACEHOLDER } from '../../@n8n/constants/src/csp';
@@ -39,7 +38,7 @@ const singleInstanceDedupe = ['zod', 'vue', 'element-plus'];
 
 const alias = editorUiAliases(__dirname, packagesDir);
 
-const { RELEASE: release } = process.env;
+const { RELEASE: release, SENTRY_AUTH_TOKEN: sentryAuthToken } = process.env;
 
 const plugins: UserConfig['plugins'] = [
 	devServerPlugin(process.env),
@@ -73,15 +72,6 @@ const plugins: UserConfig['plugins'] = [
 		],
 	}),
 	vue(),
-	{
-		name: 'allow-eit-json-render',
-		configureServer(server) {
-			const root = jsonRenderRoot(__dirname);
-			if (existsSync(root)) {
-				server.config.server.fs.allow.push(root);
-			}
-		},
-	},
 	svgLoader({
 		svgoConfig: {
 			plugins: [
@@ -149,10 +139,19 @@ const plugins: UserConfig['plugins'] = [
 				sentryVitePlugin({
 					org: 'n8nio',
 					project: 'instance-frontend',
-					authToken: process.env.SENTRY_AUTH_TOKEN,
+					authToken: sentryAuthToken,
+					// Stop the deletion hook if the Sentry upload fails.
+					errorHandler: (error) => {
+						throw error;
+					},
 					telemetry: false,
 					release: {
 						name: `n8n@${release}`,
+					},
+					sourcemaps: {
+						// Sentry keeps these maps, so the image does not need them (156MB).
+						// Keep the maps if upload credentials are not available.
+						filesToDeleteAfterUpload: sentryAuthToken ? ['./dist/**/*.map'] : undefined,
 					},
 				}),
 			]
@@ -204,8 +203,11 @@ export default defineConfig({
 		minify: !!release,
 		// Coverage builds emit INLINE maps so browser V8 coverage carries the
 		// map in the script source and monocart resolves offsets back to src.
-		sourcemap: process.env.BUILD_WITH_COVERAGE === 'true' ? 'inline' : !!release,
+		// 'hidden' writes the maps but omits the sourceMappingURL comment.
+		// Deleted maps then cause no 404 in devtools.
+		sourcemap: process.env.BUILD_WITH_COVERAGE === 'true' ? 'inline' : release ? 'hidden' : false,
 		target,
+		cssTarget: target,
 	},
 	optimizeDeps: {
 		exclude: ['wa-sqlite'],

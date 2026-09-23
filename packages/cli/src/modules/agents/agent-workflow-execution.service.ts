@@ -8,6 +8,7 @@ import {
 	sanitizeAgentSkillBodies,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
+import { AgentsConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import { context } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
@@ -36,13 +37,14 @@ import {
 	buildAgentConfigurationTelemetryFromConfig,
 } from './agent-telemetry';
 import type { Agent } from './entities/agent.entity';
-import { ExecutionRecorder, type MessageRecord } from './execution-recorder';
+import { ExecutionRecorder, type MessageRecord, type TimelineEvent } from './execution-recorder';
 import { NodeToolAiGatewayService } from './json-config/node-tool-ai-gateway.service';
 import { AgentRepository } from './repositories/agent.repository';
 import { createInputDataTool } from './tools/input-data-tool';
 import { createWorkflowContextTool } from './tools/workflow-context-tool';
 import { createAgentCredentialProvider } from './utils/agent-credential-provider';
 import { createAgentExecutionCounter } from './utils/agent-execution-counter';
+import { debugModelIoOption } from './utils/debug-model-io-option';
 import { getPublishedAgentSnapshot } from './utils/agent-published-snapshot';
 import { streamAgentChunks } from './utils/agent-stream';
 import { validateNodeToolConfigs, validateNodeToolExpressions } from './utils/node-tool-validation';
@@ -98,6 +100,7 @@ export class AgentWorkflowExecutionService {
 		private readonly agentRunTracingService: AgentRunTracingService,
 		private readonly executionLevelTracer: ExecutionLevelTracer,
 		private readonly nodeToolAiGatewayService: NodeToolAiGatewayService,
+		private readonly agentsConfig: AgentsConfig,
 	) {}
 
 	private normalizeWorkflowStreamError(error: unknown, outputSchema?: JSONSchema7): Error {
@@ -352,6 +355,7 @@ export class AgentWorkflowExecutionService {
 						runType,
 					}),
 					...(telemetry ? { telemetry } : {}),
+					...debugModelIoOption(this.agentsConfig.debugModelIo),
 				});
 
 				if (recordingParams) {
@@ -474,6 +478,8 @@ export class AgentWorkflowExecutionService {
 			);
 		}
 
+		const modelTurns = modelTurnsFromTimeline(messageRecord.timeline);
+
 		return {
 			response: messageRecord.assistantResponse,
 			structuredOutput: structuredOutput ?? null,
@@ -487,6 +493,7 @@ export class AgentWorkflowExecutionService {
 			toolCalls,
 			finishReason: messageRecord.finishReason,
 			session,
+			...(modelTurns.length > 0 ? { modelTurns } : {}),
 		};
 	}
 
@@ -583,6 +590,7 @@ export class AgentWorkflowExecutionService {
 				userMessage: message,
 				source: AGENT_WORKFLOW_TRIGGER_TYPE,
 				telemetry: {
+					userId: telemetryUserId,
 					runType,
 					configuration: telemetryConfiguration,
 				},
@@ -609,6 +617,7 @@ export class AgentWorkflowExecutionService {
 					record: run.messageRecord,
 					source: AGENT_WORKFLOW_TRIGGER_TYPE,
 					telemetry: {
+						userId: telemetryUserId,
 						runType,
 						configuration: telemetryConfiguration,
 					},
@@ -733,6 +742,7 @@ export class AgentWorkflowExecutionService {
 		try {
 			this.telemetry.trackAgentTurnFinished({
 				agent_id: syntheticAgentId,
+				user_id: telemetryUserId,
 				thread_id: threadId,
 				run_type: runType,
 				agent_type: 'inline',
@@ -804,4 +814,32 @@ interface WorkflowAgentRunOutcome {
 	toolCalls: ExecuteAgentData['toolCalls'];
 	streamError?: Error;
 	agentExecutionId?: string;
+}
+
+function isModelTurnEvent(
+	event: TimelineEvent,
+): event is Extract<TimelineEvent, { type: 'model-turn' }> {
+	return event.type === 'model-turn';
+}
+
+function modelTurnsFromTimeline(
+	timeline: TimelineEvent[],
+): NonNullable<ExecuteAgentData['modelTurns']> {
+	return timeline.filter(isModelTurnEvent).map((event) => ({
+		turnIndex: event.turnIndex,
+		timestamp: event.timestamp,
+		endTime: event.endTime,
+		...(event.model !== undefined && { model: event.model }),
+		...(event.finishReason !== undefined && { finishReason: event.finishReason }),
+		...(event.usage !== undefined && { usage: event.usage }),
+		...(event.emptyRetries !== undefined &&
+			event.emptyRetries > 0 && { emptyRetries: event.emptyRetries }),
+		url: event.url,
+		...(event.method !== undefined && { method: event.method }),
+		...(event.status !== undefined && { status: event.status }),
+		...(event.streamed === true && { streamed: true }),
+		...(event.requestBody !== undefined && { requestBody: event.requestBody }),
+		...(event.responseBody !== undefined && { responseBody: event.responseBody }),
+		...(event.error !== undefined && { error: event.error }),
+	}));
 }

@@ -9,10 +9,7 @@
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
 		"paths": {
-			"@/*": ["./src/*"],
-			"@eit/json-render-protocol": [
-				"../../../../eit-json-render/packages/protocol/dist/index.d.ts"
-			]
+			"@/*": ["./src/*"]
 		},
 		"types": ["node", "vitest/globals", "vite/client"]
 	},

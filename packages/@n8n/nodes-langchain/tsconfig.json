@@ -28,10 +28,7 @@
 			// with Oracle to .d.cts so both agree on a single VectorStore identity.
 			// Must stay `.d.cts` (not extensionless): the base resolves to the ESM
 			// `.d.ts` and reintroduces the "two unrelated VectorStore types" error.
-			"@langchain/core/vectorstores": ["./node_modules/@langchain/core/dist/vectorstores.d.cts"],
-			"@eit/json-render-protocol": [
-				"../../../../eit-json-render/packages/protocol/dist/index.d.ts"
-			]
+			"@langchain/core/vectorstores": ["./node_modules/@langchain/core/dist/vectorstores.d.cts"]
 		},
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,

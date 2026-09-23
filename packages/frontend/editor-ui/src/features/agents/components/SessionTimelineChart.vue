@@ -71,7 +71,12 @@ const segments = computed<Segment[]>(() => {
 			out.push({ kind: 'idle', range: idles[idleIdx] });
 			idleIdx++;
 		}
-		const duration = item.endTimestamp ? item.endTimestamp - item.timestamp : INSTANT_MS;
+		const duration =
+			item.kind === 'model-turn'
+				? INSTANT_MS
+				: item.endTimestamp
+					? item.endTimestamp - item.timestamp
+					: INSTANT_MS;
 		out.push({ kind: 'event', item, index: i, duration });
 	}
 	while (idleIdx < idles.length) {
@@ -111,6 +116,8 @@ function popoverLabel(item: TimelineItem): string {
 			return i18n.baseText('agentSessions.timeline.user');
 		case 'agent':
 			return i18n.baseText('agentSessions.timeline.agent');
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurn');
 		case 'tool':
 			return i18n.baseText('agentSessions.timeline.tool');
 		case 'workflow':
@@ -136,6 +143,10 @@ function popoverName(item: TimelineItem): string {
 		case 'user':
 		case 'agent':
 			return truncate(item.content ?? '', 80);
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurnIndex', {
+				interpolate: { index: String((item.turnIndex ?? 0) + 1) },
+			});
 		case 'tool': {
 			return resolveToolNameForDisplay(item.toolName, i18n);
 		}

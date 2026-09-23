@@ -1,6 +1,7 @@
 import type { Agent as RuntimeAgent, StreamChunk } from '@n8n/agents';
 import type { AgentJsonConfig } from '@n8n/api-types';
 import { mockLogger } from '@n8n/backend-test-utils';
+import type { AgentsConfig } from '@n8n/config';
 import type { JSONSchema7 } from 'json-schema';
 import { OperationalError, UserError } from 'n8n-workflow';
 import type { ExecuteAgentWorkflowContext, IRunExecutionData } from 'n8n-workflow';
@@ -138,6 +139,7 @@ function makeService() {
 		agentRunTracingService,
 		executionLevelTracer,
 		nodeToolAiGatewayService,
+		mock<AgentsConfig>({ debugModelIo: false }),
 	);
 
 	return {
@@ -155,6 +157,63 @@ function makeService() {
 describe('AgentWorkflowExecutionService', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+	});
+
+	it('surfaces model-turn debug snapshots on the workflow node output', async () => {
+		const { service, agentRepository, reconstructionService } = makeService();
+		const runtime = makeRuntime([
+			{
+				type: 'model-turn',
+				turnIndex: 0,
+				timestamp: 100,
+				endTime: 200,
+				model: 'test-model',
+				finishReason: 'stop',
+				usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				streamed: true,
+				requestBody: { messages: [{ role: 'user', content: 'hello' }] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+				},
+			},
+			{ type: 'finish', finishReason: 'stop' },
+		]);
+
+		agentRepository.findByIdAndProjectId.mockResolvedValue(makeAgent());
+		reconstructionService.reconstructFromAgentEntity.mockResolvedValue(runtime);
+
+		const result = await service.executeForWorkflow(
+			agentId,
+			'hello',
+			'execution-1',
+			'thread-1',
+			projectId,
+			userId,
+		);
+
+		expect(result.modelTurns).toEqual([
+			{
+				turnIndex: 0,
+				timestamp: 100,
+				endTime: 200,
+				model: 'test-model',
+				finishReason: 'stop',
+				usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				streamed: true,
+				requestBody: { messages: [{ role: 'user', content: 'hello' }] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+				},
+			},
+		]);
 	});
 
 	it('executes workflow runs with thread-scoped persistence and tool-call output', async () => {
@@ -202,6 +261,7 @@ describe('AgentWorkflowExecutionService', () => {
 				toolCalls: [{ toolName: 'lookup', input: { id: 1 }, result: { ok: true } }],
 			}),
 		);
+		expect(result.modelTurns).toBeUndefined();
 
 		const streamOptions = runtime.agent.stream.mock.calls[0][1] as {
 			executionCounter: { incrementMessageCount: () => void };

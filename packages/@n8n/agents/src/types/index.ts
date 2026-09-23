@@ -188,6 +188,7 @@ export type {
 	ForwardedChildChunk,
 	SubAgentChunkPayload,
 } from './runtime/event';
+export type { ModelTurnDebugPayload } from './runtime/model-turn-debug';
 
 export type {
 	McpConnectionFailedEvent,

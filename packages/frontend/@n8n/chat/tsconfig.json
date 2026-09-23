@@ -13,13 +13,6 @@
 		"resolveJsonModule": true,
 		"types": ["vitest/globals", "vitest/browser", "@testing-library/vue"],
 		"paths": {
-			"@eit/json-render-element-plus": [
-				"../../../../../eit-json-render/packages/element-plus/dist/index.d.ts"
-			],
-			"@eit/json-render-protocol": [
-				"../../../../../eit-json-render/packages/protocol/dist/index.d.ts"
-			],
-			"@eit/json-render-vue": ["../../../../../eit-json-render/packages/vue/dist/index.d.ts"],
 			"@n8n/chat/*": ["./src/*"],
 			"@n8n/design-system*": ["../design-system/src*"]
 		},

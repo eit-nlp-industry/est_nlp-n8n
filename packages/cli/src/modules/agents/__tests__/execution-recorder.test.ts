@@ -185,6 +185,18 @@ describe('ExecutionRecorder', () => {
 			);
 		});
 
+		it('keeps the first stream error when a later wrapper error arrives', () => {
+			const recorder = new ExecutionRecorder();
+
+			recorder.record({ type: 'error', error: new Error('Thinking blocks cannot be modified') });
+			recorder.record({
+				type: 'error',
+				error: new Error('No output generated. Check the stream for errors.'),
+			});
+
+			expect(recorder.getMessageRecord().error).toBe('Thinking blocks cannot be modified');
+		});
+
 		it('captures text → tool call → text in order', () => {
 			const recorder = new ExecutionRecorder();
 
@@ -1132,5 +1144,43 @@ describe('ExecutionRecorder — durable timeline events', () => {
 			endTime: 20,
 			output: { name: 'Ada' },
 		});
+	});
+
+	it('records model-turn debug snapshots', () => {
+		const recorder = new ExecutionRecorder();
+		recorder.record({
+			type: 'model-turn',
+			turnIndex: 0,
+			timestamp: 100,
+			endTime: 200,
+			model: 'test-model',
+			finishReason: 'stop',
+			usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+			url: 'https://api.example.com/v1/chat',
+			method: 'POST',
+			status: 200,
+			streamed: true,
+			requestBody: { messages: [{ role: 'user', content: 'hi' }] },
+			responseBody: {
+				object: 'chat.completion',
+				choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+			},
+		});
+
+		const { timeline } = recorder.getMessageRecord();
+		expect(timeline).toEqual([
+			expect.objectContaining({
+				type: 'model-turn',
+				turnIndex: 0,
+				model: 'test-model',
+				finishReason: 'stop',
+				url: 'https://api.example.com/v1/chat',
+				requestBody: { messages: [{ role: 'user', content: 'hi' }] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+				},
+			}),
+		]);
 	});
 });

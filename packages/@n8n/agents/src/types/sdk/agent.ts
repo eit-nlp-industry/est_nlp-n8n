@@ -17,6 +17,7 @@ import type {
 	SubAgentStartedPayload,
 } from '../runtime/event';
 import type { SerializedMessageList } from '../runtime/message-list';
+import type { ModelTurnDebugPayload } from '../runtime/model-turn-debug';
 import type { BuiltTelemetry } from '../telemetry';
 import type { JSONObject, JSONValue } from '../utils/json';
 
@@ -159,6 +160,13 @@ export type StreamChunk = ContentMetadata &
 				structuredOutput?: unknown;
 		  }
 		| { type: 'error'; error: unknown }
+		| ({
+				/**
+				 * Opt-in raw HTTP IO for one model call. Emitted when
+				 * `ExecutionOptions.debugModelIo` is set. Not part of the AI SDK stream.
+				 */
+				type: 'model-turn';
+		  } & ModelTurnDebugPayload)
 		| {
 				/**
 				 * Non-fatal warning emitted during a run. The run continues — this
@@ -233,6 +241,12 @@ export interface ExecutionOptions {
 	 * persistence-backed CheckpointStore; recover via `crashResume()`.
 	 */
 	stepCheckpoints?: boolean;
+	/**
+	 * When true, emit a `model-turn` stream chunk (and AgentEvent) for each LLM
+	 * call with the request/response snapshot used by Session debug UI.
+	 * Off by default — payloads can be large and may contain sensitive data.
+	 */
+	debugModelIo?: boolean;
 }
 
 export interface PersistedExecutionOptions {

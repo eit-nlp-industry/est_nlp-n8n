@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import { incrementMessageCount, incrementTokenCountFromUsage } from './execution-counter';
 import { GenerateSink } from './generate-sink';
 import { hydrateFileParts } from './hydrate-file-parts';
+import { buildModelTurnDebugPayload, createRawModelHttpIo } from './model-turn-debug';
 import type { RunOutputSink, RunServices } from './run-output-sink';
 import { RuntimeContextBuilder } from './runtime-context';
 import {
@@ -447,6 +448,10 @@ export class AgentRuntime {
 			await this.ensureModelCost();
 
 			await this.memory.setListObservationLogMemory(list, state.persistence);
+			// The mask boundary is runtime-only state: re-derive it from the
+			// persisted cursor so a run that compacted mid-run before suspending
+			// does not resume with the full pre-compaction window.
+			await this.memory.applyObservationMask(list, state.persistence);
 
 			if (method === 'generate') {
 				const sink = new GenerateSink(this.createRunServices());
@@ -573,6 +578,7 @@ export class AgentRuntime {
 
 			await this.ensureModelCost();
 			await this.memory.setListObservationLogMemory(list, state.persistence);
+			await this.memory.applyObservationMask(list, state.persistence);
 
 			return {
 				runId: this.runId,
@@ -747,12 +753,66 @@ export class AgentRuntime {
 	 * those throws into their terminal contract.
 	 */
 	private async runAgentLoop<T>(ctx: LoopContext, sink: RunOutputSink<T>): Promise<T> {
-		const { list, options, abortScope, pendingResume } = ctx;
+		const { list, options } = ctx;
 		this.context.hydrateDeferredToolsFromList(list);
 		// Inject a model-facing note for any MCP servers that failed to connect
 		// during build(). The agent can mention the outage to the user when
 		// relevant; the note is system-message only and never persisted.
 		list.mcpConnectionNote = formatMcpConnectionNote(this.config.mcpConnectionFailures ?? []);
+
+		// Opt-in: tee each model HTTP call as complete raw request/response text.
+		// Install before createModel so the LanguageModel uses the wrapped fetch.
+		const previousModelFetch = this.config.modelFetch;
+		const httpIo = options?.debugModelIo ? createRawModelHttpIo(previousModelFetch) : undefined;
+		if (httpIo) {
+			this.config.modelFetch = httpIo.fetch;
+		}
+
+		const emitRawHttpModelTurns = async (args: {
+			turnIndex: number;
+			finishReason?: string;
+			usage?: TokenUsage;
+			emptyRetries?: number;
+		}): Promise<void> => {
+			if (!httpIo) return;
+			await httpIo.flush();
+			for (const http of httpIo.drain()) {
+				this.eventBus.emit({
+					type: AgentEvent.ModelTurn,
+					...buildModelTurnDebugPayload(
+						{
+							turnIndex: args.turnIndex,
+							model: this.modelIdString,
+							finishReason: args.finishReason,
+							usage: args.usage,
+							emptyRetries: args.emptyRetries,
+						},
+						http,
+					),
+				});
+			}
+		};
+
+		try {
+			return await this.runAgentLoopBody(ctx, sink, emitRawHttpModelTurns);
+		} finally {
+			if (httpIo) {
+				this.config.modelFetch = previousModelFetch;
+			}
+		}
+	}
+
+	private async runAgentLoopBody<T>(
+		ctx: LoopContext,
+		sink: RunOutputSink<T>,
+		emitRawHttpModelTurns: (args: {
+			turnIndex: number;
+			finishReason?: string;
+			usage?: TokenUsage;
+			emptyRetries?: number;
+		}) => Promise<void>,
+	): Promise<T> {
+		const { list, options, abortScope, pendingResume } = ctx;
 
 		let totalUsage: TokenUsage | undefined;
 		let lastFinishReason: FinishReason = 'stop';
@@ -844,6 +904,9 @@ export class AgentRuntime {
 			});
 			const finalized = await finishToolBatch(batch, pendingLoopContext.toolMap, iterationCount);
 			if (finalized.suspended) return finalized.result;
+			// The resumed batch is a clean boundary too: its tool results are new
+			// content no earlier boundary saw, so check before the next model call.
+			await this.memory.maybeObserveMidRun(list, options);
 		}
 
 		for (; iterationCount < maxIterations; iterationCount++) {
@@ -893,16 +956,18 @@ export class AgentRuntime {
 				aiSdkOptions: this.buildAiSdkOptions(toolMap, options),
 			};
 			let turn = await sink.callModel(modelCallContext);
+			await emitRawHttpModelTurns({
+				turnIndex: iterationCount,
+				finishReason: turn.finishReason,
+				usage: turn.usage,
+			});
 
 			// Some providers occasionally return a `stop` turn with no output at
 			// all mid-task, which would silently end the run with work half-done.
 			// Retry the call a bounded number of times before accepting the empty
 			// turn; each discarded attempt still bills its usage.
-			for (
-				let emptyRetry = 0;
-				emptyRetry < MAX_EMPTY_TURN_RETRIES && isEmptyModelTurn(turn);
-				emptyRetry++
-			) {
+			let emptyRetries = 0;
+			for (; emptyRetries < MAX_EMPTY_TURN_RETRIES && isEmptyModelTurn(turn); emptyRetries++) {
 				totalUsage = mergeUsage(totalUsage, turn.usage);
 				incrementTokenCountFromUsage(options?.executionCounter, turn.usage);
 				// Publish before the abort check so a cancel between the empty attempt
@@ -910,6 +975,12 @@ export class AgentRuntime {
 				sink.reportUsage(totalUsage);
 				this.assertNotAborted(abortScope);
 				turn = await sink.callModel(modelCallContext);
+				await emitRawHttpModelTurns({
+					turnIndex: iterationCount,
+					finishReason: turn.finishReason,
+					usage: turn.usage,
+					emptyRetries: emptyRetries + 1,
+				});
 			}
 
 			// Fold the just-finished turn's usage in before the abort check so a
@@ -946,6 +1017,10 @@ export class AgentRuntime {
 
 			// Emit TurnEnd after all tool calls in this iteration are processed
 			this.emitTurnEnd(turn.newMessages, extractSettledToolCalls(list.responseDelta()));
+
+			// Clean loop boundary: all tool calls settled. Mid-run observation
+			// may compact the LLM window here before the next call.
+			await this.memory.maybeObserveMidRun(list, options);
 
 			// Step boundary reached with nothing pending: durably checkpoint so a
 			// crash before the next model call loses only the in-flight step.
@@ -1137,7 +1212,11 @@ export class AgentRuntime {
 			return;
 		}
 
-		if (this.config.workspaceFilesystem) {
+		// Gated on this runtime instance having offloaded something: with lazy sandbox
+		// acquisition an unconditional cleanup would boot the sandbox just to find nothing.
+		// Runs resumed in a fresh process skip this (flag is per-instance); their orphaned
+		// run dirs are swept by reconcileToolResultRuns on a later acquisition.
+		if (this.config.workspaceFilesystem && this.toolExecutor.hasOffloadedToolResults) {
 			try {
 				await removeToolResultRun(this.config.workspaceFilesystem, this.runId);
 			} catch (error) {

@@ -123,6 +123,32 @@ describe('MessageAnAgent Node', () => {
 		expect(result[0][0].json).not.toHaveProperty('text');
 	});
 
+	it('includes modelTurns on the item json when the agent returns debug snapshots', async () => {
+		executeFunctions.getInputData.mockReturnValue([{ json: {} }]);
+		mockParams();
+		const modelTurns = [
+			{
+				turnIndex: 0,
+				timestamp: 100,
+				endTime: 200,
+				model: 'test-model',
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				requestBody: { messages: [] },
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+				},
+			},
+		];
+		executeFunctions.executeAgent.mockResolvedValue({ ...mockAgentResult, modelTurns });
+
+		const result = await node.execute.call(executeFunctions);
+
+		expect(result[0][0].json.modelTurns).toEqual(modelTurns);
+	});
+
 	it('should forward a user-supplied sessionId from the Advanced collection', async () => {
 		executeFunctions.getInputData.mockReturnValue([{ json: {} }]);
 		mockParams({ advanced: { sessionId: '  thread-42  ' } });

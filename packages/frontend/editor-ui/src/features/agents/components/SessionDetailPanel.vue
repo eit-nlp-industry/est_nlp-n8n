@@ -203,6 +203,11 @@ const headerTitle = computed((): string => {
 	if (item.kind === 'node') return item.nodeDisplayName ?? formatToolNameForDisplay(item.toolName);
 	if (item.kind === 'user') return i18n.baseText('agentSessions.timeline.user');
 	if (item.kind === 'agent') return i18n.baseText('agentSessions.timeline.agent');
+	if (item.kind === 'model-turn') {
+		return i18n.baseText('agentSessions.timeline.modelTurnIndex', {
+			interpolate: { index: String((item.turnIndex ?? 0) + 1) },
+		});
+	}
 	if (item.kind === 'execution-error') return executionErrorLabel(item, i18n);
 	if (item.kind === 'suspension') {
 		return item.hitlRequestType === 'approval'
@@ -223,6 +228,7 @@ const headerIcon = computed((): IconName => {
 	if (item.kind === 'node') return 'box';
 	if (item.kind === 'user') return 'user';
 	if (item.kind === 'agent') return 'bot';
+	if (item.kind === 'model-turn') return 'brain';
 	if (item.kind === 'execution-error') return 'circle-x';
 	if (item.kind === 'hitl-response') return 'message-square';
 	return 'clock';
@@ -309,6 +315,59 @@ const workflowFormOutput = computed((): { formUrl: string; message: string } | n
 						<dt :class="$style.label">{{ i18n.baseText('agentSessions.timeline.created') }}</dt>
 						<dd :class="$style.value">{{ formatTimestamp(item.timestamp) }}</dd>
 					</dl>
+					<template v-if="item.kind === 'model-turn'">
+						<dl v-if="item.modelName" :class="$style.infoRow">
+							<dt :class="$style.label">{{ i18n.baseText('agentSessions.timeline.model') }}</dt>
+							<dd :class="$style.value">{{ item.modelName }}</dd>
+						</dl>
+						<dl v-if="item.modelUrl" :class="$style.infoRow">
+							<dt :class="$style.label">{{ i18n.baseText('agentSessions.timeline.modelUrl') }}</dt>
+							<dd :class="$style.value">{{ item.modelUrl }}</dd>
+						</dl>
+						<dl v-if="item.modelMethod || item.modelStatus !== undefined" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelHttp') }}
+							</dt>
+							<dd :class="$style.value">
+								{{
+									[
+										item.modelMethod,
+										item.modelStatus !== undefined ? String(item.modelStatus) : null,
+									]
+										.filter(Boolean)
+										.join(' · ')
+								}}{{ item.modelStreamed ? ' · SSE' : '' }}
+							</dd>
+						</dl>
+						<dl v-if="item.finishReason" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.finishReason') }}
+							</dt>
+							<dd :class="$style.value">{{ item.finishReason }}</dd>
+						</dl>
+						<dl v-if="item.modelUsage" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.tokenUsage') }}
+							</dt>
+							<dd :class="$style.value">
+								{{ item.modelUsage.promptTokens }} → {{ item.modelUsage.completionTokens }} ({{
+									item.modelUsage.totalTokens
+								}})
+							</dd>
+						</dl>
+						<dl v-if="item.emptyRetries" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.emptyRetries') }}
+							</dt>
+							<dd :class="$style.value">{{ item.emptyRetries }}</dd>
+						</dl>
+						<dl v-if="item.modelError" :class="$style.infoRow">
+							<dt :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelError') }}
+							</dt>
+							<dd :class="$style.value">{{ item.modelError }}</dd>
+						</dl>
+					</template>
 					<dl
 						v-if="item.kind === 'suspension' || item.kind === 'hitl-response'"
 						:class="$style.infoRow"
@@ -436,6 +495,21 @@ const workflowFormOutput = computed((): { formUrl: string; message: string } | n
 							:node-parameters="item.nodeParameters"
 							:success="item.toolOutcome ? item.toolOutcome !== 'error' : item.toolSuccess"
 						/>
+					</template>
+
+					<template v-else-if="item.kind === 'model-turn'">
+						<div data-test-id="model-turn-request">
+							<div :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelRequest') }}
+							</div>
+							<N8nCodeBlock :code="stringifyJson(item.modelRequestBody)" language="json" />
+						</div>
+						<div data-test-id="model-turn-response">
+							<div :class="$style.label">
+								{{ i18n.baseText('agentSessions.timeline.modelResponse') }}
+							</div>
+							<N8nCodeBlock :code="stringifyJson(item.modelResponseBody)" language="json" />
+						</div>
 					</template>
 
 					<template v-else-if="item.kind === 'agent' && agentStructuredContent !== undefined">

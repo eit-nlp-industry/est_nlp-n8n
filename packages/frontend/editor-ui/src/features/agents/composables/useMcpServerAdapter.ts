@@ -2,7 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { NodeHelpers } from 'n8n-workflow';
 import type { INode, INodeCredentials, INodeParameters, INodeTypeDescription } from 'n8n-workflow';
 
-import { AI_MCP_TOOL_NODE_TYPE } from '@/app/constants/nodeTypes';
+import {
+	AI_MCP_TOOL_NODE_TYPE,
+	AI_RAGFLOW_MCP_TOOL_NODE_TYPE,
+	isAiMcpClientToolNodeType,
+} from '@/app/constants/nodeTypes';
 import type { AgentJsonMcpServerConfig } from '../types';
 import type { McpAuthenticationSchemaType } from '@n8n/api-types';
 
@@ -123,7 +127,8 @@ function resolveCredentialId(credentials: INodeCredentials | undefined): string 
 
 function resolveAuthenticationFromNode(node: INode): string {
 	const authentication = toStringValue(node.parameters.authentication);
-	if (authentication) return authentication;
+	// for mcp registry nodes use credential name directly
+	if (authentication && !isMcpRegistryNodeType(node.type)) return authentication;
 
 	const credentialType = resolveCredentialType(node.credentials);
 	if (credentialType) return CREDENTIAL_TYPE_TO_AUTHENTICATION[credentialType] ?? credentialType;
@@ -136,7 +141,11 @@ function isMcpRegistryNodeType(nodeTypeName: string): boolean {
 }
 
 function isMcpClientNodeType(nodeTypeName: string): boolean {
-	return nodeTypeName === AI_MCP_TOOL_NODE_TYPE || nodeTypeName === 'mcpClientTool';
+	return (
+		isAiMcpClientToolNodeType(nodeTypeName) ||
+		nodeTypeName === 'mcpClientTool' ||
+		nodeTypeName === 'ragFlowMcpClientTool'
+	);
 }
 
 function resolveMetadata(
@@ -147,6 +156,15 @@ function resolveMetadata(
 
 	if (isMcpRegistryNodeType(nodeTypeName)) {
 		metadata.nodeTypeName = nodeTypeName;
+	} else if (nodeTypeName === AI_RAGFLOW_MCP_TOOL_NODE_TYPE) {
+		// Keep preset MCP client types so reconnect/edit does not fall back to generic MCP Client.
+		metadata.nodeTypeName = nodeTypeName;
+	} else if (nodeTypeName === AI_MCP_TOOL_NODE_TYPE || nodeTypeName === 'mcpClientTool') {
+		delete metadata.nodeTypeName;
+	} else if (isMcpClientNodeType(nodeTypeName)) {
+		metadata.nodeTypeName = nodeTypeName.startsWith('@')
+			? nodeTypeName
+			: `@n8n/n8n-nodes-langchain.${nodeTypeName}`;
 	} else {
 		delete metadata.nodeTypeName;
 	}
@@ -214,9 +232,10 @@ export function nodeTypeToNewMcpServer(nodeType: INodeTypeDescription): AgentJso
 
 	const authentication = resolveDefaultAuthentication(nodeType, defaults);
 	const serverTransport = defaults.serverTransport;
-	const metadata = isMcpRegistryNodeType(nodeType.name)
-		? { nodeTypeName: nodeType.name }
-		: undefined;
+	const metadata =
+		isMcpRegistryNodeType(nodeType.name) || nodeType.name === AI_RAGFLOW_MCP_TOOL_NODE_TYPE
+			? { nodeTypeName: nodeType.name }
+			: undefined;
 
 	return {
 		name: slugify(nodeType.displayName.replace(/\s+tool$/i, '')),
@@ -226,6 +245,18 @@ export function nodeTypeToNewMcpServer(nodeType: INodeTypeDescription): AgentJso
 		connectionTimeoutMs: resolveDefaultTimeout(nodeType),
 		metadata,
 	};
+}
+
+function resolveAuthenticationParameterFromCredentialType(
+	credentialType: string,
+	nodeTypeDescription: INodeTypeDescription,
+) {
+	const credentials = nodeTypeDescription.credentials;
+	const credential = credentials?.find((credential) => credential.name === credentialType);
+	const showCondition = credential?.displayOptions?.show?.authentication?.[0];
+	// node type with authentication selector store the authentication option in the displayOptions.show.authentication
+	// single auth method nodes don't have "authentication" parameter
+	return showCondition ? showCondition : undefined;
 }
 
 export function mcpServerToNode(
@@ -244,6 +275,9 @@ export function mcpServerToNode(
 			: undefined;
 	const toolFilterParams = resolveNodeToolFilter(server.toolFilter);
 	const options = server.connectionTimeoutMs ? { timeout: server.connectionTimeoutMs } : {};
+	const authentication = isMcpRegistryNodeType(nodeTypeDescription.name)
+		? resolveAuthenticationParameterFromCredentialType(server.authentication, nodeTypeDescription)
+		: server.authentication;
 
 	return {
 		id: uuidv4(),
@@ -253,7 +287,7 @@ export function mcpServerToNode(
 		parameters: {
 			endpointUrl: server.url,
 			serverTransport: toNodeTransport(server.transport),
-			authentication: server.authentication,
+			authentication,
 			...toolFilterParams,
 			options,
 		},

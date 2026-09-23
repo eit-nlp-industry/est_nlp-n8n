@@ -1,5 +1,5 @@
 import {
-	AI_MCP_TOOL_NODE_TYPE,
+	isAiMcpClientToolNodeType,
 	LIST_LIKE_NODE_OPERATIONS,
 	MAIN_HEADER_TABS,
 	NODE_MIN_INPUT_ITEMS_COUNT,
@@ -427,7 +427,7 @@ export function getGenericHints({
 	// tools hints
 	if (
 		node?.type.toLocaleLowerCase().includes('tool') &&
-		node?.type !== AI_MCP_TOOL_NODE_TYPE &&
+		!isAiMcpClientToolNodeType(node?.type) &&
 		hasNodeRun
 	) {
 		const stringifiedParameters = JSON.stringify(workflowNode.parameters);

@@ -64,12 +64,28 @@ export class AgentsConfig {
 	tracingRecordOutputs: boolean = true;
 
 	/**
+	 * When true, each LLM turn is recorded on the agent session timeline with the
+	 * raw request/response snapshot (for debug). Off by default — payloads can be
+	 * large and may contain sensitive data.
+	 */
+	@Env('N8N_AGENTS_DEBUG_MODEL_IO')
+	debugModelIo: boolean = false;
+
+	/**
 	 * Comma-separated list of agent sub-feature modules to enable. Each entry
 	 * gates a specific frontend/runtime capability inside the agents module.
 	 * Add supported module tokens to `AGENTS_MODULE_NAMES`.
 	 */
 	@Env('N8N_AGENTS_MODULES')
 	modules: AgentsModuleArray = [];
+
+	/**
+	 * Enable durable background jobs for agents: spawning sub-agents that outlive
+	 * the parent's turn, and detached tracking of waiting workflow tools. Must be
+	 * set to the same value on mains and workers — workers settle workflow jobs.
+	 */
+	@Env('N8N_AGENTS_BACKGROUND_TASKS_ENABLED')
+	backgroundTasksEnabled: boolean = false;
 
 	/** Enable sandbox-backed agent knowledge base operations. */
 	@Env('N8N_AGENTS_AI_SANDBOX_ENABLED')

@@ -1,4 +1,4 @@
-import type { StreamChunk } from '@n8n/agents';
+import type { ModelTurnDebugPayload, StreamChunk } from '@n8n/agents';
 import {
 	applyForwardedChildChunk,
 	emptyChildTrace,
@@ -267,6 +267,7 @@ export interface RecordedUsage {
 export type TimelineEvent =
 	| { type: 'text'; content: string; timestamp: number; endTime?: number }
 	| { type: 'reasoning'; content: string; timestamp: number; endTime?: number }
+	| ({ type: 'model-turn' } & ModelTurnDebugPayload)
 	| {
 			type: 'tool-call';
 			kind: 'tool' | 'workflow' | 'node';
@@ -475,10 +476,33 @@ export class ExecutionRecorder {
 					}),
 				});
 				break;
+			case 'model-turn':
+				this.flushReasoningBuffer();
+				this.flushTextBuffer();
+				this.appendCompletedEvent({
+					type: 'model-turn',
+					turnIndex: chunk.turnIndex,
+					timestamp: chunk.timestamp,
+					endTime: chunk.endTime,
+					...(chunk.model !== undefined && { model: chunk.model }),
+					...(chunk.finishReason !== undefined && { finishReason: chunk.finishReason }),
+					...(chunk.usage !== undefined && { usage: chunk.usage }),
+					...(chunk.emptyRetries !== undefined &&
+						chunk.emptyRetries > 0 && { emptyRetries: chunk.emptyRetries }),
+					url: chunk.url,
+					...(chunk.method !== undefined && { method: chunk.method }),
+					...(chunk.status !== undefined && { status: chunk.status }),
+					...(chunk.streamed === true && { streamed: true }),
+					// Raw HTTP bodies — no scrub/truncate (debug opt-in only).
+					...(chunk.requestBody !== undefined && { requestBody: chunk.requestBody }),
+					...(chunk.responseBody !== undefined && { responseBody: chunk.responseBody }),
+					...(chunk.error !== undefined && { error: chunk.error }),
+				});
+				break;
 			case 'error': {
 				this.flushReasoningBuffer();
 				this.flushTextBuffer();
-				this.error = normaliseStreamError(chunk.error);
+				this.error ??= normaliseStreamError(chunk.error);
 				break;
 			}
 		}
