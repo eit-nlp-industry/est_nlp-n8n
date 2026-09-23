@@ -3,4 +3,5 @@
 
 .n8n-chat {
 	@include meta.load-css('highlight.js/styles/github');
+	@include meta.load-css('element-plus/dist/index.css');
 }

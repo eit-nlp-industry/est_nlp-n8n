@@ -694,6 +694,7 @@ export const confirmationInputTypeSchema = z.enum([
 	'plan-review',
 	'resource-decision',
 	'continue',
+	'json-render',
 ]);
 export type InstanceAiConfirmationInputType = z.infer<typeof confirmationInputTypeSchema>;
 
@@ -795,6 +796,10 @@ export const confirmationRequestPayloadSchema = z.object({
 	mcpConnectRequest: mcpConnectRequestSchema
 		.optional()
 		.describe('When present, renders the inline "Available tools" MCP connect card'),
+	jsonRender: z
+		.record(z.string(), z.unknown())
+		.optional()
+		.describe('json-render payload for decision UI (inputType=json-render)'),
 });
 export type InstanceAiConfirmationRequestPayload = z.infer<typeof confirmationRequestPayloadSchema>;
 
@@ -842,6 +847,8 @@ export function isDisplayableConfirmationRequest(
 			return hasItems(payload.planItems) || argsContainPlannedTasks(payload.args);
 		case 'resource-decision':
 			return payload.resourceDecision !== undefined;
+		case 'json-render':
+			return payload.jsonRender !== undefined;
 		default:
 			return assertNever(inputType);
 	}
@@ -1529,10 +1536,43 @@ export type InstanceAiRunLimitMeta = {
 // Frontend store types (shared so both sides agree on structure)
 // ---------------------------------------------------------------------------
 
-export type InstanceAiConfirmation = Omit<
-	InstanceAiConfirmationRequestPayload,
-	'toolCallId' | 'toolName' | 'args'
-> & { expired?: boolean };
+export interface InstanceAiConfirmation {
+	requestId: string;
+	inputThreadId?: string;
+	severity: InstanceAiConfirmationSeverity;
+	message: string;
+	targetApproval?: InstanceAiTargetApproval;
+	credentialRequests?: InstanceAiCredentialRequest[];
+	requireUserSelection?: boolean;
+	projectId?: string;
+	inputType?:
+		| 'approval'
+		| 'text'
+		| 'questions'
+		| 'plan-review'
+		| 'resource-decision'
+		| 'continue'
+		| 'json-render';
+	domainAccess?: DomainAccessMeta;
+	webSearch?: WebSearchMeta;
+	credentialFlow?: InstanceAiCredentialFlow;
+	setupRequests?: InstanceAiWorkflowSetupNode[];
+	workflowId?: string;
+	planItems?: PlannedTaskArg[];
+	questions?: Array<{
+		id: string;
+		question: string;
+		type: 'single' | 'multi' | 'text';
+		options?: string[];
+	}>;
+	introMessage?: string;
+	tasks?: TaskList;
+	resourceDecision?: GatewayConfirmationRequiredPayload;
+	channelConfig?: InstanceAiChannelConfig;
+	mcpConnectRequest?: InstanceAiMcpConnectRequest;
+	jsonRender?: Record<string, unknown>;
+	expired?: boolean;
+}
 
 export interface InstanceAiToolCallState {
 	toolCallId: string;
@@ -1549,6 +1589,7 @@ export interface InstanceAiToolCallState {
 		| 'planner'
 		| 'eval-setup'
 		| 'skill'
+		| 'json-render'
 		| 'default';
 	confirmation?: InstanceAiConfirmation;
 	confirmationStatus?: 'pending' | 'approved' | 'denied';
@@ -2193,6 +2234,7 @@ export function getRenderHint(toolName: string): InstanceAiToolCallState['render
 	if (toolName === 'research-with-agent') return 'researcher';
 	if (toolName === 'create-tasks') return 'planner';
 	if (toolName === 'eval-setup-with-agent') return 'eval-setup';
+	if (toolName === 'render-ui') return 'json-render';
 	if (
 		['create_skills', 'list_skills', 'read_skill', 'update_skill', 'load_skill'].includes(toolName)
 	)

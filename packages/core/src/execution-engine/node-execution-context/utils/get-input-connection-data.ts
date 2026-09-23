@@ -3,7 +3,7 @@ import { DynamicStructuredTool, StructuredTool, Tool } from '@langchain/core/too
 import { sleep } from '@n8n/utils/sleep';
 import type {
 	AINodeConnectionType,
-	ChatNodeMessageWithButtons,
+	ChatNodeMessage,
 	CloseFunction,
 	GenericValue,
 	IDataObject,
@@ -193,7 +193,7 @@ function mapResult(result?: NodeOutput) {
 		| Array<IDataObject | GenericValue | GenericValue[] | IDataObject[]>
 		| undefined;
 	let nodeHasMixedJsonAndBinaryData = false;
-	let sendMessage: ChatNodeMessageWithButtons | string | undefined = undefined;
+	let sendMessage: ChatNodeMessage | undefined = undefined;
 
 	if (result === undefined) {
 		response = undefined;

@@ -555,6 +555,10 @@ export function useAgentChatStream(params: UseAgentChatStreamParams) {
 					const currentInteractive = getMessageInteractive(found.msg, event.toolCallId);
 					const updated = rebuildInteractiveFromHistory(found.tc);
 					if (updated && currentInteractive?.resolvedAt === undefined) {
+						// A later tool-result must not drop the run that resume needs.
+						if (!updated.runId && currentInteractive.runId) {
+							updated.runId = currentInteractive.runId;
+						}
 						upsertMessageInteractive(found.msg, updated);
 					}
 					markMessageSuccessIfSettled(found.msg);

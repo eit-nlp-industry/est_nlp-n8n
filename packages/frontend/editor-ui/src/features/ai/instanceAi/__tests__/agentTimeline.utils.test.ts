@@ -7,6 +7,7 @@ import type {
 import {
 	buildTimelineBlocks,
 	extractArtifacts,
+	getResolvedInteractionDecision,
 	isStreamingTimelineEntry,
 } from '../agentTimeline.utils';
 
@@ -267,6 +268,20 @@ describe('extractArtifacts', () => {
 	});
 });
 
+describe('getResolvedInteractionDecision', () => {
+	test('reconstructs submitted values from the persisted tool result after reload', () => {
+		expect(
+			getResolvedInteractionDecision(
+				makeToolCall({ result: { decided: true, value: { destination: 'Lab' } }, confirmationStatus: 'approved' }),
+			),
+		).toEqual({ status: 'submitted', values: { destination: 'Lab' } });
+	});
+
+	test('keeps the immediate local decision before the tool result arrives', () => {
+		expect(getResolvedInteractionDecision(makeToolCall({ isLoading: true }), { status: 'cancelled' })).toEqual({ status: 'cancelled' });
+	});
+});
+
 describe('buildTimelineBlocks', () => {
 	const reasoning = (responseId?: string): InstanceAiTimelineEntry => ({
 		type: 'reasoning',
@@ -304,6 +319,71 @@ describe('buildTimelineBlocks', () => {
 		expect(blocks).toHaveLength(1);
 		expect(blocks[0].type).toBe('thinking');
 		expect(blocks[0].type === 'thinking' && blocks[0].entries).toHaveLength(4);
+	});
+
+	test('render-ui dashboards render as a standalone block outside thinking', () => {
+		const blocks = blocksOf(
+			[reasoning('r1'), toolEntry('tc-1', 'r1'), text('Dashboard is ready.', 'r1')],
+			[
+				makeToolCall({
+					toolCallId: 'tc-1',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'text', 'json-render-answer']);
+	});
+
+	test('json-render confirmations retain a separate transcript slot after resolution', () => {
+		const blocks = blocksOf(
+			[reasoning('r1'), toolEntry('tc-1', 'r1'), text('Decision received.', 'r1')],
+			[
+				makeToolCall({
+					confirmationStatus: 'approved',
+					confirmation: {
+						requestId: 'request-1',
+						severity: 'info',
+						message: 'Choose an action',
+						inputType: 'json-render',
+						jsonRender: { format: 'json-render-v1' },
+					},
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual([
+			'thinking',
+			'json-render-interaction',
+			'text',
+		]);
+	});
+
+	test('multiple render-ui calls stack in one answer zone after text', () => {
+		const blocks = blocksOf(
+			[
+				reasoning('r1'),
+				toolEntry('tc-1', 'r1'),
+				toolEntry('tc-2', 'r1'),
+				text('Here is the comparison.', 'r1'),
+			],
+			[
+				makeToolCall({
+					toolCallId: 'tc-1',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+				makeToolCall({
+					toolCallId: 'tc-2',
+					toolName: 'render-ui',
+					renderHint: 'json-render',
+				}),
+			],
+		);
+
+		expect(blocks.map((block) => block.type)).toEqual(['thinking', 'text', 'json-render-answer']);
+		expect(blocks[2]?.type === 'json-render-answer' && blocks[2].toolCalls).toHaveLength(2);
 	});
 
 	test('an mcp connect confirmation renders as a standalone block', () => {

@@ -17,6 +17,14 @@ export const ASK_EMBEDDING_CREDENTIAL_TOOL_NAME = 'ask_embedding_credential' as 
  * maps them to this value before dispatching to the approval card component.
  */
 export const APPROVAL_TOOL_NAME = 'approval' as const;
+/**
+ * Frontend-only discriminator for json-render decision cards.
+ *
+ * The wire keeps the underlying node-tool name (e.g. `render_interaction`);
+ * the FE maps a `{ type: 'json-render-interaction' }` suspend payload to this
+ * value before dispatching to the form renderer.
+ */
+export const JSON_RENDER_INTERACTION_TOOL_NAME = 'json-render-interaction' as const;
 
 // ---------------------------------------------------------------------------
 // ask_credential

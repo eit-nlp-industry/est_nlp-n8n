@@ -18,6 +18,27 @@ describe(parseMessage, () => {
 		]);
 	});
 
+	it('should parse AI message containing json-render JSON', () => {
+		const payload = {
+			format: 'json-render-v1',
+			schemaVersion: '1.0',
+			spec: { root: 'root', elements: { root: { type: 'Card', props: { title: 'Weather' } } } },
+		};
+		const json = JSON.stringify({
+			type: 'json-render',
+			payload,
+		});
+
+		const result = parseMessage({ type: 'ai', content: json });
+
+		expect(result).toEqual([
+			{
+				type: 'json-render',
+				payload,
+			},
+		]);
+	});
+
 	it('should parse AI message containing with-buttons JSON', () => {
 		const json = JSON.stringify({
 			type: 'with-buttons',

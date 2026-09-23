@@ -5,11 +5,15 @@ import type {
 	InstanceAiToolCallState,
 	TaskList,
 } from '@n8n/api-types';
+import { N8nCard, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { computed } from 'vue';
+import JsonRenderInteractionPanel from '@/features/ai/shared/JsonRenderInteractionPanel.vue';
+import { extractJsonRenderPayload } from '@/features/ai/shared/jsonRender.utils';
 import {
 	buildTimelineBlocks,
 	extractArtifacts,
+	getResolvedInteractionDecision,
 	isStreamingTimelineEntry,
 	type ArtifactInfo,
 } from '../agentTimeline.utils';
@@ -20,6 +24,7 @@ import AgentSection from './AgentSection.vue';
 import AnsweredQuestions from './AnsweredQuestions.vue';
 import ArtifactCard from './ArtifactCard.vue';
 import InstanceAiMcpConnect from './InstanceAiMcpConnect.vue';
+import JsonRenderAnswerCards from './JsonRenderAnswerCards.vue';
 import PlanReviewPanel, { type PlannedTaskArg, type PlanReviewStatus } from './PlanReviewPanel.vue';
 import TaskChecklist from './TaskChecklist.vue';
 import ThinkingBlock from './ThinkingBlock.vue';
@@ -179,6 +184,12 @@ function isCardReadOnly(tc: InstanceAiToolCallState): boolean {
 	return !!requestId && thread.resolvedConfirmationIds.has(requestId);
 }
 
+function getInteractionDecision(tc: InstanceAiToolCallState) {
+	const requestId = tc.confirmation?.requestId;
+	if (!requestId) return undefined;
+	return getResolvedInteractionDecision(tc, thread.interactionDecisions.get(requestId));
+}
+
 function handlePlanApprove(tc: InstanceAiToolCallState) {
 	const requestId = tc.confirmation?.requestId;
 	if (!requestId) return;
@@ -282,6 +293,34 @@ function mapTaskItemsToPlannedTasks(tasks?: TaskList): PlannedTaskArg[] | undefi
 			/>
 
 			<TaskChecklist v-else-if="block.type === 'tasks'" :tasks="props.agentNode.tasks" />
+
+			<JsonRenderAnswerCards
+				v-else-if="block.type === 'json-render-answer'"
+				:tool-calls="block.toolCalls"
+				:class="$style.timelineItem"
+			/>
+
+			<N8nCard
+				v-else-if="
+					block.type === 'json-render-interaction' &&
+					block.toolCall.confirmation?.jsonRender &&
+					getInteractionDecision(block.toolCall) &&
+					extractJsonRenderPayload(block.toolCall.confirmation.jsonRender)
+				"
+				:class="$style.timelineItem"
+			>
+				<N8nText v-if="block.toolCall.confirmation?.message" tag="div" bold>
+					{{ block.toolCall.confirmation.message }}
+				</N8nText>
+				<JsonRenderInteractionPanel
+					:payload="extractJsonRenderPayload(block.toolCall.confirmation!.jsonRender!)!"
+					:instance-id="`hitl-${block.toolCall.confirmation!.requestId}`"
+					:intro-message="block.toolCall.confirmation!.introMessage"
+					:values="getInteractionDecision(block.toolCall)?.values"
+					:status="getInteractionDecision(block.toolCall)!.status"
+					:disabled="true"
+				/>
+			</N8nCard>
 
 			<PlanReviewPanel
 				v-else-if="block.type === 'plan-review'"

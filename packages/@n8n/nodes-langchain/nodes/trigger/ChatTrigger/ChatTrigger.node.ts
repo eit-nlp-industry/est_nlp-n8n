@@ -48,6 +48,7 @@ import { createPage } from './templates';
 import { assertValidLoadPreviousSessionOption, type ChatFrameIdentity } from './types';
 
 const isPublicChatTriggerDisabled = () => Container.get(ChatTriggerConfig).disablePublicChat;
+const getChatAssetsUrl = () => Container.get(ChatTriggerConfig).chatAssetsUrl.trim();
 
 /**
  * Merges the server-verified identity into the emitted item's `json`.
@@ -1116,6 +1117,7 @@ export class ChatTrigger extends Node {
 					customCss: options.customCss,
 					enableStreaming,
 					frameIdentity,
+					chatAssetsUrl: getChatAssetsUrl(),
 				});
 
 				res.status(200).send(page).end();

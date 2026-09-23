@@ -150,6 +150,68 @@ describe('rebuildInteractiveFromHistory', () => {
 		expect(result?.resolvedValue).toEqual({ type: 'button', value: 'cancel' });
 	});
 
+	it('rebuilds an OPEN json-render interaction card from the suspend payload', () => {
+		const jsonRender = {
+			format: 'json-render-v1',
+			spec: { root: 'root', elements: {} },
+			meta: { title: 'Choose next' },
+		};
+		const result = rebuildInteractiveFromHistory({
+			tool: 'render_interaction',
+			toolCallId: 'call-json-render-1',
+			input: { title: 'Choose next' },
+			suspendPayload: {
+				type: 'json-render-interaction',
+				jsonRender,
+				message: 'Choose next',
+			},
+			state: 'suspended',
+		});
+
+		expect(result?.toolName).toBe('json-render-interaction');
+		expect(result?.resolvedAt).toBeUndefined();
+		expect(result?.input).toEqual({
+			type: 'json-render-interaction',
+			jsonRender,
+			message: 'Choose next',
+		});
+	});
+
+	it('keeps the suspended run id on a rebuilt json-render card', () => {
+		const result = rebuildInteractiveFromHistory({
+			tool: 'render_interaction',
+			toolCallId: 'call-json-render-1',
+			runId: 'run-json-render',
+			input: { title: 'Choose next' },
+			suspendPayload: {
+				type: 'json-render-interaction',
+				jsonRender: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+			},
+			state: 'suspended',
+		});
+
+		expect(result?.runId).toBe('run-json-render');
+	});
+
+	it('resolves a json-render interaction card from the decided tool output', () => {
+		const result = rebuildInteractiveFromHistory({
+			tool: 'render_interaction',
+			toolCallId: 'call-json-render-1',
+			suspendPayload: {
+				type: 'json-render-interaction',
+				jsonRender: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+			},
+			output: { decided: true, value: { next_action: 'go', destination: '110实验室' } },
+			state: 'done',
+		});
+
+		expect(result?.resolvedAt).toBe(1);
+		expect(result?.resolvedValue).toEqual({
+			approved: true,
+			value: { next_action: 'go', destination: '110实验室' },
+		});
+	});
+
 	it('does not show a declined nested approval as approved from the delegate result', () => {
 		const result = rebuildInteractiveFromHistory({
 			tool: 'delegate_subagent',

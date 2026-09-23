@@ -293,6 +293,32 @@ describe('ChatTrigger Templates Security', () => {
 		});
 	});
 
+	describe('chat widget assets', () => {
+		it('defaults to the published CDN bundle', () => {
+			const result = createPage({
+				...defaultParams,
+				initialMessages: '',
+			});
+
+			expect(result).toContain('https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css');
+			expect(result).toContain(
+				'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js',
+			);
+		});
+
+		it('loads JS and CSS from a same-origin assets path', () => {
+			const result = createPage({
+				...defaultParams,
+				initialMessages: '',
+				chatAssetsUrl: '/n8n-chat-assets',
+			});
+
+			expect(result).toContain('href="/n8n-chat-assets/style.css"');
+			expect(result).toContain('from "/n8n-chat-assets/chat.bundle.es.js"');
+			expect(result).not.toContain('cdn.jsdelivr.net/npm/@n8n/chat');
+		});
+	});
+
 	describe('webhookUrl rendering', () => {
 		it('should encode single quotes and adjacent characters in the value', () => {
 			const input = "https://test.com/webhook/abc', extra: fetch('https://other.test/x'), tail: '";

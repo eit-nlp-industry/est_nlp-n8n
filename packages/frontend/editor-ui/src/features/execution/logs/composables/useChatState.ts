@@ -7,6 +7,7 @@ import { injectWorkflowExecutionStateStore } from '@/app/stores/workflowExecutio
 import { injectWorkflowDocumentStore } from '@/app/stores/workflowDocument.store';
 import { useRootStore } from '@n8n/stores/useRootStore';
 import MessageWithButtons from '@n8n/chat/components/MessageWithButtons.vue';
+import { defaultOptions } from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import type { ChatOptions, SendMessageResponse } from '@n8n/chat/types';
 import { v4 as uuid } from 'uuid';
@@ -253,6 +254,7 @@ export function useChatState(
 			chatSessionKey: 'sessionId',
 			defaultLanguage: 'en' as const,
 			messageComponents: {
+				...defaultOptions.messageComponents,
 				[MessageComponentKey.WITH_BUTTONS]: MessageWithButtons,
 			},
 			messageHistory: isReadOnly ? restoredChatMessages.value : messages.value,

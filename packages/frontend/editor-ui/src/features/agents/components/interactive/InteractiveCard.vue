@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { APPROVAL_TOOL_NAME, N8N_CHAT_ACTION_TOOL_NAME, WAIT_TOOL_NAME } from '@n8n/api-types';
+import { APPROVAL_TOOL_NAME, JSON_RENDER_INTERACTION_TOOL_NAME, N8N_CHAT_ACTION_TOOL_NAME, WAIT_TOOL_NAME } from '@n8n/api-types';
 import type { AgentsChatInteractionRenderer } from '@/features/ai/shared/agentsChat/interactionRegistry';
 import InteractionRenderer from '@/features/ai/shared/agentsChat/components/InteractionRenderer.vue';
 import type { InteractivePayload } from '@/features/ai/shared/agentsChat/types';
 import ApprovalCard from './ApprovalCard.vue';
+import JsonRenderInteractionCard from './JsonRenderInteractionCard.vue';
 import N8nChatActionCard from './N8nChatActionCard.vue';
 
 /**
- * Single dispatch point for the interactive cards. `approval`, `chat_action`
- * and `wait` dispatch by `toolName` — their payload shape isn't shared
- * with any other surface, so `toolName` is a reliable, TS-narrowing
- * discriminant for both `matches` and `getProps`.
+ * Single dispatch point for the interactive cards. `approval`, `chat_action`,
+ * `wait`, and `json-render-interaction` dispatch by `toolName` — their payload
+ * shape isn't shared with any other surface, so `toolName` is a reliable,
+ * TS-narrowing discriminant for both `matches` and `getProps`.
  */
 const props = defineProps<{
 	payload: InteractivePayload;
@@ -64,6 +65,19 @@ const interactiveRenderers = [
 			if (payload.toolName !== WAIT_TOOL_NAME) return {};
 			return {
 				input: payload.input,
+				resolvedValue: payload.resolvedValue,
+			};
+		},
+	},
+	{
+		key: 'json-render-interaction',
+		component: JsonRenderInteractionCard,
+		matches: (payload) => payload.toolName === JSON_RENDER_INTERACTION_TOOL_NAME,
+		getProps: (payload) => {
+			if (payload.toolName !== JSON_RENDER_INTERACTION_TOOL_NAME) return {};
+			return {
+				input: payload.input,
+				instanceId: payload.toolCallId,
 				resolvedValue: payload.resolvedValue,
 			};
 		},

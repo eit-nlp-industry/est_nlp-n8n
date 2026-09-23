@@ -4,6 +4,7 @@ import { useChatHubMarkdownOptions } from '@/features/ai/chatHub/composables/use
 import { ref } from 'vue';
 import type { ChatMessageContentChunk } from '@n8n/api-types';
 import ChatButtons from './ChatButtons.vue';
+import ChatJsonRenderChunk from './ChatJsonRenderChunk.vue';
 
 const {
 	source,
@@ -77,6 +78,7 @@ defineExpose({
 		/>
 		<ChatButtons :buttons="source.buttons" :is-disabled="isButtonsDisabled" />
 	</div>
+	<ChatJsonRenderChunk v-else-if="source.type === 'json-render'" :source="source" />
 	<div v-else-if="source.type === 'hidden'" />
 	<button
 		v-else-if="source.type === 'artifact-edit' && !source.isIncomplete"

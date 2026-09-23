@@ -119,7 +119,7 @@ const messageChunks = computed(() =>
 			return [];
 		}
 
-		if (chunk.type === 'with-buttons') {
+		if (chunk.type === 'with-buttons' || chunk.type === 'json-render') {
 			return [chunk];
 		}
 

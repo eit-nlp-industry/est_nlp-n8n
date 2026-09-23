@@ -94,6 +94,9 @@ catalog:
   '@confluentinc/kafka-javascript': 1.9.1
   '@daytona/sdk': 0.205.1
   '@e965/xlsx': 0.20.3
+  '@eit/json-render-element-plus': github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/element-plus
+  '@eit/json-render-protocol': github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/protocol
+  '@eit/json-render-vue': github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/vue
   '@iconify-json/lucide': ^1.2.112
   '@iconify-json/mdi': ^1.1.63
   '@iconify/json': ^2.2.488
@@ -346,6 +349,10 @@ catalogs:
     undici: ^7.29.0
 
 overrides:
+  '@eit/json-render-element-plus': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus'
+  '@eit/json-render-protocol': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol'
+  '@eit/json-render-vue': 'git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue'
+  '@eit/json-render-protocol>zod': ^4.4.3
   libphonenumber-js: npm:empty-npm-package@1.0.0
   '@browserbasehq/stagehand': npm:empty-npm-package@1.0.0
   sharp: npm:empty-npm-package@1.0.0
@@ -485,6 +492,9 @@ patchedDependencies:
   '@confluentinc/kafka-javascript@1.9.1': patches/@confluentinc__kafka-javascript@1.9.1.patch
 
 allowBuilds:
+  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus': true
+  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol': true
+  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue': true
   '@biomejs/biome': false
   '@confluentinc/kafka-javascript': true
   '@jitsi/robotjs': false

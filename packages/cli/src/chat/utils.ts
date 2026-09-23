@@ -210,6 +210,10 @@ export function shouldResumeImmediately(lastNode: INode) {
 
 	const operation = lastNode?.parameters?.operation;
 	const isChatNode = lastNode?.type === CHAT_NODE_TYPE || lastNode?.type === CHAT_TOOL_NODE_TYPE;
+	// Interaction forms wait for Submit/Cancel even when the Chat node operation is "send".
+	if (isChatNode && lastNode?.parameters?.responseContentType === 'interaction') {
+		return false;
+	}
 	if (isChatNode && operation && operation !== SEND_AND_WAIT_OPERATION) {
 		return true;
 	}

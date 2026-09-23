@@ -56,6 +56,7 @@ export default mergeConfig(
 			},
 		],
 		resolve: {
+			dedupe: ['vue', 'element-plus'],
 			alias: [
 				{
 					find: '@',

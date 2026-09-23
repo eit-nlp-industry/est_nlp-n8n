@@ -1,4 +1,5 @@
 import {
+	chatHubMessageJsonRenderSchema,
 	chatHubMessageWithButtonsSchema,
 	type ChatHubMessageType,
 	type ChatMessageContentChunk,
@@ -34,10 +35,10 @@ export function appendChunkToParsedMessageItems(
 		}
 	}
 
-	// Check if the chunk is button JSON (arrives as complete JSON in one chunk)
-	const buttonChunk = tryParseButtonsJson(remaining);
-	if (buttonChunk) {
-		result.push(buttonChunk);
+	// Check if the chunk is structured JSON (arrives as complete JSON in one chunk)
+	const structuredChunk = tryParseStructuredMessageJson(remaining);
+	if (structuredChunk) {
+		result.push(structuredChunk);
 		return result;
 	}
 
@@ -247,18 +248,26 @@ function extractTagContent(xml: string, tagName: string): string | null {
 	return xml.slice(contentStart, endIndex);
 }
 
-function tryParseButtonsJson(content: string): ChatMessageContentChunk | null {
+function tryParseStructuredMessageJson(content: string): ChatMessageContentChunk | null {
 	if (!content.startsWith('{')) return null;
 
 	try {
 		const parsed: unknown = JSON.parse(content);
-		const result = chatHubMessageWithButtonsSchema.safeParse(parsed);
-		if (result.success) {
+		const jsonRender = chatHubMessageJsonRenderSchema.safeParse(parsed);
+		if (jsonRender.success) {
+			return {
+				type: 'json-render',
+				payload: jsonRender.data.payload,
+			};
+		}
+
+		const buttons = chatHubMessageWithButtonsSchema.safeParse(parsed);
+		if (buttons.success) {
 			return {
 				type: 'with-buttons',
-				content: result.data.text,
-				buttons: result.data.buttons,
-				blockUserInput: result.data.blockUserInput,
+				content: buttons.data.text,
+				buttons: buttons.data.buttons,
+				blockUserInput: buttons.data.blockUserInput,
 			};
 		}
 	} catch {

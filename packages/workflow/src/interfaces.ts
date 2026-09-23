@@ -1710,6 +1710,8 @@ export interface IPairedItemData {
 
 export const ChatNodeMessageType = {
 	WITH_BUTTONS: 'with-buttons',
+	JSON_RENDER: 'json-render',
+	JSON_RENDER_INTERACTION: 'json-render-interaction',
 } as const;
 
 export type ChatNodeMessageButtonType = 'primary' | 'secondary';
@@ -1725,7 +1727,22 @@ export type ChatNodeMessageWithButtons = {
 	}>;
 };
 
-export type ChatNodeMessage = ChatNodeMessageWithButtons | string;
+export type ChatNodeMessageJsonRender = {
+	type: typeof ChatNodeMessageType.JSON_RENDER;
+	payload: IDataObject;
+};
+
+export type ChatNodeMessageJsonRenderInteraction = {
+	type: typeof ChatNodeMessageType.JSON_RENDER_INTERACTION;
+	payload: IDataObject;
+	blockUserInput: boolean;
+};
+
+export type ChatNodeMessage =
+	| ChatNodeMessageWithButtons
+	| ChatNodeMessageJsonRender
+	| ChatNodeMessageJsonRenderInteraction
+	| string;
 
 /**
  * Technical metadata preserved when an error is redacted.

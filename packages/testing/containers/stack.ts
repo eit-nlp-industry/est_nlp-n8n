@@ -1,6 +1,6 @@
 import getPort from 'get-port';
 import type { StartedNetwork, StartedTestContainer, StoppedTestContainer } from 'testcontainers';
-import { Network } from 'testcontainers';
+import { Network, StartedNetwork, getContainerRuntimeClient } from 'testcontainers';
 
 import {
 	createElapsedLogger,
@@ -136,8 +136,7 @@ export async function createN8NStack(config: N8NConfig = {}): Promise<N8NStack> 
 	let network: StartedNetwork;
 	try {
 		const networkStart = performance.now();
-		const uuid = networkName ? { nextUuid: () => networkName } : undefined;
-		network = await new Network(uuid).start();
+		network = await startOrReuseNetwork(networkName);
 		telemetry.recordNetwork(Math.round(performance.now() - networkStart));
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -410,6 +409,22 @@ export async function createN8NStack(config: N8NConfig = {}): Promise<N8NStack> 
 		}
 		telemetry.flush(false, message);
 		throw error;
+	}
+}
+
+/** Create a named network, or attach to one left over from a prior failed run (Docker 409). */
+async function startOrReuseNetwork(networkName?: string): Promise<StartedNetwork> {
+	const uuid = networkName ? { nextUuid: () => networkName } : undefined;
+	try {
+		return await new Network(uuid).start();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (!networkName || !message.includes('already exists')) {
+			throw error;
+		}
+		const client = await getContainerRuntimeClient();
+		const existing = client.network.getById(networkName);
+		return new StartedNetwork(client, networkName, existing);
 	}
 }
 

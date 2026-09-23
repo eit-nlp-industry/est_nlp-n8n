@@ -1,5 +1,6 @@
 import {
 	APPROVAL_TOOL_NAME,
+	JSON_RENDER_INTERACTION_TOOL_NAME,
 	N8N_CHAT_ACTION_TOOL_NAME,
 	WAIT_TOOL_NAME,
 	type AgentBuilderOpenSuspension,
@@ -23,6 +24,7 @@ import type {
 	ChatMessageAttachment,
 	ChatMessageRenderPart,
 	InteractivePayload,
+	JsonRenderInteractionInput,
 	ThinkingSegment,
 	ToolCall,
 } from './types';
@@ -129,6 +131,23 @@ export function isApprovalSuspendInput(value: unknown): boolean {
 	return parseApprovalInput(value) !== undefined;
 }
 
+function parseJsonRenderInteractionInput(value: unknown): JsonRenderInteractionInput | undefined {
+	if (!isRecord(value)) return undefined;
+	if (value.type !== 'json-render-interaction') return undefined;
+	if (!isRecord(value.jsonRender)) return undefined;
+	return {
+		type: 'json-render-interaction',
+		jsonRender: value.jsonRender,
+		...(typeof value.message === 'string' && value.message.length > 0 && { message: value.message }),
+	};
+}
+
+function isDecidedToolOutput(
+	value: unknown,
+): value is { decided: boolean; value?: Record<string, unknown> } {
+	return isRecord(value) && typeof value.decided === 'boolean';
+}
+
 function parseApprovalInput(value: unknown): ApprovalInput | undefined {
 	if (!isRecord(value)) return undefined;
 	if (value.type !== 'approval') return undefined;
@@ -218,6 +237,29 @@ export function rebuildInteractiveFromHistory(tc: ToolCall): InteractivePayload 
 			toolName: N8N_CHAT_ACTION_TOOL_NAME,
 			input,
 			...(tc.canceled !== true && resolved?.success && { resolvedValue: resolved.data }),
+		};
+	}
+
+	const jsonRenderInput =
+		parseJsonRenderInteractionInput(tc.suspendPayload) ??
+		parseJsonRenderInteractionInput(tc.input);
+	if (jsonRenderInput) {
+		const resolved = tc.output !== undefined;
+		const decided = isDecidedToolOutput(tc.output) ? tc.output : undefined;
+		return {
+			toolCallId: tc.toolCallId,
+			...(tc.runId ? { runId: tc.runId } : {}),
+			...(resolved && { resolvedAt: 1 }),
+			...(tc.canceled === true && { cancelled: true }),
+			toolName: JSON_RENDER_INTERACTION_TOOL_NAME,
+			input: jsonRenderInput,
+			...(resolved &&
+				tc.canceled !== true && {
+					resolvedValue: {
+						approved: decided?.decided === true,
+						...(decided?.value !== undefined && { value: decided.value }),
+					},
+				}),
 		};
 	}
 

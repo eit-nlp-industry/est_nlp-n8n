@@ -69,6 +69,8 @@ export function toConfirmationData(request: InstanceAiConfirmRequest): Confirmat
 				nodeCredentials: request.nodeCredentials,
 				nodeParameters: request.nodeParameters,
 			};
+		case 'interaction':
+			return { approved: request.approved, value: request.value };
 	}
 }
 
@@ -96,5 +98,6 @@ export function buildResumeData(data: ConfirmationData): Record<string, unknown>
 		...(data.credentialDestination ? { credentialDestination: data.credentialDestination } : {}),
 		...(data.denied ? { denied: true } : {}),
 		...(data.connectedSlugs ? { connectedSlugs: data.connectedSlugs } : {}),
+		...(data.value ? { value: data.value } : {}),
 	};
 }

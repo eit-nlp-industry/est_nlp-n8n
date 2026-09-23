@@ -29,7 +29,7 @@ live in `src/tools/tool-ids.ts`.
 | `eval-config` | 6 |
 | `n8n-docs` | 3 |
 | `agents` | 1 |
-| `build-workflow`, `ask-user`, `parse-file` | single-purpose |
+| `build-workflow`, `ask-user`, `parse-file`, `render-ui` | single-purpose |
 
 ## Orchestration Tools
 
@@ -996,6 +996,22 @@ choice to select questions. The result is `{ answered: false }` when the user
 dismisses the request. Otherwise it is `{ answered: true, answers }`, with the
 question text added to every answer.
 
+## `render-ui`
+
+Render a display-only dashboard in the assistant timeline. The tool compiles
+the input into a `json-render-v1` payload (Card + Metric + Table). It does not
+suspend. Do not use it to build workflows.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | yes | Card title |
+| `description` | string | no | Muted summary under the title |
+| `metrics` | array | no | KPI items with `label`, `value`, optional `trend` / `trendLabel` |
+| `table` | object | no | `{ columns: string[], rows: string[][] }` |
+
+Provide at least one metric or a table. The return value is
+`{ format: "json-render-v1", payload }`.
+
 ---
 
 ## Filesystem Tools (dynamic, conditional)
@@ -1226,6 +1242,7 @@ except for the workflow-tool permission fallback described above.
 | `data-tables` | ✅ (direct, via `data-table-manager` skill) | ❌ |
 | `workspace` | ✅ | ❌ |
 | `ask-user` | ✅ | ❌ |
+| `render-ui` | ✅ | ❌ |
 | `parse-file` | ✅ (when the turn has a parseable attachment) | ❌ |
 | `research` | ✅ | ❌ |
 | `conversation-history` | ✅ (experiment `109_instance_ai_conversation_history`, via `conversationHistoryService`) | ❌ |

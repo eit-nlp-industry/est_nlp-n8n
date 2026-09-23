@@ -85,6 +85,8 @@ export {
 	type ChatHubMessageButton,
 	chatHubMessageWithButtonsSchema,
 	type ChatHubMessageWithButtons,
+	chatHubMessageJsonRenderSchema,
+	type ChatHubMessageJsonRender,
 	type ChatHubToolDto,
 	ChatHubCreateToolRequest,
 	ChatHubUpdateToolRequest,

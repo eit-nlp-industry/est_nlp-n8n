@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { N8nText } from '@n8n/design-system';
 import { useSpeechSynthesis } from '@vueuse/core';
-import { N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
+import { JSON_RENDER_INTERACTION_TOOL_NAME, N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
 import { isAwaitingCard } from '@/features/ai/shared/agentsChat/n8nChatInteraction';
 import { useI18n } from '@n8n/i18n';
 import {
@@ -19,6 +19,11 @@ import type {
 	InteractivePayload,
 	ToolCall,
 } from '@/features/ai/shared/agentsChat/types';
+import {
+	collectJsonRenderCards,
+	extractJsonRenderPayload,
+} from '@/features/ai/shared/jsonRender.utils';
+import JsonRenderAnswerCards from '@/features/ai/instanceAi/components/JsonRenderAnswerCards.vue';
 import AiReasoningBlock from '@/features/ai/shared/components/AiReasoningBlock.vue';
 import AiThinkingBlock from '@/features/ai/shared/components/AiThinkingBlock.vue';
 import AgentChatMemoryUsed from './AgentChatMemoryUsed.vue';
@@ -83,12 +88,15 @@ function externalWaitPlatform(tc: ToolCall): string | undefined {
 }
 
 /**
- * Open cards always render. Once resolved, answered interactive cards clear
- * from the chat (both approval and n8n chat cards collapse into their
- * tool-step summary) — but display-only n8n chat cards persist: they are
- * content, and being born resolved they would otherwise never render at all.
+ * Open approval and chat cards render only when they still have a run to
+ * resume. An open json-render form is the turn's content: hiding it leaves
+ * the composer waiting on a card that is not on screen. Resolved json-render
+ * cards stay in the transcript. Other resolved cards clear, except
+ * display-only n8n chat cards, which are born resolved and would otherwise
+ * never render.
  */
 function shouldRenderInteractive(payload: InteractivePayload): boolean {
+	if (payload.toolName === JSON_RENDER_INTERACTION_TOOL_NAME) return true;
 	if (!payload.resolvedAt) return !!payload.runId;
 	return payload.toolName === N8N_CHAT_ACTION_TOOL_NAME && !isAwaitingCard(payload.input.card);
 }
@@ -109,7 +117,9 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 
 	if (!message.renderParts?.length) {
 		return [
-			...(message.content ? [{ type: 'text' as const, key: 'text', text: message.content }] : []),
+			...(message.content && !isJsonRenderAssistantText(message.content)
+				? [{ type: 'text' as const, key: 'text', text: message.content }]
+				: []),
 			...renderableInteractives.map((payload) => ({
 				type: 'interactive' as const,
 				key: `interactive-${payload.toolCallId}`,
@@ -122,7 +132,9 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 	const renderedInteractiveIds = new Set<string>();
 	for (const [index, part] of message.renderParts.entries()) {
 		if (part.type === 'text') {
-			if (part.text) items.push({ type: 'text', key: `text-${index}`, text: part.text });
+			if (part.text && !isJsonRenderAssistantText(part.text)) {
+				items.push({ type: 'text', key: `text-${index}`, text: part.text });
+			}
 			continue;
 		}
 
@@ -138,6 +150,21 @@ function getMessageRenderItems(message: ChatMessage): MessageRenderItem[] {
 	}
 
 	return items;
+}
+
+function isJsonRenderAssistantText(text: string): boolean {
+	return extractJsonRenderPayload(text) !== null;
+}
+
+function jsonRenderCardsForToolRun(group: Extract<DisplayGroup, { kind: 'toolRun' }>) {
+	return collectJsonRenderCards(group.toolCalls, group.finalMessage?.content);
+}
+
+function jsonRenderCardsForMessage(message: ChatMessage) {
+	return collectJsonRenderCards(
+		message.toolCalls ?? [],
+		message.role === 'assistant' ? message.content : undefined,
+	);
 }
 
 const scrollRef = useTemplateRef<HTMLDivElement>('scrollRef');
@@ -400,7 +427,7 @@ watch(
 		const thinking = getMessageThinkingSegments(last)
 			.map((segment) => segment.content)
 			.join('');
-		return `${last.content}|${last.toolCalls?.length ?? 0}|${getMessageInteractives(last).length}|${thinking}`;
+		return `${last.content}|${last.toolCalls?.map((tc) => `${tc.state}:${tc.output === undefined ? '0' : '1'}`).join(',') ?? ''}|${getMessageInteractives(last).length}|${thinking}`;
 	},
 	autoScrollIfSticky,
 	{ flush: 'post' },
@@ -454,16 +481,8 @@ onBeforeUnmount(() => {
 							}}
 						</N8nText>
 					</template>
-					<div v-if="group.interactives.some(shouldRenderInteractive)" :class="$style.interactives">
-						<InteractiveCard
-							v-for="payload in group.interactives.filter(shouldRenderInteractive)"
-							:key="payload.toolCallId"
-							:payload="payload"
-							@submit="onInteractiveSubmit(payload, $event)"
-						/>
-					</div>
 					<div
-						v-if="group.finalMessage?.content"
+						v-if="group.finalMessage?.content && !isJsonRenderAssistantText(group.finalMessage.content)"
 						:class="[
 							$style.chatMessage,
 							{ [$style.chatMessageError]: group.finalMessage.status === 'error' },
@@ -472,6 +491,22 @@ onBeforeUnmount(() => {
 						<div :class="$style.markdownContent">
 							<AgentMarkdownChunk :source="group.finalMessage.content" />
 						</div>
+					</div>
+					<div
+						v-if="jsonRenderCardsForToolRun(group).length"
+						:class="$style.jsonRender"
+						data-testid="agent-chat-json-render"
+					>
+						<JsonRenderAnswerCards :tool-calls="jsonRenderCardsForToolRun(group)" />
+					</div>
+					<!-- Decision forms stay last in the turn so they sit above the composer. -->
+					<div v-if="group.interactives.some(shouldRenderInteractive)" :class="$style.interactives">
+						<InteractiveCard
+							v-for="payload in group.interactives.filter(shouldRenderInteractive)"
+							:key="payload.toolCallId"
+							:payload="payload"
+							@submit="onInteractiveSubmit(payload, $event)"
+						/>
 					</div>
 					<AiThinkingBlock
 						v-if="group.thinkingSegments.length"
@@ -581,6 +616,13 @@ onBeforeUnmount(() => {
 							</div>
 						</template>
 					</template>
+					<div
+						v-if="jsonRenderCardsForMessage(group.message).length"
+						:class="$style.jsonRender"
+						data-testid="agent-chat-json-render"
+					>
+						<JsonRenderAnswerCards :tool-calls="jsonRenderCardsForMessage(group.message)" />
+					</div>
 					<AiThinkingBlock
 						v-if="group.thinkingSegments.length"
 						:segments="group.thinkingSegments"
@@ -705,6 +747,13 @@ onBeforeUnmount(() => {
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing--2xs);
+	margin-top: var(--spacing--2xs);
+	margin-bottom: var(--spacing--2xs);
+	overflow: visible;
+}
+
+.jsonRender {
+	width: 100%;
 	margin-top: var(--spacing--2xs);
 	margin-bottom: var(--spacing--2xs);
 }

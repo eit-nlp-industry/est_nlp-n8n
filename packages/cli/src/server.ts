@@ -12,7 +12,13 @@ import { resolve } from 'path';
 
 import { AbstractServer } from '@/abstract-server';
 import { AuthService } from '@/auth/auth.service';
-import { CLI_DIR, EDITOR_UI_DIST_DIR, inE2ETests } from '@/constants';
+import {
+	CHAT_WIDGET_ASSETS_PATH,
+	CHAT_WIDGET_DIST_DIR,
+	CLI_DIR,
+	EDITOR_UI_DIST_DIR,
+	inE2ETests,
+} from '@/constants';
 import { ControllerRegistry } from '@/controller.registry';
 import { CredentialsOverwrites } from '@/credentials-overwrites';
 import { MessageEventBus } from '@/eventbus/message-event-bus/message-event-bus';
@@ -343,6 +349,24 @@ export class Server extends AbstractServer {
 
 		const maxAge = Time.days.toMilliseconds;
 		const cacheOptions = inE2ETests || inDevelopment ? {} : { maxAge };
+
+		try {
+			await fsAccess(CHAT_WIDGET_DIST_DIR);
+			this.app.use(
+				CHAT_WIDGET_ASSETS_PATH,
+				express.static(CHAT_WIDGET_DIST_DIR, {
+					maxAge: 0,
+					setHeaders: (res) => {
+						res.setHeader('Cache-Control', 'no-cache');
+					},
+				}),
+			);
+			this.logger.info(`Serving local @n8n/chat assets from ${CHAT_WIDGET_ASSETS_PATH}`);
+		} catch {
+			this.logger.warn(
+				`Local @n8n/chat dist not found at ${CHAT_WIDGET_DIST_DIR}. Hosted chat will 404 widget files until you run pnpm --filter @n8n/chat build.`,
+			);
+		}
 		const { staticCacheDir } = Container.get(InstanceSettings);
 
 		this.protectTypeFiles(staticCacheDir);
@@ -422,6 +446,7 @@ export class Server extends AbstractServer {
 				'assets',
 				'static',
 				'types',
+				'n8n-chat-assets',
 				'\\.well-known',
 				this.endpointHealth,
 				'metrics',

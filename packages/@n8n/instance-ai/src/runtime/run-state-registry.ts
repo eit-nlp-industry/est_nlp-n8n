@@ -91,6 +91,8 @@ export interface ConfirmationData {
 	autoSetup?: { credentialType: string; attemptId?: string };
 	credentialDestination?: InstanceAiCredentialDestinationDecision;
 	connectedSlugs?: string[];
+	/** Structured json-render decision payload from inputType=json-render. */
+	value?: Record<string, unknown>;
 }
 
 export interface PendingConfirmation {

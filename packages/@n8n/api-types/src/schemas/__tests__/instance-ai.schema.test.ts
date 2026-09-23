@@ -374,6 +374,15 @@ describe('isDisplayableConfirmationRequest', () => {
 		expect(
 			isDisplayableConfirmationRequest(
 				makeConfirmation({
+					inputType: 'json-render',
+					message: 'Pick executions',
+					jsonRender: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+				}),
+			),
+		).toBe(true);
+		expect(
+			isDisplayableConfirmationRequest(
+				makeConfirmation({
 					inputType: 'resource-decision',
 					message: '',
 					resourceDecision: {
