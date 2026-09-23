@@ -116,6 +116,7 @@ export const RESPOND_TO_WEBHOOK_NODE_TYPE = 'n8n-nodes-base.respondToWebhook';
 export const DATA_TABLE_NODE_TYPE = 'n8n-nodes-base.dataTable';
 export const DATA_TABLE_TOOL_NODE_TYPE = 'n8n-nodes-base.dataTableTool';
 export const MESSAGE_AN_AGENT_NODE_TYPE = 'n8n-nodes-base.messageAnAgent';
+export const DEEPSEEK_HARNESS_NODE_TYPE = 'n8n-nodes-base.deepSeekHarness';
 export const TIME_SAVED_NODE_TYPE = 'n8n-nodes-base.timeSaved';
 
 export const CREDENTIAL_ONLY_NODE_PREFIX = 'n8n-creds-base';

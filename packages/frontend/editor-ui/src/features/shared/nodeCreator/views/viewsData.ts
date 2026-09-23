@@ -27,6 +27,7 @@ import {
 	DATA_TABLE_NODE_TYPE,
 	DATETIME_NODE_TYPE,
 	DEFAULT_SUBCATEGORY,
+	DEEPSEEK_HARNESS_NODE_TYPE,
 	EDIT_IMAGE_NODE_TYPE,
 	EMAIL_IMAP_NODE_TYPE,
 	EMAIL_SEND_NODE_TYPE,
@@ -184,6 +185,13 @@ function getMessageAnAgentNode(
 	return [getNodeView(node)];
 }
 
+function getDeepSeekHarnessNode(nodeTypesStore: ReturnType<typeof useNodeTypesStore>) {
+	const node = nodeTypesStore.getNodeType(DEEPSEEK_HARNESS_NODE_TYPE);
+	if (!node) return [];
+
+	return [getNodeView(node)];
+}
+
 export function AIView(_nodes: SimplifiedNodeType[]): NodeView {
 	const i18n = useI18n();
 	const nodeTypesStore = useNodeTypesStore();
@@ -197,6 +205,7 @@ export function AIView(_nodes: SimplifiedNodeType[]): NodeView {
 	const chainNodes = getAiNodesBySubcategory(nodeTypesStore.allLatestNodeTypes, AI_CATEGORY_CHAINS);
 	const agentNodes = getAiNodesBySubcategory(nodeTypesStore.allLatestNodeTypes, AI_CATEGORY_AGENTS);
 	const messageAnAgentNode = getMessageAnAgentNode(nodeTypesStore, settingsStore);
+	const deepSeekHarnessNode = getDeepSeekHarnessNode(nodeTypesStore);
 
 	const websiteCategoryURLParams = new URLSearchParams(
 		templatesStore.websiteTemplateRepositoryParameters,
@@ -220,6 +229,7 @@ export function AIView(_nodes: SimplifiedNodeType[]): NodeView {
 			// shown only when agents module is active
 			// TODO: revert before GA release
 			...messageAnAgentNode,
+			...deepSeekHarnessNode,
 			...agentNodes,
 			...chainNodes,
 			...evaluationNode,

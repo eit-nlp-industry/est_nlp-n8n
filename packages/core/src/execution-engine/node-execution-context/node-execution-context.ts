@@ -267,6 +267,22 @@ export abstract class NodeExecutionContext implements Omit<FunctionsBase, 'getCr
 		return await this.additionalData.listAgents(this.additionalData.userId);
 	}
 
+	async listDeepSeekHarnessAgents(): Promise<Array<{ id: string; name: string }>> {
+		if (!this.additionalData.listDeepSeekHarnessAgents || !this.additionalData.projectId) {
+			return [];
+		}
+
+		return await this.additionalData.listDeepSeekHarnessAgents(this.additionalData.projectId);
+	}
+
+	async listDeepSeekHarnessWorkspaces(agentId: string): Promise<Array<{ id: string; name: string }>> {
+		if (!this.additionalData.listDeepSeekHarnessWorkspaces || !this.additionalData.projectId) {
+			return [];
+		}
+
+		return await this.additionalData.listDeepSeekHarnessWorkspaces(this.additionalData.projectId, agentId);
+	}
+
 	getInstanceId() {
 		return this.instanceSettings.instanceId;
 	}

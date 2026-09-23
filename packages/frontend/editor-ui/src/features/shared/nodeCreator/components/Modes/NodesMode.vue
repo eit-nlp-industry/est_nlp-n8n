@@ -17,6 +17,7 @@ import {
 	AI_OTHERS_NODE_CREATOR_VIEW,
 	AI_MCP_TOOL_NODE_TYPE,
 	HITL_SUBCATEGORY,
+	DEEPSEEK_HARNESS_NODE_TYPE,
 	MESSAGE_AN_AGENT_NODE_TYPE,
 	AI_CATEGORY_MCP_NODES,
 	REQUEST_NODE_FORM_URL,
@@ -168,13 +169,13 @@ function onSelected(item: INodeCreateElement) {
 
 		// Instead of dropping the node on the canvas, open the agent picker
 		// sub-panel; it adds the node itself with the picked agent preset.
-		if (item.key === MESSAGE_AN_AGENT_NODE_TYPE) {
+		if ([MESSAGE_AN_AGENT_NODE_TYPE, DEEPSEEK_HARNESS_NODE_TYPE].includes(item.key)) {
 			pushViewStack({
 				title: item.properties.displayName,
 				nodeIcon,
 				rootView: activeViewStack.value.rootView,
 				hasSearch: true,
-				mode: 'agents',
+				mode: item.key === DEEPSEEK_HARNESS_NODE_TYPE ? 'deepseek-harness' : 'agents',
 				// Deliberately [] rather than undefined so the stack doesn't get
 				// baseline items from the default subcategory.
 				items: [],

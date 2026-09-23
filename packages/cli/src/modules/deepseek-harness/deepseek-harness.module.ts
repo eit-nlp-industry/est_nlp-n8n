@@ -6,14 +6,18 @@ import { Container } from '@n8n/di';
 export class DeepSeekHarnessModule implements ModuleInterface {
 	async init() {
 		await import('./deepseek-harness.controller.js');
+		const { DeepSeekHarnessHomeService } = await import('./deepseek-harness-home.service.js');
 		const { DeepSeekHarnessService } = await import('./deepseek-harness.service.js');
-		Container.get(DeepSeekHarnessService);
+		void Container.get(DeepSeekHarnessHomeService).cleanupStagedHomes().catch((error: unknown) => {
+			console.error('Failed to clean staged DeepSeek Harness homes', error);
+		});
+		void Container.get(DeepSeekHarnessService).resumePublishedAgents().catch((error: unknown) => {
+			console.error('Failed to resume published DeepSeek Harness agents', error);
+		});
 	}
 
 	async entities() {
-		const { DeepSeekHarnessAgent } = await import(
-			'./entities/deepseek-harness-agent.entity.js'
-		);
+		const { DeepSeekHarnessAgent } = await import('./entities/deepseek-harness-agent.entity.js');
 		return [DeepSeekHarnessAgent];
 	}
 }

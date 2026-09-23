@@ -30,6 +30,7 @@ import {
 } from '../../views/viewsData';
 import ActionsRenderer from '../Modes/ActionsMode.vue';
 import AgentsRenderer from '../Modes/AgentsMode.vue';
+import DeepSeekHarnessRenderer from '../Modes/DeepSeekHarnessMode.vue';
 import NodesRenderer from '../Modes/NodesMode.vue';
 import SearchBar from './SearchBar.vue';
 
@@ -59,6 +60,9 @@ const viewStacks = computed(() => useViewStacks().viewStacks);
 const isActionsMode = computed(() => useViewStacks().activeViewStackMode === 'actions');
 
 const isAgentsMode = computed(() => useViewStacks().activeViewStackMode === 'agents');
+const isDeepSeekHarnessMode = computed(
+	() => useViewStacks().activeViewStackMode === 'deepseek-harness',
+);
 
 const searchPlaceholder = computed(() => {
 	let node = activeViewStack.value?.title as string;
@@ -75,6 +79,10 @@ const searchPlaceholder = computed(() => {
 
 	if (isAgentsMode.value) {
 		return i18n.baseText('nodeCreator.agentsPanel.searchPlaceholder');
+	}
+
+	if (isDeepSeekHarnessMode.value) {
+		return i18n.baseText('nodeCreator.deepSeekHarnessPanel.searchPlaceholder');
 	}
 
 	return i18n.baseText('nodeCreator.searchBar.searchNodes');
@@ -324,6 +332,9 @@ function onBackButton() {
 
 				<!-- Agents mode -->
 				<AgentsRenderer v-else-if="isAgentsMode" v-bind="$attrs" />
+
+				<!-- DeepSeek Harness mode -->
+				<DeepSeekHarnessRenderer v-else-if="isDeepSeekHarnessMode" v-bind="$attrs" />
 
 				<!-- Nodes Mode -->
 				<NodesRenderer v-else :root-view="nodeCreatorView" v-bind="$attrs" />

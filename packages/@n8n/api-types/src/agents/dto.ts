@@ -143,12 +143,18 @@ export class UpdateDeepSeekHarnessAgentDto extends Z.class({
 }) {}
 
 export type DeepSeekHarnessAgentStatus = 'created';
+export type DeepSeekHarnessAgentRuntimeStatus = 'stopped' | 'starting' | 'running' | 'error';
 
 export type DeepSeekHarnessAgentDto = {
 	id: string;
 	projectId: string;
 	name: string;
 	status: DeepSeekHarnessAgentStatus;
+	published: boolean;
+	runtimeStatus: DeepSeekHarnessAgentRuntimeStatus;
+	runtimePort: number | null;
+	runtimeUrl: string | null;
+	runtimeError: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 };

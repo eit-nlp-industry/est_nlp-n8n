@@ -6,6 +6,7 @@ import {
 	DRAG_EVENT_DATA_KEY,
 	HITL_SUBCATEGORY,
 	HUMAN_IN_THE_LOOP_CATEGORY,
+	DEEPSEEK_HARNESS_NODE_TYPE,
 	MESSAGE_AN_AGENT_NODE_TYPE,
 } from '@/app/constants';
 import { COMMUNITY_NODES_INSTALLATION_DOCS_URL } from '@/features/settings/communityNodes/communityNodes.constants';
@@ -91,7 +92,9 @@ const showActionArrow = computed(() => {
 	return hasActions.value && !isSendAndWaitCategory.value;
 });
 
-const opensAgentSubPanel = computed(() => props.nodeType.name === MESSAGE_AN_AGENT_NODE_TYPE);
+const opensAgentSubPanel = computed(() =>
+	[ MESSAGE_AN_AGENT_NODE_TYPE, DEEPSEEK_HARNESS_NODE_TYPE ].includes(props.nodeType.name),
+);
 const isSendAndWaitCategory = computed(
 	() =>
 		activeViewStack.subcategory === HITL_SUBCATEGORY ||

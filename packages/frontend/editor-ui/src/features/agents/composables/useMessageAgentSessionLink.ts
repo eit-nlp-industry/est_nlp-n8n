@@ -1,8 +1,14 @@
 import { computed, type ComputedRef } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { MESSAGE_AN_AGENT_NODE_TYPE } from '@/app/constants/nodeTypes';
-import { AGENT_SESSION_DETAIL_VIEW } from '@/features/agents/constants';
+import {
+	DEEPSEEK_HARNESS_NODE_TYPE,
+	MESSAGE_AN_AGENT_NODE_TYPE,
+} from '@/app/constants/nodeTypes';
+import {
+	AGENT_SESSION_DETAIL_VIEW,
+	PROJECT_DEEPSEEK_HARNESS_AGENT,
+} from '@/features/agents/constants';
 import { type LogEntry, isNodeLog } from '@/features/execution/logs/logs.types';
 
 /**
@@ -32,7 +38,11 @@ function isMessageAgentSession(value: unknown): value is MessageAgentSession {
 
 function extractSession(logEntry: LogEntry | undefined): MessageAgentSession | null {
 	if (!logEntry || !isNodeLog(logEntry)) return null;
-	if (logEntry.node.type !== MESSAGE_AN_AGENT_NODE_TYPE) return null;
+	if (
+		logEntry.node.type !== MESSAGE_AN_AGENT_NODE_TYPE &&
+		logEntry.node.type !== DEEPSEEK_HARNESS_NODE_TYPE
+	)
+		return null;
 
 	const main = logEntry.runData?.data?.main;
 	if (!Array.isArray(main)) return null;
@@ -62,15 +72,40 @@ export function useMessageAgentSessionLink(logEntry: ComputedRef<LogEntry | unde
 	link: ComputedRef<{ href: string; open: () => void } | null>;
 } {
 	const router = useRouter();
-
 	const link = computed(() => {
-		const session = extractSession(logEntry.value);
+		const currentLogEntry = logEntry.value;
+		const session = extractSession(currentLogEntry);
 		if (!session) return null;
 
 		// Guard against the agents module not being mounted (or any router that
 		// doesn't know the route, e.g. in unit tests). `router.resolve` throws
 		// for unknown named routes — without this, the button would crash the
 		// log panel render in environments where agents aren't loaded.
+		if (
+			currentLogEntry &&
+			isNodeLog(currentLogEntry) &&
+			currentLogEntry.node.type === DEEPSEEK_HARNESS_NODE_TYPE
+		) {
+			let href: string;
+			try {
+				href = router.resolve({
+					name: PROJECT_DEEPSEEK_HARNESS_AGENT,
+					params: {
+						projectId: session.projectId,
+						agentId: session.agentId,
+					},
+				}).href;
+			} catch {
+				return null;
+			}
+			return {
+				href,
+				open: () => {
+					window.open(href, '_blank', 'noopener');
+				},
+			};
+		}
+
 		let href: string;
 		try {
 			href = router.resolve({

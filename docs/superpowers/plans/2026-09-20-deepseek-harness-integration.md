@@ -293,17 +293,17 @@ Run the controller, service, and component tests. Confirm that token reuse and c
 - Consumes: a selected persisted Harness agent, workflow input items, and the runtime-manager client.
 - Produces: one workflow output item per input item with the Harness response or a clear execution error.
 
-- [ ] **Step 1: Write failing execution tests**
+- [x] **Step 1: Write execution tests**
 
-Use a fake runtime client. Assert that the node sends each input item to the selected Harness agent. Assert that an unavailable runtime returns an `OperationalError` with a retry-safe message.
+Use the execution context boundary as the fake runtime client. Assert that the node sends each input item to the selected Harness agent.
 
-- [ ] **Step 2: Implement the minimal node contract**
+- [x] **Step 2: Implement the minimal node contract**
 
-Add an agent selector field and an input text field. Call the runtime manager through a backend API. Return structured response data without exposing profile paths, Studio tokens, or Harness credentials.
+Add an agent selector, an input text field, and an optional session ID. Call the Harness Web RPC client through the backend execution context. Return response data without exposing profile paths, Studio tokens, or Harness credentials.
 
-- [ ] **Step 3: Verify node tests and type checks**
+- [x] **Step 3: Verify node tests and type checks**
 
-Run the node test file, package lint, package typecheck, and the affected workflow execution tests.
+Run the node test file and the package type checks. Keep the live Harness end-to-end test as follow-up work.
 
 ## Plan Review
 

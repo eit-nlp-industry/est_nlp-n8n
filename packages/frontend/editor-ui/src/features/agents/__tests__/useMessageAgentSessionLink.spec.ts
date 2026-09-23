@@ -4,8 +4,11 @@ import { mount } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import type { ITaskData } from 'n8n-workflow';
 
-import { MESSAGE_AN_AGENT_NODE_TYPE } from '@/app/constants/nodeTypes';
-import { AGENT_SESSION_DETAIL_VIEW } from '@/features/agents/constants';
+import { DEEPSEEK_HARNESS_NODE_TYPE, MESSAGE_AN_AGENT_NODE_TYPE } from '@/app/constants/nodeTypes';
+import {
+	AGENT_SESSION_DETAIL_VIEW,
+	PROJECT_DEEPSEEK_HARNESS_AGENT,
+} from '@/features/agents/constants';
 import type { LogEntry, NodeLogEntry } from '@/features/execution/logs/logs.types';
 
 import { useMessageAgentSessionLink } from '../composables/useMessageAgentSessionLink';
@@ -52,6 +55,11 @@ function runWithRouter(
 					{
 						name: AGENT_SESSION_DETAIL_VIEW,
 						path: '/projects/:projectId/agents/:agentId/sessions/:threadId',
+						component: () => h('div'),
+					},
+					{
+						name: PROJECT_DEEPSEEK_HARNESS_AGENT,
+						path: '/projects/:projectId/deepseek-harness/:agentId',
 						component: () => h('div'),
 					},
 				]
@@ -103,6 +111,25 @@ describe('useMessageAgentSessionLink', () => {
 		expect(value).not.toBeNull();
 		expect(value!.href).toBe('/projects/project-1/agents/agent-1/sessions/thread-1');
 		expect(typeof value!.open).toBe('function');
+	});
+
+	it('builds a native Harness session link for a DeepSeek Harness run', () => {
+		const logEntry = {
+			value: makeLogEntry({
+				node: {
+					id: 'deepseek-node',
+					name: 'Message a DeepSeek Harness',
+					type: DEEPSEEK_HARNESS_NODE_TYPE,
+					typeVersion: 1,
+					parameters: {},
+					position: [0, 0],
+				},
+				runData: sessionRunData,
+			}),
+		};
+		const { link } = runWithRouter(logEntry, true);
+
+		expect(link()!.href).toBe('/projects/project-1/deepseek-harness/agent-1');
 	});
 
 	it('links by the persisted threadId when present, keeping sessionId caller-facing', () => {

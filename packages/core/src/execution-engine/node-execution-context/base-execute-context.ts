@@ -215,6 +215,11 @@ export class BaseExecuteContext extends NodeExecutionContext {
 		let source: ExecuteAgentSource;
 		if (agentInfo.inlineAgent) {
 			source = { inlineAgent: agentInfo.inlineAgent };
+		} else if ('deepSeekHarnessAgentId' in agentInfo && agentInfo.deepSeekHarnessAgentId) {
+			source = {
+				deepSeekHarnessAgentId: agentInfo.deepSeekHarnessAgentId,
+				...(agentInfo.workspaceId ? { workspaceId: agentInfo.workspaceId } : {}),
+			};
 		} else if (agentInfo.agentId) {
 			source = { agentId: agentInfo.agentId };
 		} else {

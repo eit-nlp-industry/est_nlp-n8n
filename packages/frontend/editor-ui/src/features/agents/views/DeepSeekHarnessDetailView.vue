@@ -15,9 +15,11 @@ const route = useRoute();
 const router = useRouter();
 const i18n = useI18n();
 const toast = useToast();
-const { getAgent, updateAgent } = useDeepSeekHarnessApi();
+const { getAgent, updateAgent, startStudio, publishAgent, unpublishAgent } = useDeepSeekHarnessApi();
 const agent = ref<DeepSeekHarnessAgentDto | null>(null);
 const isLoading = ref(true);
+const studioUrl = ref<string>();
+const studioError = ref(false);
 const renameInput = useTemplateRef<InstanceType<typeof N8nInlineTextEdit>>('renameInput');
 
 const projectId = computed(() => {
@@ -29,6 +31,12 @@ const agentId = computed(() => {
 	const value = route.params.agentId;
 	return Array.isArray(value) ? value[0] : value;
 });
+
+function useCurrentHost(url: string): string {
+	const studioUrl = new URL(url);
+	studioUrl.hostname = window.location.hostname;
+	return studioUrl.toString();
+}
 
 const onBreadcrumbsItemSelected = () => {
 	void router.push({ name: PROJECT_DEEPSEEK_HARNESS, params: { projectId: projectId.value } });
@@ -45,19 +53,46 @@ const onNameSubmit = async (value: string) => {
 		return;
 	}
 
+	const previousStudioUrl = studioUrl.value;
+	const shouldReloadStudio = Boolean(previousStudioUrl);
+	if (shouldReloadStudio) {
+		// The rename restarts Harness. Do not keep an iframe connected to the old process.
+		studioUrl.value = undefined;
+		studioError.value = false;
+	}
+
 	try {
 		const updated = await updateAgent(projectId.value, agentId.value, name);
 		agent.value = updated;
+		if (shouldReloadStudio) {
+			const runtime = await startStudio(projectId.value, agentId.value);
+			studioUrl.value = useCurrentHost(runtime.url);
+		}
 	} catch (error) {
+		if (shouldReloadStudio && previousStudioUrl) studioUrl.value = previousStudioUrl;
 		toast.showError(error, i18n.baseText('folders.rename.error.title'));
 		renameInput.value?.forceCancel();
 	}
+};
+
+const onPublish = async () => {
+	if (!projectId.value || !agentId.value) return;
+	agent.value = await publishAgent(projectId.value, agentId.value);
+};
+
+const onUnpublish = async () => {
+	if (!projectId.value || !agentId.value) return;
+	agent.value = await unpublishAgent(projectId.value, agentId.value);
 };
 
 onMounted(async () => {
 	if (!projectId.value || !agentId.value) return;
 	try {
 		agent.value = await getAgent(projectId.value, agentId.value);
+		studioUrl.value = useCurrentHost((await startStudio(projectId.value, agentId.value)).url);
+	} catch (error) {
+		studioError.value = true;
+		toast.showError(error, i18n.baseText('deepseekHarness.studio.error'));
 	} finally {
 		isLoading.value = false;
 	}
@@ -91,10 +126,26 @@ onMounted(async () => {
 				</FolderBreadcrumbs>
 			</div>
 			<span :class="$style.spacer" />
-			<DeepSeekHarnessPublishActions />
+			<DeepSeekHarnessPublishActions
+				v-if="agent"
+				:agent="agent"
+				:on-publish="onPublish"
+				:on-unpublish="onUnpublish"
+			/>
 		</div>
 
-		<div class="studio-container" data-test-id="deepseek-harness-studio-container" />
+		<div :class="$style.studioContainer" data-test-id="deepseek-harness-studio-container">
+			<iframe
+				v-if="studioUrl"
+				:src="studioUrl"
+				:class="$style.studio"
+				:title="i18n.baseText('deepseekHarness.studio.title')"
+				data-test-id="deepseek-harness-studio"
+			/>
+			<div v-else-if="studioError" :class="$style.error">
+				{{ i18n.baseText('deepseekHarness.studio.error') }}
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -158,7 +209,21 @@ onMounted(async () => {
 	margin-right: var(--spacing--md);
 }
 
-.studio-container {
+.studioContainer {
 	flex: 1;
+	min-height: 0;
+}
+
+.studio {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+.error {
+	padding: var(--spacing--lg);
+	color: var(--color--text--danger);
+	text-align: center;
 }
 </style>

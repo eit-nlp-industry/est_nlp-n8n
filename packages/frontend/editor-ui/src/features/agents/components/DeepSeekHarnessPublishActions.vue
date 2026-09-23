@@ -6,10 +6,15 @@ import {
 	type ActionDropdownItem,
 } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
-import { ref } from 'vue';
+import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
+
+const props = defineProps<{
+	agent: DeepSeekHarnessAgentDto;
+	onPublish: () => Promise<void>;
+	onUnpublish: () => Promise<void>;
+}>();
 
 const i18n = useI18n();
-const isPublished = ref(false);
 
 const actions: Array<ActionDropdownItem<'publish' | 'unpublish'>> = [
 	{
@@ -21,22 +26,22 @@ const actions: Array<ActionDropdownItem<'publish' | 'unpublish'>> = [
 		label: i18n.baseText('workflows.unpublish'),
 		divided: true,
 		get disabled() {
-			return !isPublished.value;
+			return !props.agent.published;
 		},
 	},
 ];
 
-function publish() {
-	isPublished.value = true;
+async function publish() {
+	await props.onPublish();
 }
 
-function unpublish() {
-	isPublished.value = false;
+async function unpublish() {
+	await props.onUnpublish();
 }
 
 function onSelect(action: 'publish' | 'unpublish') {
-	if (action === 'publish') publish();
-	if (action === 'unpublish') unpublish();
+	if (action === 'publish') void publish();
+	if (action === 'unpublish') void unpublish();
 }
 </script>
 
@@ -51,11 +56,11 @@ function onSelect(action: 'publish' | 'unpublish') {
 			>
 				<div :class="$style.flex">
 					<span
-						v-if="isPublished"
+						v-if="props.agent.published"
 						data-test-id="deepseek-harness-published-indicator"
 						:class="$style.indicatorDot"
 					/>
-					{{ isPublished ? i18n.baseText('generic.published') : i18n.baseText('workflows.publish') }}
+					{{ props.agent.published ? i18n.baseText('generic.published') : i18n.baseText('workflows.publish') }}
 				</div>
 			</N8nButton>
 			<N8nActionDropdown

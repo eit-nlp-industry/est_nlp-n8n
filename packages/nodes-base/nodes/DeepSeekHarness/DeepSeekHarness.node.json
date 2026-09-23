@@ -1,0 +1,9 @@
+{
+	"node": "n8n-nodes-base.deepSeekHarness",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["AI"],
+	"resources": { "primaryDocumentation": [] },
+	"alias": ["deepseek", "harness", "agent"],
+	"subcategories": { "AI": ["Agents", "Root Nodes"] }
+}

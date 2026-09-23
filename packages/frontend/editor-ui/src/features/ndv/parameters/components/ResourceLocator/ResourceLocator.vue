@@ -262,6 +262,12 @@ const currentMode = computed<INodePropertyMode>(
 	() => findModeByName(selectedMode.value) ?? ({} as INodePropertyMode),
 );
 
+const isDeepSeekHarnessResourceLocator = computed(() =>
+	['listDeepSeekHarnessAgents', 'listDeepSeekHarnessWorkspaces'].includes(
+		getPropertyArgument(currentMode.value, 'searchListMethod') as string,
+	),
+);
+
 const hasMultipleModes = computed(() => {
 	return props.parameter.modes && props.parameter.modes.length > 1;
 });
@@ -274,7 +280,10 @@ const valueToDisplay = computed<INodeParameterResourceLocator['value']>(() => {
 	}
 
 	if (isListMode.value) {
-		return props.modelValue?.cachedResultName ?? props.modelValue?.value ?? '';
+		const selected = currentQueryResults.value.find(
+			(result) => result.value === props.modelValue?.value,
+		);
+		return selected?.name ?? props.modelValue?.cachedResultName ?? props.modelValue?.value ?? '';
 	}
 
 	return props.modelValue?.value ?? '';
@@ -373,6 +382,19 @@ const currentQueryResults = computed<IResourceLocatorResultExpanded[]>(() => {
 			...(result.name && result.url ? { linkAlt: getLinkAlt(result.name) } : {}),
 		}),
 	);
+});
+
+watch(currentQueryResults, (results) => {
+	if (!isDeepSeekHarnessResourceLocator.value || !isListMode.value || !isResourceLocatorValue(props.modelValue)) return;
+
+	const selected = results.find((result) => result.value === props.modelValue.value);
+	if (!selected || selected.name === props.modelValue.cachedResultName) return;
+
+	emit('update:modelValue', {
+		...props.modelValue,
+		cachedResultName: selected.name ?? '',
+		cachedResultUrl: selected.url ?? '',
+	});
 });
 
 const currentQueryHasMore = computed(() => !!currentResponse.value?.nextPageToken);
@@ -640,6 +662,14 @@ watch(
 onMounted(() => {
 	props.eventBus.on('refreshList', refreshList);
 	window.addEventListener('resize', setWidth);
+	if (
+		isListMode.value &&
+		isResourceLocatorValue(props.modelValue) &&
+		props.modelValue.value &&
+		isDeepSeekHarnessResourceLocator.value
+	) {
+		void loadInitialResources();
+	}
 
 	ndvStore.value.$subscribe(() => {
 		// Update the width when main panel dimension change
@@ -798,10 +828,33 @@ function onModeSelected(value: string): void {
 			value: props.modelValue.cachedResultUrl,
 		});
 	} else if (value === 'id' && selectedMode.value === 'list' && props.modelValue?.value) {
-		emit('update:modelValue', { __rl: true, mode: value, value: props.modelValue.value });
+		emit('update:modelValue', {
+			__rl: true,
+			mode: value,
+			value: props.modelValue.value,
+			cachedResultName: props.modelValue.cachedResultName,
+			cachedResultUrl: props.modelValue.cachedResultUrl,
+		});
 	} else {
 		const currentValue = props.modelValue?.value ?? '';
-		emit('update:modelValue', { __rl: true, mode: value, value: currentValue });
+		const selectedResource =
+			value === 'list' && selectedMode.value === 'id'
+				? currentQueryResults.value.find((result) => result.value === currentValue)
+				: undefined;
+
+		emit('update:modelValue', {
+			__rl: true,
+			mode: value,
+			value: currentValue,
+			...(value === 'list' && selectedMode.value === 'id'
+				? {
+						cachedResultName:
+							props.modelValue?.cachedResultName ?? selectedResource?.name ?? '',
+						cachedResultUrl:
+							props.modelValue?.cachedResultUrl ?? selectedResource?.url ?? '',
+				  }
+				: {}),
+		});
 	}
 
 	trackEvent('User changed resource locator mode', { mode: value });

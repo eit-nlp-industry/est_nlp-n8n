@@ -21,10 +21,7 @@ export function useDeepSeekHarnessApi() {
 		);
 	};
 
-	const getAgent = async (
-		projectId: string,
-		agentId: string,
-	): Promise<DeepSeekHarnessAgentDto> => {
+	const getAgent = async (projectId: string, agentId: string): Promise<DeepSeekHarnessAgentDto> => {
 		return await makeRestApiRequest<DeepSeekHarnessAgentDto>(
 			rootStore.restApiContext,
 			'GET',
@@ -54,5 +51,44 @@ export function useDeepSeekHarnessApi() {
 		);
 	};
 
-	return { createAgent, getAgent, listAgents, deleteAgent, updateAgent };
+	const startStudio = async (projectId: string, agentId: string): Promise<{ url: string }> => {
+		return await makeRestApiRequest<{ url: string }>(
+			rootStore.restApiContext,
+			'GET',
+			`/projects/${projectId}/deepseek-harness/agents/${agentId}/studio`,
+		);
+	};
+
+	const publishAgent = async (
+		projectId: string,
+		agentId: string,
+	): Promise<DeepSeekHarnessAgentDto> => {
+		return await makeRestApiRequest<DeepSeekHarnessAgentDto>(
+			rootStore.restApiContext,
+			'POST',
+			`/projects/${projectId}/deepseek-harness/agents/${agentId}/publish`,
+		);
+	};
+
+	const unpublishAgent = async (
+		projectId: string,
+		agentId: string,
+	): Promise<DeepSeekHarnessAgentDto> => {
+		return await makeRestApiRequest<DeepSeekHarnessAgentDto>(
+			rootStore.restApiContext,
+			'POST',
+			`/projects/${projectId}/deepseek-harness/agents/${agentId}/unpublish`,
+		);
+	};
+
+	return {
+		createAgent,
+		getAgent,
+		listAgents,
+		deleteAgent,
+		updateAgent,
+		startStudio,
+		publishAgent,
+		unpublishAgent,
+	};
 }

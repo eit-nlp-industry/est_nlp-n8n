@@ -23,6 +23,7 @@ import {
 	BETA_NODES,
 	CORE_NODES_CATEGORY,
 	DEFAULT_SUBCATEGORY,
+	DEEPSEEK_HARNESS_NODE_TYPE,
 	DISCORD_NODE_TYPE,
 	HITL_SUBCATEGORY,
 	HUMAN_IN_THE_LOOP_CATEGORY,
@@ -458,7 +459,10 @@ function applyNodeTags(element: INodeCreateElement): INodeCreateElement {
 
 	if (element.properties.tag) return element;
 
-	if (element.properties.name === MESSAGE_AN_AGENT_NODE_TYPE) {
+	if (
+		element.properties.name === MESSAGE_AN_AGENT_NODE_TYPE ||
+		element.properties.name === DEEPSEEK_HARNESS_NODE_TYPE
+	) {
 		element.properties.tag = {
 			preview: true,
 			text: i18n.baseText('nodeCreator.nodeItem.earlyPreview'),

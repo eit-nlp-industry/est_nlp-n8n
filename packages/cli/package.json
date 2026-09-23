@@ -45,7 +45,7 @@
     "test:sqlite:win": "set N8N_LOG_LEVEL=silent&& set DB_SQLITE_POOL_SIZE=4&& set DB_TYPE=sqlite&& vitest run --config vitest.config.integration.ts",
     "test:postgres:win": "set N8N_LOG_LEVEL=silent&& set DB_TYPE=postgresdb&& set DB_POSTGRESDB_SCHEMA=alt_schema&& set DB_TABLE_PREFIX=test_&& vitest run --config vitest.config.integration.ts",
     "test:mariadb:win": "echo true",
-    "watch": "tsc-watch --compiler @typescript/native/bin/tsc -p tsconfig.build.json --onCompilationComplete \"tsc-alias -p tsconfig.build.json\""
+    "watch": "tsc-watch --compiler @typescript/native/bin/tsc -p tsconfig.build.json --onCompilationComplete \"tsc-alias -p tsconfig.build.json && node scripts/touch-dev-ready.mjs\""
   },
   "bin": {
     "n8n": "./bin/n8n"

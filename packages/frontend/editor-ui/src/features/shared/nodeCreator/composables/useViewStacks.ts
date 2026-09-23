@@ -94,7 +94,7 @@ export interface ViewStack {
 	baselineItems?: INodeCreateElement[];
 	searchItems?: SimplifiedNodeType[];
 	forceIncludeNodes?: string[];
-	mode?: 'actions' | 'nodes' | 'community-node' | 'agents';
+	mode?: 'actions' | 'nodes' | 'community-node' | 'agents' | 'deepseek-harness';
 	hideActions?: boolean;
 	baseFilter?: (item: INodeCreateElement) => boolean;
 	itemsMapper?: (item: INodeCreateElement) => INodeCreateElement;

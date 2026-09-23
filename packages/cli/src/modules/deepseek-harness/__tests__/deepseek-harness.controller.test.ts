@@ -13,10 +13,7 @@ describe('DeepSeekHarnessController', () => {
 			{} as never,
 		);
 
-		expect(service.createForProject).toHaveBeenCalledWith(
-			'user@example.com',
-			'project-1',
-		);
+		expect(service.createForProject).toHaveBeenCalledWith('user@example.com', 'project-1');
 	});
 
 	it('deletes an agent for the requested project', async () => {
@@ -24,11 +21,7 @@ describe('DeepSeekHarnessController', () => {
 		const controller = new DeepSeekHarnessController(service as never);
 
 		await expect(
-			controller.delete(
-				{ params: { projectId: 'project-1' } } as never,
-				{} as never,
-				'agent-1',
-			),
+			controller.delete({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
 		).resolves.toEqual({ success: true });
 
 		expect(service.deleteForProject).toHaveBeenCalledWith('agent-1', 'project-1');
@@ -41,14 +34,48 @@ describe('DeepSeekHarnessController', () => {
 		const controller = new DeepSeekHarnessController(service as never);
 
 		await expect(
-			controller.update(
-				{ params: { projectId: 'project-1' } } as never,
-				{} as never,
-				'agent-1',
-				{ name: 'Renamed' } as never,
-			),
+			controller.update({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1', {
+				name: 'Renamed',
+			} as never),
 		).resolves.toEqual({ id: 'agent-1', name: 'Renamed' });
 
 		expect(service.updateForProject).toHaveBeenCalledWith('agent-1', 'project-1', 'Renamed');
+	});
+
+	it('starts the native Studio for the requested project agent', async () => {
+		const service = {
+			startStudioForProject: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43123/?token=x' }),
+		};
+		const controller = new DeepSeekHarnessController(service as never);
+
+		await expect(
+			controller.studio({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
+		).resolves.toEqual({ url: 'http://127.0.0.1:43123/?token=x' });
+
+		expect(service.startStudioForProject).toHaveBeenCalledWith('agent-1', 'project-1');
+	});
+
+	it('publishes the requested project agent', async () => {
+		const service = {
+			publishForProject: vi.fn().mockResolvedValue({ id: 'agent-1', published: true }),
+		};
+		const controller = new DeepSeekHarnessController(service as never);
+
+		await expect(
+			controller.publish({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
+		).resolves.toEqual({ id: 'agent-1', published: true });
+		expect(service.publishForProject).toHaveBeenCalledWith('agent-1', 'project-1');
+	});
+
+	it('unpublishes the requested project agent', async () => {
+		const service = {
+			unpublishForProject: vi.fn().mockResolvedValue({ id: 'agent-1', published: false }),
+		};
+		const controller = new DeepSeekHarnessController(service as never);
+
+		await expect(
+			controller.unpublish({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
+		).resolves.toEqual({ id: 'agent-1', published: false });
+		expect(service.unpublishForProject).toHaveBeenCalledWith('agent-1', 'project-1');
 	});
 });

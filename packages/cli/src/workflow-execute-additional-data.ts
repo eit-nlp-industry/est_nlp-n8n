@@ -427,6 +427,21 @@ export async function executeAgent(
 
 	const scopedThreadId = `workflow:project-${projectId}:${threadId}`;
 
+	if ('deepSeekHarnessAgentId' in source) {
+		const { DeepSeekHarnessService } = await import(
+			'@/modules/deepseek-harness/deepseek-harness.service.js'
+		);
+		return await Container.get(DeepSeekHarnessService).executeForWorkflow(
+			source.deepSeekHarnessAgentId,
+			projectId,
+			message,
+			threadId,
+			isManualOrChatExecution(executionMode),
+			invocationContext?.sendResponseChunk,
+			source.workspaceId,
+		);
+	}
+
 	if (source.inlineAgent) {
 		return await agentWorkflowExecutionService.executeInlineForWorkflow(
 			source.inlineAgent,
@@ -494,6 +509,31 @@ async function listAgents(userId: string): Promise<Array<{ id: string; name: str
 		id: agent.id,
 		name: agent.name,
 	}));
+}
+
+async function listDeepSeekHarnessAgents(
+	projectId: string,
+): Promise<Array<{ id: string; name: string }>> {
+	const { DeepSeekHarnessService } = await import(
+		'@/modules/deepseek-harness/deepseek-harness.service.js'
+	);
+	// Production runs require a published agent. Drafts stay in the list so
+	// manual/chat workflow executions can call them during development.
+	const agents = await Container.get(DeepSeekHarnessService).listForProject(projectId);
+	return agents.map((agent) => ({
+		id: agent.id,
+		name: agent.published ? agent.name : `${agent.name} (draft)`,
+	}));
+}
+
+async function listDeepSeekHarnessWorkspaces(
+	projectId: string,
+	agentId: string,
+): Promise<Array<{ id: string; name: string }>> {
+	const { DeepSeekHarnessService } = await import(
+		'@/modules/deepseek-harness/deepseek-harness.service.js'
+	);
+	return await Container.get(DeepSeekHarnessService).listWorkspacesForProject(agentId, projectId);
 }
 
 /**
@@ -822,6 +862,8 @@ export async function getBase({
 		executeWorkflow,
 		executeAgent,
 		listAgents,
+		listDeepSeekHarnessAgents,
+		listDeepSeekHarnessWorkspaces,
 		restApiUrl: urlBaseWebhook + globalConfig.endpoints.rest,
 		instanceBaseUrl: `${instanceBaseUrl}/`,
 		formWaitingBaseUrl: urlBaseWebhook + globalConfig.endpoints.formWaiting,

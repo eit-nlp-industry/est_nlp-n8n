@@ -1203,6 +1203,8 @@ export interface FunctionsBase {
 	isNodeFeatureEnabled(featureName: string): boolean;
 	getExecutionContext: () => IExecutionContext | undefined;
 	listAgents?(): Promise<Array<{ id: string; name: string }>>;
+	listDeepSeekHarnessAgents?(): Promise<Array<{ id: string; name: string }>>;
+	listDeepSeekHarnessWorkspaces?(agentId: string): Promise<Array<{ id: string; name: string }>>;
 
 	/** @deprecated */
 	prepareOutputData(outputData: INodeExecutionData[]): Promise<INodeExecutionData[][]>;
@@ -2391,6 +2393,7 @@ export interface InlineAgentPayload {
 /** Which agent to execute: a saved agent by id, or an inline definition. */
 export type ExecuteAgentSource =
 	| { agentId: string; inlineAgent?: never }
+	| { deepSeekHarnessAgentId: string; workspaceId?: string; agentId?: never; inlineAgent?: never }
 	| { agentId?: never; inlineAgent: InlineAgentPayload };
 
 export type ExecuteAgentInfo = ExecuteAgentSource & {
@@ -3875,6 +3878,13 @@ export interface IWorkflowExecuteAdditionalData {
 		invocationContext?: ExecuteAgentInvocationContext,
 	) => Promise<ExecuteAgentData>;
 	listAgents?: (userId: string) => Promise<Array<{ id: string; name: string }>>;
+	listDeepSeekHarnessAgents?: (
+		projectId: string,
+	) => Promise<Array<{ id: string; name: string }>>;
+	listDeepSeekHarnessWorkspaces?: (
+		projectId: string,
+		agentId: string,
+	) => Promise<Array<{ id: string; name: string }>>;
 	getRunExecutionData: (executionId: string) => Promise<IRunExecutionData | undefined>;
 	executionId?: string;
 	restartExecutionId?: string;

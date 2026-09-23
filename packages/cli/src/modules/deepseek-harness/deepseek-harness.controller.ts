@@ -4,7 +4,16 @@ import {
 	UpdateDeepSeekHarnessAgentDto,
 } from '@n8n/api-types';
 import type { AuthenticatedRequest } from '@n8n/db';
-import { Body, Delete, Get, Param, Patch, Post, ProjectScope, RestController } from '@n8n/decorators';
+import {
+	Body,
+	Delete,
+	Get,
+	Param,
+	Patch,
+	Post,
+	ProjectScope,
+	RestController,
+} from '@n8n/decorators';
 
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
 
@@ -28,6 +37,40 @@ export class DeepSeekHarnessController {
 	@ProjectScope('agent:list')
 	async list(req: AuthenticatedRequest<{ projectId: string }>): Promise<DeepSeekHarnessAgentDto[]> {
 		return await this.service.listForProject(req.params.projectId);
+	}
+
+	@Get('/:agentId/studio')
+	@ProjectScope('agent:read')
+	async studio(
+		req: AuthenticatedRequest<{ projectId: string }>,
+		_res: unknown,
+		@Param('agentId') agentId: string,
+	): Promise<{ url: string }> {
+		return await this.service.startStudioForProject(agentId, req.params.projectId);
+	}
+
+	@Post('/:agentId/publish')
+	@ProjectScope('agent:update')
+	async publish(
+		req: AuthenticatedRequest<{ projectId: string }>,
+		_res: unknown,
+		@Param('agentId') agentId: string,
+	): Promise<DeepSeekHarnessAgentDto> {
+		const agent = await this.service.publishForProject(agentId, req.params.projectId);
+		if (!agent) throw new NotFoundError(`DeepSeek Harness agent "${agentId}" not found`);
+		return agent;
+	}
+
+	@Post('/:agentId/unpublish')
+	@ProjectScope('agent:update')
+	async unpublish(
+		req: AuthenticatedRequest<{ projectId: string }>,
+		_res: unknown,
+		@Param('agentId') agentId: string,
+	): Promise<DeepSeekHarnessAgentDto> {
+		const agent = await this.service.unpublishForProject(agentId, req.params.projectId);
+		if (!agent) throw new NotFoundError(`DeepSeek Harness agent "${agentId}" not found`);
+		return agent;
 	}
 
 	@Get('/:agentId')
