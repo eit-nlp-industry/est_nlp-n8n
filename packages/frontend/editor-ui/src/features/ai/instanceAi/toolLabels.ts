@@ -110,6 +110,7 @@ export function getToolIcon(toolName: string): IconName {
 	if (toolName === 'data-tables') return 'table';
 	if (toolName === 'activity') return 'history';
 	if (toolName === 'conversation-history') return 'message-square';
+	if (toolName === 'render-ui') return 'table';
 	if (toolName === 'mcp-servers') return 'plug';
 	if (
 		toolName === 'workflows' ||

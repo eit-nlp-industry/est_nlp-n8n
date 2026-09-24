@@ -219,3 +219,7 @@ export const WsStatusCodes = {
 export const FREE_AI_CREDITS_CREDENTIAL_NAME = 'n8n free OpenAI API credits';
 
 export const STREAM_SEPARATOR = '⧉⇋⇋➽⌑⧉§§\n';
+
+/** Local `@n8n/chat` build output, served to Hosted Chat pages. */
+export const CHAT_WIDGET_DIST_DIR = join(CLI_DIR, '..', 'frontend', '@n8n', 'chat', 'dist');
+export const CHAT_WIDGET_ASSETS_PATH = '/n8n-chat-assets';

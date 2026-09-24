@@ -62,6 +62,53 @@ function resolveToolNodeType(nodeType: string, nodeTypeVersion: number): string 
 	}
 }
 
+export function isRenderInteractionNodeType(nodeType: string): boolean {
+	return /renderInteraction/i.test(nodeType);
+}
+
+const jsonRenderInteractionSuspendSchema = z.object({
+	type: z.literal('json-render-interaction'),
+	jsonRender: z.record(z.string(), z.unknown()),
+	message: z.string().optional(),
+});
+
+const jsonRenderInteractionResumeSchema = z.object({
+	approved: z.boolean(),
+	value: z.record(z.string(), z.unknown()).optional(),
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function canSuspendJsonRender(context: object): context is {
+	suspend: (payload: z.infer<typeof jsonRenderInteractionSuspendSchema>) => Promise<unknown>;
+} {
+	return 'suspend' in context && typeof context.suspend === 'function';
+}
+
+/**
+ * Pull the inner json-render document out of the wrappers Render Interaction
+ * actually returns (`{ format, payload, phase }`, node-tool `{ status, data }`).
+ */
+export function extractRenderInteractionDocument(
+	result: { data?: Array<{ json?: unknown }> } | unknown,
+): Record<string, unknown> | null {
+	if (!isRecord(result)) return null;
+
+	const first = Array.isArray(result.data) ? result.data[0] : undefined;
+	const json = isRecord(first) && 'json' in first ? first.json : result;
+	if (!isRecord(json)) return null;
+
+	if (isRecord(json.payload) && json.payload.format === 'json-render-v1') {
+		return json.payload;
+	}
+	if (json.format === 'json-render-v1' && isRecord(json.spec)) {
+		return json;
+	}
+	return null;
+}
+
 function createNativeStringToolInputSchema(description: string): z.ZodType {
 	return z.preprocess(
 		(value) => (typeof value === 'string' ? { input: value } : value),
@@ -163,10 +210,27 @@ export async function resolveNodeTool(
 			}
 		: {};
 
-	const built = new Tool(sanitizedName)
+	const toolBuilder = new Tool(sanitizedName)
 		.description(toolSchema.description ?? `Execute the ${nodeType} node`)
-		.input(await resolveInputSchema(toolSchema, ctx))
-		.handler(async (input: Record<string, unknown>) => {
+		.input(await resolveInputSchema(toolSchema, ctx));
+
+	if (isRenderInteractionNodeType(nodeType)) {
+		toolBuilder
+			.suspend(jsonRenderInteractionSuspendSchema)
+			.resume(jsonRenderInteractionResumeSchema);
+	}
+
+	const built = toolBuilder
+		.handler(async (input: Record<string, unknown>, handlerCtx) => {
+			if (isRenderInteractionNodeType(nodeType) && 'resumeData' in handlerCtx) {
+				const resumeData = handlerCtx.resumeData;
+				if (resumeData !== undefined && resumeData !== null) {
+					const resume = jsonRenderInteractionResumeSchema.parse(resumeData);
+					if (!resume.approved) return { decided: false };
+					return { decided: true, value: resume.value };
+				}
+			}
+
 			const result = await ctx.executor.executeInline({
 				nodeType,
 				nodeTypeVersion: toolSchema.node.nodeTypeVersion,
@@ -183,6 +247,24 @@ export async function resolveNodeTool(
 			if (result.status === 'error') {
 				throw new Error(result.error ?? `Node "${toolSchema.node.nodeType}" failed to execute`);
 			}
+
+			if (isRenderInteractionNodeType(nodeType) && canSuspendJsonRender(handlerCtx)) {
+				const jsonRender = extractRenderInteractionDocument(result);
+				if (!jsonRender) {
+					throw new Error('Render Interaction did not return a json-render decision payload');
+				}
+				const metaTitle =
+					isRecord(jsonRender.meta) && typeof jsonRender.meta.title === 'string'
+						? jsonRender.meta.title
+						: undefined;
+				const message = (typeof input.title === 'string' && input.title) || metaTitle;
+				return await handlerCtx.suspend({
+					type: 'json-render-interaction' as const,
+					jsonRender,
+					...(message ? { message } : {}),
+				});
+			}
+
 			return result;
 		})
 		.build();

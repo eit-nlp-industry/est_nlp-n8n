@@ -47,10 +47,15 @@ async function load() {
 	}
 }
 
-const debouncedLoad = debounce(() => void load(), {
-	debounceTime: getDebounceTime(DEBOUNCE_TIME.INPUT.SEARCH),
-	trailing: true,
-});
+const debouncedLoad = debounce(
+	() => {
+		load();
+	},
+	{
+		debounceTime: getDebounceTime(DEBOUNCE_TIME.INPUT.SEARCH),
+		trailing: true,
+	},
+);
 watch(search, () => debouncedLoad());
 
 const elements = computed<INodeCreateElement[]>(() =>
@@ -112,25 +117,48 @@ function resetSearch() {
 	updateCurrentViewStack({ search: '' });
 }
 
-onMounted(() => void load());
+onMounted(() => {
+	load();
+});
 </script>
 
 <template>
 	<div :class="$style.container" data-test-id="node-creator-deepseek-harness-panel">
-		<N8nLoading v-if="isLoading && elements.length === 0" :class="$style.state" :loading="true" :rows="3" variant="p" />
+		<N8nLoading
+			v-if="isLoading && elements.length === 0"
+			:class="$style.state"
+			:loading="true"
+			:rows="3"
+			variant="p"
+		/>
 		<div v-else-if="loadError" :class="$style.state">
-			<N8nText size="small" color="text-base">{{ i18n.baseText('nodeCreator.deepSeekHarnessPanel.loadError') }}</N8nText>
+			<N8nText size="small" color="text-base">{{
+				i18n.baseText('nodeCreator.deepSeekHarnessPanel.loadError')
+			}}</N8nText>
 			<N8nLink size="small" @click="load">{{ i18n.baseText('generic.retry') }}</N8nLink>
 		</div>
 		<div v-else-if="elements.length === 0" :class="$style.state">
-			<N8nText size="small" color="text-base">{{ i18n.baseText('nodeCreator.deepSeekHarnessPanel.empty') }}</N8nText>
-			<N8nLink v-if="search" size="small" @click="resetSearch">{{ i18n.baseText('generic.clear') }}</N8nLink>
+			<N8nText size="small" color="text-base">{{
+				i18n.baseText('nodeCreator.deepSeekHarnessPanel.empty')
+			}}</N8nText>
+			<N8nLink v-if="search" size="small" @click="resetSearch">{{
+				i18n.baseText('generic.clear')
+			}}</N8nLink>
 		</div>
 		<ItemsRenderer v-else :elements="elements" @selected="onSelected" />
 	</div>
 </template>
 
 <style lang="scss" module>
-.container { display: flex; flex-direction: column; padding-bottom: var(--spacing--xl); }
-.state { display: flex; flex-direction: column; gap: var(--spacing--3xs); padding: var(--spacing--2xs) var(--spacing--sm); }
+.container {
+	display: flex;
+	flex-direction: column;
+	padding-bottom: var(--spacing--xl);
+}
+.state {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing--3xs);
+	padding: var(--spacing--2xs) var(--spacing--sm);
+}
 </style>

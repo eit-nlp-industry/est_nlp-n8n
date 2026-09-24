@@ -11,6 +11,7 @@ import { credentialsResumeSchema } from '../../tools/credentials.tool';
 import { gatewayConfirmationResumeSchema } from '../../tools/filesystem/create-tools-from-mcp-server';
 import { planResumeSchema } from '../../tools/orchestration/plan.tool';
 import { askUserResumeSchema } from '../../tools/shared/ask-user.tool';
+import { collectDecisionResumeSchema } from '../../tools/collect-decision/collect-decision.schema';
 import { workflowsResumeSchema } from '../../tools/workflows.tool';
 import { buildResumeData, toConfirmationData } from '../confirmation-payload';
 
@@ -173,6 +174,15 @@ describe('confirmation payload → tool resume schema contract', () => {
 			request: { kind: 'mcpConnect', approved: true, connectedSlugs: ['brave'] },
 			targets: [['mcp-servers', mcpConnectResumeSchema]],
 		},
+		{
+			label: 'json-render interaction submission',
+			request: {
+				kind: 'interaction',
+				approved: true,
+				value: { executionIds: ['ex-1'], maxRetries: 2 },
+			},
+			targets: [['collect-decision', collectDecisionResumeSchema]],
+		},
 	];
 
 	const cases = rows.flatMap(({ label, request, targets }) =>
@@ -208,6 +218,7 @@ describe('confirmation payload → tool resume schema contract', () => {
 		setupWorkflowApply: true,
 		setupWorkflowTestTrigger: true,
 		mcpConnect: true,
+		interaction: true,
 	} satisfies Record<InstanceAiConfirmRequestKind, true>;
 
 	it('covers every confirmation kind the API accepts', () => {

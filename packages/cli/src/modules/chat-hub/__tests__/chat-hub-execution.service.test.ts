@@ -77,6 +77,33 @@ describe('ChatHubExecutionService', () => {
 				expect(service.extractMessage(runData, 'responseNodes')).toBe('Hello from node');
 			});
 
+			it('should parse valid json-render object and return JSON string', () => {
+				const jsonRender = {
+					type: 'json-render',
+					payload: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+				};
+				const runData = createRunData('TestNode', {
+					TestNode: [{ data: { main: [[{ json: {}, sendMessage: jsonRender }]] } }],
+				});
+
+				const result = service.extractMessage(runData, 'responseNodes');
+				expect(result).toBe(JSON.stringify(jsonRender));
+			});
+
+			it('should parse valid json-render-interaction object and return JSON string', () => {
+				const jsonRenderInteraction = {
+					type: 'json-render-interaction',
+					payload: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+					blockUserInput: true,
+				};
+				const runData = createRunData('TestNode', {
+					TestNode: [{ data: { main: [[{ json: {}, sendMessage: jsonRenderInteraction }]] } }],
+				});
+
+				const result = service.extractMessage(runData, 'responseNodes');
+				expect(result).toBe(JSON.stringify(jsonRenderInteraction));
+			});
+
 			it('should parse valid with-buttons object and return JSON string', () => {
 				const withButtons = {
 					type: 'with-buttons',

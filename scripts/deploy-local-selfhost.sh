@@ -125,6 +125,12 @@ flock -n 9 || die 'Another deployment is running'
 cd "$REPO_DIR"
 log "Image: $IMAGE"
 
+# Private @eit/json-render-* packages resolve to https:// in the lockfile.
+# Rewrite to SSH for this process so `pnpm deploy` can fetch without a token.
+export GIT_CONFIG_COUNT="${GIT_CONFIG_COUNT:-1}"
+export GIT_CONFIG_KEY_0="${GIT_CONFIG_KEY_0:-url.ssh://git@github.com/.insteadOf}"
+export GIT_CONFIG_VALUE_0="${GIT_CONFIG_VALUE_0:-https://github.com/}"
+
 if [[ "$DO_BUILD" -eq 1 ]]; then
 	mkdir -p "$(dirname "$BUILD_LOG")" "$(dirname "$DOCKER_BUILD_LOG")"
 	log "Build the production files. See $BUILD_LOG."

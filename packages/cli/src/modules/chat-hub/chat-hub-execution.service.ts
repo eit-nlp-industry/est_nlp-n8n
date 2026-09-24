@@ -2,6 +2,8 @@ import {
 	type ChatMessageId,
 	type ChatSessionId,
 	ChatHubConversationModel,
+	chatHubMessageJsonRenderInteractionSchema,
+	chatHubMessageJsonRenderSchema,
 	chatHubMessageWithButtonsSchema,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
@@ -751,6 +753,17 @@ export class ChatHubExecutionService {
 			const sendMessage = entry.sendMessage;
 			if (typeof sendMessage === 'string') {
 				return sendMessage;
+			}
+
+			const jsonRender = chatHubMessageJsonRenderSchema.safeParse(sendMessage);
+			if (jsonRender.success) {
+				return jsonStringify(jsonRender.data);
+			}
+
+			const jsonRenderInteraction =
+				chatHubMessageJsonRenderInteractionSchema.safeParse(sendMessage);
+			if (jsonRenderInteraction.success) {
+				return jsonStringify(jsonRenderInteraction.data);
 			}
 
 			const result = chatHubMessageWithButtonsSchema.safeParse(sendMessage);

@@ -1,6 +1,10 @@
 /* eslint-disable import-x/no-extraneous-dependencies -- test-only */
 import { mount } from '@vue/test-utils';
-import { APPROVAL_TOOL_NAME, WAIT_TOOL_NAME } from '@n8n/api-types';
+import {
+	APPROVAL_TOOL_NAME,
+	JSON_RENDER_INTERACTION_TOOL_NAME,
+	WAIT_TOOL_NAME,
+} from '@n8n/api-types';
 import { describe, expect, it, vi } from 'vitest';
 
 import InteractiveCard from '../components/interactive/InteractiveCard.vue';
@@ -18,11 +22,27 @@ vi.mock('@n8n/i18n', () => {
 			if (key === 'agents.chat.approval.approved') return 'Approved';
 			if (key === 'agents.chat.approval.rejected') return 'Rejected';
 			if (key === 'agents.chat.approval.viewToolDetails') return 'View tool details';
+			if (key === 'generic.cancel') return 'Cancel';
+			if (key === 'jsonRender.interaction.submit') return 'Submit';
 			return key;
 		},
 	};
 	return { useI18n: () => i18n, i18n, i18nInstance: { install: vi.fn() } };
 });
+
+vi.mock('@/features/ai/shared/JsonRenderInteractionPanel.vue', () => ({
+	default: {
+		name: 'JsonRenderInteractionPanel',
+		props: ['payload', 'instanceId', 'introMessage', 'disabled', 'values', 'status'],
+		emits: ['submit', 'cancel'],
+		template: `
+			<div>
+				<button data-test-id="json-render-interaction-cancel" :disabled="disabled" @click="$emit('cancel')">Cancel</button>
+				<button data-test-id="json-render-interaction-submit" :disabled="disabled" @click="$emit('submit', { next_action: 'go' })">Submit</button>
+			</div>
+		`,
+	},
+}));
 
 function mountCard(payload: InteractivePayload) {
 	return mount(InteractiveCard, {
@@ -56,6 +76,39 @@ const approvalPayload: InteractivePayload = {
 			toolName: 'calculator',
 			input: { input: '2 + 2' },
 			node: { parameters: { operation: 'calculate' } },
+		},
+	},
+};
+
+const jsonRenderForm = {
+	format: 'json-render-v1' as const,
+	spec: {
+		root: 'root',
+		elements: {
+			root: { type: 'Card', children: ['form', 'submit', 'cancel'] },
+			form: {
+				type: 'DynamicForm',
+				props: {
+					fields: [
+						{
+							type: 'select',
+							key: 'next_action',
+							label: 'Next action',
+							value: { options: [{ value: 'go', label: 'Go' }] },
+						},
+					],
+				},
+			},
+			submit: {
+				type: 'Button',
+				props: { label: 'Submit' },
+				on: { press: { action: 'form.submit' } },
+			},
+			cancel: {
+				type: 'Button',
+				props: { label: 'Cancel' },
+				on: { press: { action: 'form.cancel' } },
+			},
 		},
 	},
 };
@@ -150,5 +203,65 @@ describe('InteractiveCard', () => {
 		await buttons[1].trigger('click');
 
 		expect(wrapper.emitted('submit')).toEqual([[{ type: 'button', value: 'cancel' }]]);
+	});
+
+	it('renders the json-render form and emits the submitted values', async () => {
+		const wrapper = mountCard({
+			toolName: JSON_RENDER_INTERACTION_TOOL_NAME,
+			toolCallId: 'tc-json-render',
+			runId: 'run-json-render',
+			input: {
+				type: 'json-render-interaction',
+				jsonRender: {
+					format: 'json-render-v1',
+					spec: jsonRenderForm.spec,
+					meta: { title: 'Choose next' },
+				},
+				message: 'Choose the next action',
+			},
+		});
+
+		expect(wrapper.find('[data-testid="agent-json-render-interaction-card"]').exists()).toBe(true);
+
+		await wrapper.find('[data-test-id="json-render-interaction-submit"]').trigger('click');
+
+		expect(wrapper.emitted('submit')).toEqual([[{ approved: true, value: { next_action: 'go' } }]]);
+	});
+
+	it('emits a cancelled resume when the json-render form is cancelled', async () => {
+		const wrapper = mountCard({
+			toolName: JSON_RENDER_INTERACTION_TOOL_NAME,
+			toolCallId: 'tc-json-render',
+			runId: 'run-json-render',
+			input: {
+				type: 'json-render-interaction',
+				jsonRender: jsonRenderForm,
+			},
+		});
+
+		await wrapper.find('[data-test-id="json-render-interaction-cancel"]').trigger('click');
+
+		expect(wrapper.emitted('submit')).toEqual([[{ approved: false }]]);
+	});
+
+	it('renders a resolved json-render form as read-only with its submitted values', () => {
+		const wrapper = mountCard({
+			toolName: JSON_RENDER_INTERACTION_TOOL_NAME,
+			toolCallId: 'tc-json-render-resolved',
+			resolvedAt: 1,
+			resolvedValue: { approved: true, value: { next_action: 'rest' } },
+			input: {
+				type: 'json-render-interaction',
+				jsonRender: jsonRenderForm,
+			},
+		});
+
+		const panel = wrapper.findComponent({ name: 'JsonRenderInteractionPanel' });
+		expect(panel.props()).toMatchObject({
+			instanceId: 'tc-json-render-resolved',
+			disabled: true,
+			values: { next_action: 'rest' },
+			status: 'submitted',
+		});
 	});
 });

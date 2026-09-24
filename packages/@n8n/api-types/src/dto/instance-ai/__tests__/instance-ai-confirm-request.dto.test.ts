@@ -123,6 +123,16 @@ describe('InstanceAiConfirmRequestDto', () => {
 			['mcpConnect (connected)', { kind: 'mcpConnect', approved: true, connectedSlugs: ['brave'] }],
 			['mcpConnect (skipped)', { kind: 'mcpConnect', approved: false, connectedSlugs: [] }],
 			['mcpConnect (minimal)', { kind: 'mcpConnect', approved: false }],
+			// JsonRenderInteractionConfirmation: submit / cancel
+			[
+				'interaction approve with value',
+				{
+					kind: 'interaction',
+					approved: true,
+					value: { city: 'Berlin' },
+				},
+			],
+			['interaction cancel', { kind: 'interaction', approved: false }],
 		];
 
 		test.each(cases)('%s', (_label, payload) => {

@@ -35,6 +35,7 @@ export {
 	ASK_CREDENTIAL_TOOL_NAME,
 	ASK_EMBEDDING_CREDENTIAL_TOOL_NAME,
 	APPROVAL_TOOL_NAME,
+	JSON_RENDER_INTERACTION_TOOL_NAME,
 	askCredentialInputSchema,
 	cancellationResumeSchema,
 	type AskCredentialInput,

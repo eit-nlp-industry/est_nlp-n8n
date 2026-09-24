@@ -686,8 +686,10 @@ export const useChatStore = defineStore(STORES.CHAT_HUB, () => {
 			// The push handler will call handleWebSocketStreamBegin, handleWebSocketStreamChunk, etc.
 			// Human message will be created by handleHumanMessageCreated event when it has been accepted by the server
 			// The messageId for the AI response will be set by handleWebSocketStreamBegin
+			return true;
 		} catch (error) {
 			await handleApiError(error);
+			return false;
 		}
 	}
 

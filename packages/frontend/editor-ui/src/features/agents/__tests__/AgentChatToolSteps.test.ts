@@ -6,6 +6,30 @@ import { TOOL_CALL_STATE } from '../constants';
 import { DELEGATE_SUB_AGENT_TOOL_NAME } from '../utils/delegate-tool';
 import { WRITE_TODOS_TOOL_NAME } from '../utils/write-todos-tool';
 
+vi.mock('../components/AgentChatToolDataOutput.vue', async () => {
+	const { extractJsonRenderPayload } = await import('@/features/ai/shared/jsonRender.utils');
+	return {
+		default: {
+			name: 'AgentChatToolDataOutput',
+			props: ['value', 'instanceId'],
+			setup(props: { value: unknown }) {
+				const payload = extractJsonRenderPayload(props.value);
+				const formatted =
+					typeof props.value === 'string'
+						? props.value
+						: (JSON.stringify(props.value, null, 2) ?? '');
+				return { payload, formatted };
+			},
+			template: `
+				<div v-if="payload" data-testid="agent-chat-json-render-output">
+					{{ payload.spec.elements.root.props.title }}
+				</div>
+				<pre v-else>{{ formatted }}</pre>
+			`,
+		},
+	};
+});
+
 vi.mock('@n8n/design-system', () => ({
 	N8nAiActivityStep: {
 		props: ['label', 'hasContent', 'loading', 'error', 'hideErrorCallout'],
@@ -576,5 +600,42 @@ describe('AgentChatToolSteps', () => {
 		await wrapper.find('button').trigger('click');
 		expect(wrapper.text()).toContain('Weighing the sources.');
 		expect(wrapper.text()).not.toContain('Reasoning');
+	});
+
+	it('renders json-render output instead of raw JSON', async () => {
+		const wrapper = mountSteps([
+			{
+				tool: 'Render_Dashboard',
+				toolCallId: 'tc-dash',
+				state: TOOL_CALL_STATE.DONE,
+				input: { title: 'Weather snapshot' },
+				output: {
+					status: 'success',
+					data: [
+						{
+							json: {
+								format: 'json-render-v1',
+								payload: {
+									format: 'json-render-v1',
+									spec: {
+										root: 'root',
+										elements: {
+											root: { type: 'Card', props: { title: 'Weather snapshot' }, children: [] },
+										},
+									},
+								},
+							},
+						},
+					],
+				},
+			},
+		]);
+
+		await wrapper.find('button').trigger('click');
+
+		expect(wrapper.find('[data-testid="agent-chat-json-render-output"]').text()).toBe(
+			'Weather snapshot',
+		);
+		expect(wrapper.text()).not.toContain('"status": "success"');
 	});
 });

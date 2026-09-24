@@ -809,6 +809,7 @@ export const confirmationInputTypeSchema = z.enum([
 	'plan-review',
 	'resource-decision',
 	'continue',
+	'json-render',
 ]);
 export type InstanceAiConfirmationInputType = z.infer<typeof confirmationInputTypeSchema>;
 
@@ -917,6 +918,10 @@ export const confirmationRequestPayloadSchema = z.object({
 	mcpConnectRequest: mcpConnectRequestSchema
 		.optional()
 		.describe('When present, renders the inline "Available tools" MCP connect card'),
+	jsonRender: z
+		.record(z.string(), z.unknown())
+		.optional()
+		.describe('json-render payload for decision UI (inputType=json-render)'),
 });
 export type InstanceAiConfirmationRequestPayload = z.infer<typeof confirmationRequestPayloadSchema>;
 
@@ -964,6 +969,8 @@ export function isDisplayableConfirmationRequest(
 			return hasItems(payload.planItems) || argsContainPlannedTasks(payload.args);
 		case 'resource-decision':
 			return payload.resourceDecision !== undefined;
+		case 'json-render':
+			return payload.jsonRender !== undefined;
 		default:
 			return assertNever(inputType);
 	}
@@ -1859,6 +1866,7 @@ export interface InstanceAiToolCallState {
 		| 'planner'
 		| 'eval-setup'
 		| 'skill'
+		| 'json-render'
 		| 'default';
 	confirmation?: InstanceAiConfirmation;
 	confirmationStatus?: 'pending' | 'approved' | 'denied';
@@ -2547,6 +2555,7 @@ export function getRenderHint(toolName: string): InstanceAiToolCallState['render
 	if (toolName === 'research-with-agent') return 'researcher';
 	if (toolName === 'create-tasks') return 'planner';
 	if (toolName === 'eval-setup-with-agent') return 'eval-setup';
+	if (toolName === 'render-ui') return 'json-render';
 	if (
 		['create_skills', 'list_skills', 'read_skill', 'update_skill', 'load_skill'].includes(toolName)
 	)

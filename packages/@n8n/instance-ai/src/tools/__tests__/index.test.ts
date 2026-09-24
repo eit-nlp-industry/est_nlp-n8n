@@ -84,6 +84,16 @@ vi.mock('../shared/ask-user.tool', () => ({
 	createAskUserTool: vi.fn(() => ({ id: 'ask-user' })),
 }));
 
+vi.mock('../render-ui/render-ui.tool', () => ({
+	RENDER_UI_TOOL_ID: 'render-ui',
+	createRenderUiTool: vi.fn(() => ({ id: 'render-ui' })),
+}));
+
+vi.mock('../collect-decision/collect-decision.tool', () => ({
+	COLLECT_DECISION_TOOL_ID: 'collect-decision',
+	createCollectDecisionTool: vi.fn(() => ({ id: 'collect-decision' })),
+}));
+
 vi.mock('../task-control.tool', () => ({
 	createTaskControlTool: vi.fn(() => ({ id: 'task-control' })),
 }));
@@ -141,6 +151,8 @@ describe('domain tool construction', () => {
 			nodes: { id: 'nodes' },
 			searchModels: { id: 'searchModels' },
 			'ask-user': { id: 'ask-user' },
+			'render-ui': { id: 'render-ui' },
+			'collect-decision': { id: 'collect-decision' },
 			'build-workflow': { id: 'build-workflow' },
 		});
 		expect(orchestratorTools.has('templates')).toBe(false);
@@ -241,6 +253,10 @@ describe('domain tool construction', () => {
 		expect(ALWAYS_LOADED_TOOL_NAMES.has('mcp-servers')).toBe(true);
 	});
 
+	it('never defers render-ui behind search_tools', () => {
+		expect(ALWAYS_LOADED_TOOL_NAMES.has('render-ui')).toBe(true);
+	});
+
 	it('pairs list-agent-capabilities with build-agent in the always-loaded set', () => {
 		// Both are gated on the agents feature flag at module load time, so they
 		// must always be in or out together — the orchestrator needs to check
@@ -248,6 +264,9 @@ describe('domain tool construction', () => {
 		expect(ALWAYS_LOADED_TOOL_NAMES.has('list-agent-capabilities')).toBe(
 			ALWAYS_LOADED_TOOL_NAMES.has('build-agent'),
 		);
+	});
+	it('never defers collect-decision behind search_tools', () => {
+		expect(ALWAYS_LOADED_TOOL_NAMES.has('collect-decision')).toBe(true);
 	});
 
 	it('constructs create-tasks for the agent to apply profile exclusions', () => {

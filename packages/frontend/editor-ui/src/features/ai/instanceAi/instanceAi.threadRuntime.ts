@@ -451,6 +451,9 @@ export function createThreadRuntime(
 	const resolvedConfirmationIds = reactive(
 		new Map<string, 'approved' | 'changes-requested' | 'denied' | 'deferred'>(),
 	);
+	const interactionDecisions = reactive(
+		new Map<string, { status: 'submitted' | 'cancelled'; values?: Record<string, unknown> }>(),
+	);
 	const pendingMessageCount = ref(0);
 	const hydrationStatus = ref<'idle' | 'hydrating' | 'ready'>('idle');
 	const sseState = ref<InstanceAiSSEConnectionState>('disconnected');
@@ -1279,6 +1282,7 @@ export function createThreadRuntime(
 		debugEvents.value = [];
 		resetFeedback();
 		resolvedConfirmationIds.clear();
+		interactionDecisions.clear();
 		sessionAlwaysAllowKeys.value = new Set();
 		runStateByGroupId.clear();
 		groupIdByRunId.clear();
@@ -1744,6 +1748,7 @@ export function createThreadRuntime(
 		latestTasks,
 		debugEvents,
 		resolvedConfirmationIds,
+		interactionDecisions,
 		sessionAlwaysAllowKeys,
 		pendingMessageCount,
 		hydrationStatus,

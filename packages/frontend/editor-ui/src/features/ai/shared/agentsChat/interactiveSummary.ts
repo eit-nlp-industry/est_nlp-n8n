@@ -1,4 +1,4 @@
-import { N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
+import { JSON_RENDER_INTERACTION_TOOL_NAME, N8N_CHAT_ACTION_TOOL_NAME } from '@n8n/api-types';
 import { isRecord } from '@n8n/utils/is-record';
 
 import {
@@ -35,6 +35,15 @@ export function summariseToolCall(
 		const parsed = parseN8nChatActionInput(input);
 		if (!parsed) return resume.data.value;
 		return cardChoiceLabel(parsed.card, resume.data);
+	}
+
+	if (toolName === JSON_RENDER_INTERACTION_TOOL_NAME || /render[_-]?interaction/i.test(toolName)) {
+		if (typeof output.decided !== 'boolean') return undefined;
+		if (!output.decided) return 'Cancelled';
+		if (!isRecord(output.value)) return 'Submitted';
+		return Object.entries(output.value)
+			.map(([key, value]) => `${key}=${String(value)}`)
+			.join(', ');
 	}
 
 	return undefined;

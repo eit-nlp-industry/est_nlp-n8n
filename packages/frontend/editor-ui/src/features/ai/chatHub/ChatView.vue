@@ -510,6 +510,35 @@ async function onSubmit(message: string, attachments: File[]) {
 	}
 }
 
+async function submitJsonRenderDecision(
+	approved: boolean,
+	value?: Record<string, unknown>,
+): Promise<void> {
+	if (
+		isResponding.value ||
+		!selectedModel.value ||
+		!credentialsForSelectedProvider.value ||
+		(dynamicCreds.hasDynamicCredentials.value && !dynamicCreds.allAuthenticated.value)
+	) {
+		throw new Error('Chat Hub cannot submit the interaction now');
+	}
+
+	const sent = await chatStore.sendMessage(
+		sessionId.value,
+		JSON.stringify({
+			type: 'json-render-interaction-response',
+			approved,
+			value: approved ? value : undefined,
+		}),
+		selectedModel.value,
+		credentialsForSelectedProvider.value,
+	);
+
+	if (!sent) {
+		throw new Error('Chat Hub could not submit the interaction');
+	}
+}
+
 async function onStop() {
 	await chatStore.stopStreamingMessage(sessionId.value);
 }
@@ -755,6 +784,7 @@ function onFilesDropped(files: File[]) {
 								:cached-agent-display-name="selectedModel?.name ?? null"
 								:cached-agent-icon="selectedModel?.icon ?? null"
 								:accepted-mime-types="selectedModel?.metadata.allowedFilesMimeTypes ?? ''"
+								:submit-json-render-decision="submitJsonRenderDecision"
 								:min-height="
 									didSubmitInCurrentSession &&
 									message.type === 'ai' &&

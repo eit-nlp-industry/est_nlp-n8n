@@ -215,6 +215,14 @@ try {
 		'--config.package-import-method=copy',
 	];
 
+	// Private @eit/json-render-* git deps resolve to https:// in the lockfile.
+	// Prefer SSH for this process when the caller has not already set a rewrite.
+	if (!process.env.GIT_CONFIG_COUNT) {
+		process.env.GIT_CONFIG_COUNT = '1';
+		process.env.GIT_CONFIG_KEY_0 = 'url.ssh://git@github.com/.insteadOf';
+		process.env.GIT_CONFIG_VALUE_0 = 'https://github.com/';
+	}
+
 	// The dedicated-lockfile deploy leaves pnpm's own files in the closure, which the
 	// legacy deploy did not write. They are not needed to run the closure, they point at
 	// patch files that only exist in this checkout, and a `pnpm-lock.yaml` would make

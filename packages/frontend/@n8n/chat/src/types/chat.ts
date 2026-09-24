@@ -14,6 +14,10 @@ export interface Chat {
 	credentialStatus: Ref<CredentialStatus | null>;
 	loadPreviousSession?: () => Promise<string | undefined>;
 	startNewSession?: () => Promise<void>;
-	sendMessage: (text: string, files?: File[]) => Promise<SendMessageResponse | null>;
+	sendMessage: (
+		text: string,
+		files?: File[],
+		options?: { addToTranscript?: boolean; throwOnError?: boolean },
+	) => Promise<SendMessageResponse | null>;
 	ws?: WebSocket | null;
 }

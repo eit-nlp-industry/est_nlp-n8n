@@ -18,6 +18,7 @@ import InstanceAiChannelSetup from './InstanceAiChannelSetup.vue';
 import InstanceAiCredentialSetup from './InstanceAiCredentialSetup.vue';
 import type { QuestionAnswer } from './InstanceAiQuestions.vue';
 import InstanceAiQuestions from './InstanceAiQuestions.vue';
+import JsonRenderInteractionConfirmation from './JsonRenderInteractionConfirmation.vue';
 import InstanceAiWorkflowSetup from '../workflowSetup/InstanceAiWorkflowSetup.vue';
 import ConfirmationPreview from './ConfirmationPreview.vue';
 
@@ -539,6 +540,16 @@ function handleQuestionsSubmit(conf: InstanceAiConfirmation, answers: QuestionAn
 					:project-id="chunk.item.toolCall.confirmation.projectId ?? thread.projectId"
 					:credential-flow="chunk.item.toolCall.confirmation.credentialFlow"
 					:require-user-selection="chunk.item.toolCall.confirmation.requireUserSelection"
+				/>
+
+				<!-- json-render decision -->
+				<JsonRenderInteractionConfirmation
+					v-else-if="
+						chunk.item.toolCall.confirmation.inputType === 'json-render' &&
+						chunk.item.toolCall.confirmation.jsonRender
+					"
+					:key="'json-render-' + chunk.item.toolCall.confirmation.requestId"
+					:confirmation="chunk.item.toolCall.confirmation"
 				/>
 
 				<!-- Text input (ask-user) -->

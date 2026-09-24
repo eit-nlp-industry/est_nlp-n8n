@@ -239,6 +239,17 @@ describe('isWaitingForApproval', () => {
 		expect(isWaitingForApproval(message)).toBe(true);
 	});
 
+	it('should return true when message has waiting status with blocking json-render-interaction chunk', () => {
+		const message = createMessage('waiting', [
+			{
+				type: 'json-render-interaction',
+				payload: { format: 'json-render-v1' },
+				blockUserInput: true,
+			},
+		]);
+		expect(isWaitingForApproval(message)).toBe(true);
+	});
+
 	it('should return true when with-buttons is among other content chunks', () => {
 		const message = createMessage('waiting', [
 			{ type: 'text', content: 'Some text before' },

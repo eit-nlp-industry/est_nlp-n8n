@@ -32,7 +32,9 @@ const currentAlternativeIndex = computed(() => {
 	return message.alternatives.findIndex((id) => id === message.id);
 });
 
-const text = computed(() => message.content.map((c) => c.content).join('\n\n'));
+const text = computed(() =>
+	message.content.flatMap((chunk) => (chunk.type === 'text' ? [chunk.content] : [])).join('\n\n'),
+);
 
 const executionUrl = computed(() => {
 	if (

@@ -193,6 +193,32 @@ async function onSubmit(message: string, attachments: File[]) {
 	inputRef.value?.reset();
 }
 
+async function submitJsonRenderDecision(
+	approved: boolean,
+	value?: Record<string, unknown>,
+): Promise<void> {
+	if (isResponding.value || !workflowAgent.value) {
+		throw new Error('Chat Hub cannot submit the interaction now');
+	}
+
+	const sent = await chatStore.sendMessage(
+		sessionId.value,
+		JSON.stringify({
+			type: 'json-render-interaction-response',
+			approved,
+			value: approved ? value : undefined,
+		}),
+		workflowAgent.value,
+		{} as ChatHubSendMessageRequest['credentials'],
+		[],
+		workflowDocumentStore.value.workflowId,
+	);
+
+	if (!sent) {
+		throw new Error('Chat Hub could not submit the interaction');
+	}
+}
+
 async function onStop() {
 	await chatStore.stopStreamingMessage(sessionId.value);
 }
@@ -379,6 +405,7 @@ defineExpose({
 						:cached-agent-display-name="workflowAgent?.name ?? null"
 						:cached-agent-icon="workflowAgent?.icon ?? null"
 						:accepted-mime-types="workflowAgent?.metadata.allowedFilesMimeTypes ?? ''"
+						:submit-json-render-decision="submitJsonRenderDecision"
 						@start-edit="handleStartEditMessage(message.id)"
 						@cancel-edit="handleCancelEditMessage"
 						@update="handleEditMessage"

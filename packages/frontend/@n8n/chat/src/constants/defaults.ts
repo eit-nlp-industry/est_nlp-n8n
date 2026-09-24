@@ -1,4 +1,7 @@
+import MessageJsonRender from '@n8n/chat/components/MessageJsonRender.vue';
+import MessageJsonRenderInteraction from '@n8n/chat/components/MessageJsonRenderInteraction.vue';
 import MessageWithButtons from '@n8n/chat/components/MessageWithButtons.vue';
+import { defaultI18n } from '@n8n/chat/constants/defaultI18n';
 import { MessageComponentKey } from '@n8n/chat/constants/messageComponents';
 import type { ChatOptions } from '@n8n/chat/types';
 
@@ -16,22 +19,13 @@ export const defaultOptions: ChatOptions = {
 	defaultLanguage: 'en',
 	showWelcomeScreen: false,
 	initialMessages: ['Hi there! 👋', 'My name is Nathan. How can I assist you today?'],
-	i18n: {
-		en: {
-			title: 'Hi there! 👋',
-			subtitle: "Start a chat. We're here to help you 24/7.",
-			footer: '',
-			getStarted: 'New Conversation',
-			inputPlaceholder: 'Type your question..',
-			closeButtonTooltip: 'Close chat',
-			repostButton: 'Repost message',
-			reuseButton: 'Reuse message',
-		},
-	},
+	i18n: defaultI18n,
 	theme: {},
 	enableStreaming: false,
 	messageComponents: {
 		[MessageComponentKey.WITH_BUTTONS]: MessageWithButtons,
+		[MessageComponentKey.JSON_RENDER]: MessageJsonRender,
+		[MessageComponentKey.JSON_RENDER_INTERACTION]: MessageJsonRenderInteraction,
 	},
 };
 

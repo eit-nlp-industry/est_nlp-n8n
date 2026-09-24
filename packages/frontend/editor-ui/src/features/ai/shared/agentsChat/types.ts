@@ -2,6 +2,7 @@ import {
 	type AgentMessageAuthor,
 	type APPROVAL_TOOL_NAME,
 	type AgentBackgroundJobSignal,
+	type JSON_RENDER_INTERACTION_TOOL_NAME,
 	type N8N_CHAT_ACTION_TOOL_NAME,
 	type WAIT_TOOL_NAME,
 } from '@n8n/api-types';
@@ -83,6 +84,17 @@ export interface ApprovalResume {
 	approved: boolean;
 }
 
+export interface JsonRenderInteractionInput {
+	type: 'json-render-interaction';
+	jsonRender: Record<string, unknown>;
+	message?: string;
+}
+
+export interface JsonRenderInteractionResume {
+	approved: boolean;
+	value?: Record<string, unknown>;
+}
+
 /**
  * Discriminated union describing the interactive card that a suspended tool call
  * renders in the chat. `toolName` is the discriminant.
@@ -107,6 +119,11 @@ export type InteractivePayload =
 			toolName: typeof WAIT_TOOL_NAME;
 			input: N8nChatInteractionInput;
 			resolvedValue?: N8nChatResumeValue;
+	  })
+	| (InteractivePayloadBase & {
+			toolName: typeof JSON_RENDER_INTERACTION_TOOL_NAME;
+			input: JsonRenderInteractionInput;
+			resolvedValue?: JsonRenderInteractionResume;
 	  });
 
 export type AgentsChatInteraction = InteractivePayload;

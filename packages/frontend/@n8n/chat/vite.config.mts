@@ -36,7 +36,7 @@ export default mergeConfig(
 							// tests and stories from the published surface.
 							tsconfigPath: resolve(__dirname, 'tsconfig.build.json'),
 							entryRoot: srcPath,
-							processor: 'vue'
+							processor: 'vue',
 						}),
 					]),
 			{
@@ -71,6 +71,7 @@ export default mergeConfig(
 			},
 		],
 		resolve: {
+			dedupe: ['vue', 'element-plus'],
 			alias: [
 				{
 					find: '@',

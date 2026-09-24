@@ -5,9 +5,7 @@ import { useElementSize, useResizeObserver } from '@vueuse/core';
 import {
 	N8nButton,
 	N8nHeading,
-	N8nIcon,
 	N8nIconButton,
-	N8nLink,
 	N8nText,
 	N8nTooltip,
 	isIconOrEmoji,
@@ -383,7 +381,10 @@ function getUIContext(routeName: string) {
 
 type CreateSource = 'button' | 'dropdown';
 
-const actions: Record<ActionTypes, (projectId: string, source: CreateSource) => void | Promise<void>> = {
+const actions: Record<
+	ActionTypes,
+	(projectId: string, source: CreateSource) => void | Promise<void>
+> = {
 	[ACTION_TYPES.WORKFLOW]: (projectId: string) => {
 		void router.push({
 			name: VIEWS.NEW_WORKFLOW,

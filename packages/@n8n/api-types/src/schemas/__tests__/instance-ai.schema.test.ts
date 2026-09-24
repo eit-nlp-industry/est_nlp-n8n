@@ -570,6 +570,15 @@ describe('isDisplayableConfirmationRequest', () => {
 		expect(
 			isDisplayableConfirmationRequest(
 				makeConfirmation({
+					inputType: 'json-render',
+					message: 'Pick executions',
+					jsonRender: { format: 'json-render-v1', spec: { root: 'root', elements: {} } },
+				}),
+			),
+		).toBe(true);
+		expect(
+			isDisplayableConfirmationRequest(
+				makeConfirmation({
 					inputType: 'resource-decision',
 					message: '',
 					resourceDecision: {
@@ -687,10 +696,11 @@ describe('isDisplayableConfirmationRequest', () => {
 			questions: true,
 			'plan-review': true,
 			'resource-decision': true,
+			'json-render': true,
 			continue: true,
 		} satisfies Record<InstanceAiConfirmationInputType, true>;
 
-		expect(Object.keys(handled)).toHaveLength(6);
+		expect(Object.keys(handled)).toHaveLength(7);
 	});
 });
 

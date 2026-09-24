@@ -18,6 +18,63 @@ describe(parseMessage, () => {
 		]);
 	});
 
+	it('should parse AI message containing json-render-interaction JSON', () => {
+		const payload = {
+			format: 'json-render-v1',
+			schemaVersion: '1.0',
+			spec: { root: 'root', elements: { root: { type: 'Card', props: { title: 'Form' } } } },
+		};
+		const json = JSON.stringify({
+			type: 'json-render-interaction',
+			payload,
+			blockUserInput: true,
+		});
+
+		const result = parseMessage({ type: 'ai', content: json });
+
+		expect(result).toEqual([
+			{
+				type: 'json-render-interaction',
+				payload,
+				blockUserInput: true,
+			},
+		]);
+	});
+
+	it('should render a human json-render-interaction response as a short label', () => {
+		const result = parseMessage({
+			type: 'human',
+			content: JSON.stringify({
+				type: 'json-render-interaction-response',
+				approved: true,
+				value: { city: 'Berlin' },
+			}),
+		});
+
+		expect(result).toEqual([{ type: 'text', content: 'Submitted decision' }]);
+	});
+
+	it('should parse AI message containing json-render JSON', () => {
+		const payload = {
+			format: 'json-render-v1',
+			schemaVersion: '1.0',
+			spec: { root: 'root', elements: { root: { type: 'Card', props: { title: 'Weather' } } } },
+		};
+		const json = JSON.stringify({
+			type: 'json-render',
+			payload,
+		});
+
+		const result = parseMessage({ type: 'ai', content: json });
+
+		expect(result).toEqual([
+			{
+				type: 'json-render',
+				payload,
+			},
+		]);
+	});
+
 	it('should parse AI message containing with-buttons JSON', () => {
 		const json = JSON.stringify({
 			type: 'with-buttons',

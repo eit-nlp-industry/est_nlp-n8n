@@ -21,6 +21,7 @@ import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
 import { useI18n } from '@n8n/i18n';
 import {
 	APPROVAL_TOOL_NAME,
+	JSON_RENDER_INTERACTION_TOOL_NAME,
 	WAIT_TOOL_NAME,
 	MAX_AGENT_CHAT_ATTACHMENT_SIZE_BYTES,
 	MAX_AGENT_CHAT_ATTACHMENT_SIZE_MB,
@@ -379,8 +380,15 @@ const hasOpenApproval = computed(() => openInteractive.value?.toolName === APPRO
 // A waiting card is an interactive the user can act on, but never a question:
 // its resume arrives from the workflow, so typing must not cancel and steer it.
 const hasOpenWaitCard = computed(() => openInteractive.value?.toolName === WAIT_TOOL_NAME);
+const hasOpenJsonRenderInteraction = computed(
+	() => openInteractive.value?.toolName === JSON_RENDER_INTERACTION_TOOL_NAME,
+);
 const hasOpenInteractiveQuestion = computed(
-	() => hasOpenInteraction.value && !hasOpenApproval.value && !hasOpenWaitCard.value,
+	() =>
+		hasOpenInteraction.value &&
+		!hasOpenApproval.value &&
+		!hasOpenWaitCard.value &&
+		!hasOpenJsonRenderInteraction.value,
 );
 const hasOpenSuspension = computed(
 	() =>
@@ -432,6 +440,9 @@ const showStopAsPrimaryAction = computed(
 const chatPlaceholder = computed(() => {
 	if (hasOpenApproval.value) {
 		return locale.baseText('agents.chat.approval.inputPlaceholder');
+	}
+	if (hasOpenJsonRenderInteraction.value) {
+		return locale.baseText('agents.chat.jsonRender.inputPlaceholder');
 	}
 	if (inputBlockedBySuspension.value) {
 		return locale.baseText('agents.chat.waiting.inputPlaceholder');

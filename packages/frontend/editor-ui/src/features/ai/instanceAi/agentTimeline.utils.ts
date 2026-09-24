@@ -8,6 +8,26 @@ import { firstNonBlank, isActiveBuilderAgent, isBuilderAgent } from './builderAg
 /** Tool calls that are internal bookkeeping and should not be shown to the user. */
 export const HIDDEN_TOOLS = new Set(['updateWorkingMemory']);
 
+export function getResolvedInteractionDecision(
+	toolCall: InstanceAiToolCallState,
+	local?: { status: 'submitted' | 'cancelled'; values?: Record<string, unknown> },
+) {
+	if (local) return local;
+	const result = toolCall.result;
+	if (result && typeof result === 'object' && !Array.isArray(result)) {
+		if ('decided' in result && result.decided === false) return { status: 'cancelled' as const };
+		if ('decided' in result && result.decided === true && 'value' in result) {
+			const values = result.value;
+			if (values && typeof values === 'object' && !Array.isArray(values)) {
+				return { status: 'submitted' as const, values: { ...values } };
+			}
+		}
+	}
+	if (toolCall.confirmationStatus === 'approved') return { status: 'submitted' as const };
+	if (toolCall.confirmationStatus === 'denied') return { status: 'cancelled' as const };
+	return undefined;
+}
+
 /** Render hints whose tool calls produce no output in the timeline — they are
  *  represented elsewhere (child agent sections, artifact cards). */
 const INVISIBLE_RENDER_HINTS = new Set(['data-table', 'eval-setup']);
@@ -37,14 +57,17 @@ type TextEntry = Extract<InstanceAiTimelineEntry, { type: 'text' }>;
  * A `thinking` block is a maximal run of trace content — reasoning segments,
  * generic tool calls, and the intermediate narration text the model emits
  * between them — split only by user-facing content (answer text, plan
- * reviews, answered questions, task checklists, child agents). Invisible
- * entries (hidden tools, builder/planner hints, pending questions) are
- * dropped without splitting a run.
+ * reviews, answered questions, task checklists, json-render dashboards,
+ * child agents). Invisible entries (hidden tools, builder/planner hints,
+ * pending questions) are dropped without splitting a run.
  */
 export type TimelineBlock =
 	| { type: 'thinking'; key: string; entries: InstanceAiTimelineEntry[]; active: boolean }
 	| { type: 'text'; key: string; entry: TextEntry }
 	| { type: 'tasks'; key: string; toolCall: InstanceAiToolCallState }
+	| { type: 'json-render'; key: string; toolCall: InstanceAiToolCallState }
+	| { type: 'json-render-interaction'; key: string; toolCall: InstanceAiToolCallState }
+	| { type: 'json-render-answer'; key: string; toolCalls: InstanceAiToolCallState[] }
 	| { type: 'plan-review'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'mcp-connect'; key: string; toolCall: InstanceAiToolCallState }
 	| { type: 'questions'; key: string; toolCall: InstanceAiToolCallState }
@@ -54,6 +77,8 @@ export type TimelineBlock =
 type ToolCallKind =
 	| 'hidden'
 	| 'tasks'
+	| 'json-render'
+	| 'json-render-interaction'
 	| 'plan-review'
 	| 'mcp-connect'
 	| 'questions'
@@ -62,8 +87,8 @@ type ToolCallKind =
 
 /**
  * How a tool call renders in the timeline. `trace` rows join thinking blocks;
- * `tasks`/`plan-review`/`mcp-connect`/`questions` render standalone UI; `hidden`
- * calls are dropped without splitting a run.
+ * `tasks`/`json-render`/`plan-review`/`mcp-connect`/`questions` render
+ * standalone UI; `hidden` calls are dropped without splitting a run.
  *
  * Builder calls delegated to a sub-agent (`*-with-agent`) are hidden — the
  * child agent section represents them. In-thread builds (`build-workflow`)
@@ -72,6 +97,9 @@ type ToolCallKind =
 function classifyToolCall(tc: InstanceAiToolCallState): ToolCallKind {
 	if (HIDDEN_TOOLS.has(tc.toolName)) return 'hidden';
 	if (tc.renderHint === 'tasks') return 'tasks';
+	if (tc.renderHint === 'json-render' || tc.toolName === 'render-ui') return 'json-render';
+	if (tc.confirmation?.inputType === 'json-render' && tc.confirmation.jsonRender)
+		return 'json-render-interaction';
 	if (tc.renderHint === 'builder' && tc.toolName.endsWith('-with-agent')) return 'hidden';
 	if (tc.renderHint && INVISIBLE_RENDER_HINTS.has(tc.renderHint)) return 'hidden';
 	if (tc.confirmation?.inputType === 'plan-review') return 'plan-review';
@@ -226,6 +254,16 @@ export function buildTimelineBlocks(
 			case 'tasks':
 				pushStandalone({ type: 'tasks', key: `tasks-${idx}`, toolCall: tc });
 				return;
+			case 'json-render':
+				pushStandalone({ type: 'json-render', key: `json-render-${idx}`, toolCall: tc });
+				return;
+			case 'json-render-interaction':
+				pushStandalone({
+					type: 'json-render-interaction',
+					key: `json-render-interaction-${idx}`,
+					toolCall: tc,
+				});
+				return;
 			case 'plan-review':
 				pushStandalone({ type: 'plan-review', key: `plan-${idx}`, toolCall: tc });
 				return;
@@ -279,7 +317,39 @@ export function buildTimelineBlocks(
 		}
 	}
 
-	return blocks;
+	return promoteJsonRenderAnswerZone(blocks);
+}
+
+/** Collect dashboards into a fixed answer zone after the last text block. */
+export function promoteJsonRenderAnswerZone(blocks: TimelineBlock[]): TimelineBlock[] {
+	const dashboards: InstanceAiToolCallState[] = [];
+	const filtered: TimelineBlock[] = [];
+
+	for (const block of blocks) {
+		if (block.type === 'json-render') {
+			dashboards.push(block.toolCall);
+		} else {
+			filtered.push(block);
+		}
+	}
+
+	if (dashboards.length === 0) return blocks;
+
+	let insertAt = filtered.length;
+	for (let i = filtered.length - 1; i >= 0; i--) {
+		if (filtered[i]?.type === 'text') {
+			insertAt = i + 1;
+			break;
+		}
+	}
+
+	filtered.splice(insertAt, 0, {
+		type: 'json-render-answer',
+		key: 'json-render-answer',
+		toolCalls: dashboards,
+	});
+
+	return filtered;
 }
 
 /**

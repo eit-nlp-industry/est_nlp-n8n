@@ -76,6 +76,13 @@ const loadResearchTool = lazyMod(
 const loadAskUserTool = lazyMod(
 	() => require('./shared/ask-user.tool') as typeof import('./shared/ask-user.tool'),
 );
+const loadRenderUiTool = lazyMod(
+	() => require('./render-ui/render-ui.tool') as typeof import('./render-ui/render-ui.tool'),
+);
+const loadCollectDecisionTool = lazyMod(
+	() =>
+		require('./collect-decision/collect-decision.tool') as typeof import('./collect-decision/collect-decision.tool'),
+);
 const loadTaskControlTool = lazyMod(
 	() => require('./task-control.tool') as typeof import('./task-control.tool'),
 );
@@ -110,6 +117,8 @@ function getOrchestratorDomainToolFactories(
 		[DOMAIN_TOOL_IDS.NODES, () => loadNodesTool().createNodesTool(context)],
 		[DOMAIN_TOOL_IDS.SEARCH_MODELS, () => loadSearchModelsTool().createSearchModelsTool()],
 		[DOMAIN_TOOL_IDS.ASK_USER, () => loadAskUserTool().createAskUserTool(context)],
+		[DOMAIN_TOOL_IDS.RENDER_UI, () => loadRenderUiTool().createRenderUiTool()],
+		[DOMAIN_TOOL_IDS.COLLECT_DECISION, () => loadCollectDecisionTool().createCollectDecisionTool()],
 		[
 			DOMAIN_TOOL_IDS.BUILD_WORKFLOW,
 			() => loadBuildWorkflowTool().createBuildWorkflowTool(context),

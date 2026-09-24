@@ -87,6 +87,7 @@ function withAuthenticatedUser(
 	};
 }
 
+const getChatAssetsUrl = () => Container.get(ChatTriggerConfig).chatAssetsUrl.trim();
 const allowFileUploadsOption: INodeProperties = {
 	displayName: 'Allow File Uploads',
 	name: 'allowFileUploads',
@@ -1116,6 +1117,7 @@ export class ChatTrigger extends Node {
 					customCss: options.customCss,
 					enableStreaming,
 					frameIdentity,
+					chatAssetsUrl: getChatAssetsUrl(),
 				});
 
 				res.status(200).send(page).end();

@@ -20,6 +20,7 @@ import {
 	resolveSubAgentName,
 } from '../utils/delegate-tool';
 import { getToolCallDetails } from '../utils/tool-call-details';
+import AgentChatToolDataOutput from './AgentChatToolDataOutput.vue';
 import {
 	countIncompleteTodos,
 	isWriteTodosTool,
@@ -262,7 +263,10 @@ function hasActiveToolCall(): boolean {
 								<span :class="$style.toolDataLabel">
 									{{ i18n.baseText('agentSessions.timeline.output') }}
 								</span>
-								<pre :class="$style.toolDataContent">{{ formatToolData(tc.output) }}</pre>
+								<AgentChatToolDataOutput
+									:value="tc.output"
+									:instance-id="`agent-tool-${tc.toolCallId}`"
+								/>
 							</div>
 						</div>
 					</N8nAiActivityStep>
@@ -326,7 +330,10 @@ function hasActiveToolCall(): boolean {
 								<span :class="$style.toolDataLabel">
 									{{ i18n.baseText('agentSessions.timeline.output') }}
 								</span>
-								<pre :class="$style.toolDataContent">{{ formatToolData(tc.output) }}</pre>
+								<AgentChatToolDataOutput
+									:value="tc.output"
+									:instance-id="`agent-tool-${tc.toolCallId}`"
+								/>
 							</div>
 						</div>
 					</template>

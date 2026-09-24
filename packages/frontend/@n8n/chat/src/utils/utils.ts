@@ -5,6 +5,8 @@ import type { ChatMessage } from '../types';
 
 const CHAT_NODE_MESSAGE_TYPE = 'message';
 const CHAT_NODE_MESSAGE_WITH_BUTTONS_TYPE = 'with-buttons';
+const CHAT_NODE_MESSAGE_JSON_RENDER_TYPE = 'json-render';
+const CHAT_NODE_MESSAGE_JSON_RENDER_INTERACTION_TYPE = 'json-render-interaction';
 const CHAT_NODE_ERROR_TYPE = 'error';
 
 interface ChatNodeMessageWithButtons {
@@ -23,12 +25,28 @@ interface ChatNodeMessageRegular {
 	text: string;
 }
 
+interface ChatNodeMessageJsonRender {
+	type: typeof CHAT_NODE_MESSAGE_JSON_RENDER_TYPE;
+	payload: Record<string, unknown>;
+}
+
+interface ChatNodeMessageJsonRenderInteraction {
+	type: typeof CHAT_NODE_MESSAGE_JSON_RENDER_INTERACTION_TYPE;
+	payload: Record<string, unknown>;
+	blockUserInput: boolean;
+}
+
 interface ChatNodeError {
 	type: typeof CHAT_NODE_ERROR_TYPE;
 	message: string;
 }
 
-type ChatNodeFrame = ChatNodeMessageWithButtons | ChatNodeMessageRegular | ChatNodeError;
+type ChatNodeFrame =
+	| ChatNodeMessageWithButtons
+	| ChatNodeMessageRegular
+	| ChatNodeMessageJsonRender
+	| ChatNodeMessageJsonRenderInteraction
+	| ChatNodeError;
 
 export function constructChatWebsocketUrl(
 	url: string,
@@ -67,6 +85,27 @@ export function parseBotChatMessageContent(message: string): ChatMessage {
 					blockUserInput: parsed.blockUserInput,
 				},
 			};
+		} else if (parsed.type === CHAT_NODE_MESSAGE_JSON_RENDER_TYPE) {
+			chatMessage = {
+				id,
+				sender: 'bot',
+				type: 'component',
+				key: MessageComponentKey.JSON_RENDER,
+				arguments: {
+					payload: parsed.payload,
+				},
+			};
+		} else if (parsed.type === CHAT_NODE_MESSAGE_JSON_RENDER_INTERACTION_TYPE) {
+			chatMessage = {
+				id,
+				sender: 'bot',
+				type: 'component',
+				key: MessageComponentKey.JSON_RENDER_INTERACTION,
+				arguments: {
+					payload: parsed.payload,
+					blockUserInput: parsed.blockUserInput,
+				},
+			};
 		} else if (parsed.type === CHAT_NODE_MESSAGE_TYPE) {
 			chatMessage = { id, sender: 'bot', text: parsed.text };
 		} else if (parsed.type === CHAT_NODE_ERROR_TYPE) {
@@ -80,12 +119,17 @@ export function parseBotChatMessageContent(message: string): ChatMessage {
 }
 
 export function shouldBlockUserInput(message: ChatMessage): boolean {
+	if (message.type !== 'component') return false;
+
 	if (
-		message.type === 'component' &&
 		message.key === MessageComponentKey.WITH_BUTTONS &&
 		typeof message.arguments?.blockUserInput === 'boolean'
 	) {
-		return message.arguments?.blockUserInput;
+		return message.arguments.blockUserInput;
+	}
+
+	if (message.key === MessageComponentKey.JSON_RENDER_INTERACTION) {
+		return message.arguments?.blockUserInput !== false;
 	}
 
 	return false;

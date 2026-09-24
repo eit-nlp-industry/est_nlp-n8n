@@ -1,8 +1,9 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import type { McpToolCallResult } from '@n8n/api-types';
 import { N8nAiActivityStepResultSection } from '@n8n/design-system';
 import { isRecord } from '@n8n/utils/is-record';
+import { extractJsonRenderPayload } from '@/features/ai/shared/jsonRender.utils';
 
 import ToolResultJson from './ToolResultJson.vue';
 import ToolResultTable from './ToolResultTable.vue';
@@ -11,13 +12,17 @@ import ToolResultImage from './ToolResultImage.vue';
 import ToolResultFile from './ToolResultFile.vue';
 import ToolResultText from './ToolResultText.vue';
 
+const JsonRenderToolResult = defineAsyncComponent(
+	async () => await import('./JsonRenderToolResult.vue'),
+);
+
 const props = defineProps<{
 	result: unknown;
 	toolName: string;
 	toolArgs?: Record<string, unknown>;
 }>();
 
-type ResultType = 'content' | 'code' | 'table' | 'json';
+type ResultType = 'json-render' | 'content' | 'code' | 'table' | 'json';
 type McpContentItem = McpToolCallResult['content'][number];
 
 function isAction(family: string, action: string): boolean {
@@ -112,6 +117,7 @@ function extractMcpContent(result: unknown): McpToolCallResult['content'] | null
 }
 
 function detectType(result: unknown): ResultType {
+	if (extractJsonRenderPayload(result) !== null) return 'json-render';
 	if (extractMcpContent(result) !== null) return 'content';
 	if (isCodeTool()) return 'code';
 	if (isTableTool() && result && typeof result === 'object') return 'table';
@@ -156,13 +162,20 @@ function extractTableRows(result: unknown): Array<Record<string, unknown>> | nul
 }
 
 const resultType = computed(() => detectType(props.result));
+const jsonRenderPayload = computed(() => extractJsonRenderPayload(props.result));
 const contentItems = computed(() => extractMcpContent(props.result));
 const codeContent = computed(() => extractCode(props.result));
 const tableRows = computed(() => extractTableRows(props.result));
 </script>
 
 <template>
-	<N8nAiActivityStepResultSection v-if="resultType === 'content' && contentItems">
+	<N8nAiActivityStepResultSection v-if="resultType === 'json-render' && jsonRenderPayload">
+		<JsonRenderToolResult
+			:payload="jsonRenderPayload"
+			:instance-id="`render-ui-${props.toolName}`"
+		/>
+	</N8nAiActivityStepResultSection>
+	<N8nAiActivityStepResultSection v-else-if="resultType === 'content' && contentItems">
 		<div :class="$style.contentList">
 			<template v-for="(item, idx) in contentItems" :key="idx">
 				<ToolResultImage

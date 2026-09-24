@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { EphemeralNodeExecutor } from '@/node-execution';
 import { NodeTypes } from '@/node-types';
 
-import { resolveNodeTool } from '../node-tool-factory';
+import { resolveNodeTool, extractRenderInteractionDocument } from '../node-tool-factory';
 
 // The node-tool-factory imports the DI `Container` to look up NodeTypes inside
 // `resolveInputSchema` (for auto-seeding a `{ input: string }` schema on
@@ -294,5 +294,100 @@ describe('resolveNodeTool → eval instrumentation', () => {
 		const request = executeInline.mock.calls[0][0] as Record<string, unknown>;
 		expect(request.nodeName).toBeUndefined();
 		expect(request.configureAdditionalData).toBeUndefined();
+	});
+});
+
+describe('extractRenderInteractionDocument', () => {
+	const inner = {
+		format: 'json-render-v1',
+		spec: { root: 'root', elements: {} },
+		meta: { title: 'Choose next' },
+	};
+
+	it('unwraps the node { format, payload, phase } wrapper', () => {
+		expect(
+			extractRenderInteractionDocument({
+				status: 'success',
+				data: [{ json: { format: 'json-render-v1', payload: inner, phase: 'decision' } }],
+			}),
+		).toEqual(inner);
+	});
+
+	it('accepts the inner json-render document', () => {
+		expect(extractRenderInteractionDocument(inner)).toEqual(inner);
+	});
+
+	it('returns null for unrelated output', () => {
+		expect(
+			extractRenderInteractionDocument({ status: 'success', data: [{ json: { ok: true } }] }),
+		).toBeNull();
+	});
+});
+
+describe('resolveNodeTool → Render Interaction suspend/resume', () => {
+	const interactionSchema = {
+		type: 'node' as const,
+		name: 'render_interaction',
+		node: {
+			nodeType: '@n8n/n8n-nodes-langchain.renderInteraction',
+			nodeTypeVersion: 1,
+			nodeParameters: {},
+		},
+	};
+
+	const inner = {
+		format: 'json-render-v1',
+		spec: { root: 'root', elements: {} },
+		meta: { title: 'Choose next' },
+	};
+
+	it('suspends with the json-render decision payload', async () => {
+		const executeInline = vi.fn().mockResolvedValue({
+			status: 'success',
+			data: [{ json: { format: 'json-render-v1', payload: inner, phase: 'decision' } }],
+		});
+		const suspend = vi.fn().mockResolvedValue({ suspended: true });
+
+		const tool = await resolveNodeTool(interactionSchema, {
+			executor: { executeInline } as unknown as EphemeralNodeExecutor,
+			projectId: 'p1',
+		});
+
+		await tool.handler!({ title: 'Choose next' }, { suspend } as never);
+
+		expect(executeInline).toHaveBeenCalled();
+		expect(suspend).toHaveBeenCalledWith({
+			type: 'json-render-interaction',
+			jsonRender: inner,
+			message: 'Choose next',
+		});
+	});
+
+	it('returns the submitted form on resume without re-executing the node', async () => {
+		const executeInline = vi.fn();
+		const tool = await resolveNodeTool(interactionSchema, {
+			executor: { executeInline } as unknown as EphemeralNodeExecutor,
+			projectId: 'p1',
+		});
+
+		const result = await tool.handler!({}, {
+			resumeData: { approved: true, value: { next_action: 'go' } },
+		} as never);
+
+		expect(executeInline).not.toHaveBeenCalled();
+		expect(result).toEqual({ decided: true, value: { next_action: 'go' } });
+	});
+
+	it('returns decided false when the user cancels', async () => {
+		const executeInline = vi.fn();
+		const tool = await resolveNodeTool(interactionSchema, {
+			executor: { executeInline } as unknown as EphemeralNodeExecutor,
+			projectId: 'p1',
+		});
+
+		const result = await tool.handler!({}, { resumeData: { approved: false } } as never);
+
+		expect(executeInline).not.toHaveBeenCalled();
+		expect(result).toEqual({ decided: false });
 	});
 });

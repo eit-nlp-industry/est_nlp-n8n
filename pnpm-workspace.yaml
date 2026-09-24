@@ -361,6 +361,10 @@ catalogs:
     zod: ^4.4.3
 
 overrides:
+  # Keep protocol on the repo-wide zod 3 pin. A scoped zod 4 override
+  # puts both 3.x and 4.x into the deploy graph and breaks `pnpm deploy`
+  # with ERR_PNPM_DEPLOY_AMBIGUOUS_PEER on workspace peers.
+  '@eit/json-render-protocol>zod': 3.25.76
   libphonenumber-js: npm:empty-npm-package@1.0.0
   '@browserbasehq/stagehand': npm:empty-npm-package@1.0.0
   sharp: npm:empty-npm-package@1.0.0
@@ -501,6 +505,9 @@ patchedDependencies:
   imapflow@1.7.1: patches/imapflow@1.7.1.patch
 
 allowBuilds:
+  '@eit/json-render-element-plus@git+https://github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus': true
+  '@eit/json-render-protocol@git+https://github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol': true
+  '@eit/json-render-vue@git+https://github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue': true
   '@biomejs/biome': false
   '@confluentinc/kafka-javascript': true
   '@jitsi/robotjs': false

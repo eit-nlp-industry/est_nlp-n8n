@@ -1,0 +1,78 @@
+{
+	"name": "Chat Weather Dashboard Demo",
+	"nodes": [
+		{
+			"parameters": {
+				"options": {
+					"responseMode": "responseNodes"
+				}
+			},
+			"type": "@n8n/n8n-nodes-langchain.chatTrigger",
+			"typeVersion": 1.4,
+			"position": [0, 0],
+			"id": "chat-trigger",
+			"name": "When chat message received"
+		},
+		{
+			"parameters": {
+				"title": "Weather snapshot",
+				"description": "Demo data for json-render dashboard",
+				"metrics": {
+					"metrics": [
+						{
+							"label": "Shanghai",
+							"value": "22°C",
+							"trend": "up",
+							"trendLabel": "+2°"
+						},
+						{
+							"label": "Beijing",
+							"value": "18°C",
+							"trend": "neutral"
+						}
+					]
+				},
+				"tableColumns": ["City", "Condition", "High/Low"],
+				"tableRows": "[[\"Shanghai\",\"Sunny\",\"24°/18°\"],[\"Beijing\",\"Cloudy\",\"20°/14°\"]]"
+			},
+			"type": "@n8n/n8n-nodes-langchain.renderDashboard",
+			"typeVersion": 1,
+			"position": [240, 0],
+			"id": "render-dashboard",
+			"name": "Render Dashboard"
+		},
+		{
+			"parameters": {
+				"responseContentType": "dashboard"
+			},
+			"type": "@n8n/n8n-nodes-langchain.chat",
+			"typeVersion": 1.3,
+			"position": [480, 0],
+			"id": "chat-dashboard",
+			"name": "Chat Dashboard"
+		},
+		{
+			"parameters": {
+				"message": "Above is the weather dashboard for major cities."
+			},
+			"type": "@n8n/n8n-nodes-langchain.chat",
+			"typeVersion": 1.3,
+			"position": [720, 0],
+			"id": "chat-text",
+			"name": "Chat Text"
+		}
+	],
+	"connections": {
+		"When chat message received": {
+			"main": [[{ "node": "Render Dashboard", "type": "main", "index": 0 }]]
+		},
+		"Render Dashboard": {
+			"main": [[{ "node": "Chat Dashboard", "type": "main", "index": 0 }]]
+		},
+		"Chat Dashboard": {
+			"main": [[{ "node": "Chat Text", "type": "main", "index": 0 }]]
+		}
+	},
+	"active": false,
+	"pinData": {}
+}

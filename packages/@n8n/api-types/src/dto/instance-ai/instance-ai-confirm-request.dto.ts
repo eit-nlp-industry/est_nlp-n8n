@@ -107,6 +107,13 @@ const mcpConnectConfirmSchema = mcpConnectResumeSchema.extend({
 	kind: z.literal('mcpConnect'),
 });
 
+/** json-render decision submission (inputType='json-render'). */
+const interactionConfirmSchema = z.object({
+	kind: z.literal('interaction'),
+	approved: z.boolean(),
+	value: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const InstanceAiConfirmRequestDto = z.discriminatedUnion('kind', [
 	approvalConfirmSchema,
 	questionsConfirmSchema,
@@ -120,6 +127,7 @@ export const InstanceAiConfirmRequestDto = z.discriminatedUnion('kind', [
 	setupWorkflowApplyConfirmSchema,
 	setupWorkflowTestTriggerConfirmSchema,
 	mcpConnectConfirmSchema,
+	interactionConfirmSchema,
 ]);
 
 export type InstanceAiConfirmRequest = z.infer<typeof InstanceAiConfirmRequestDto>;

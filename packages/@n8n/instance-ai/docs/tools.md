@@ -61,7 +61,7 @@ keep their explicit pattern. `like` matches case; `ilike` ignores case.
 | `eval-config` | 6 |
 | `n8n-docs` | 3 |
 | `agents` | 1 |
-| `build-workflow`, `ask-user`, `parse-file`, `searchModels` | single-purpose |
+| `build-workflow`, `ask-user`, `parse-file`, `searchModels`, `render-ui` | single-purpose |
 
 ## Orchestration Tools
 
@@ -1213,6 +1213,14 @@ unspecified details within the requested task. A skipped request to expand scope
 leaves the existing state intact. Report any remaining blocker without asking
 the same question again.
 
+## `render-ui`
+
+Render a display-only dashboard in the assistant timeline. The tool compiles
+the input into a `json-render-v1` payload. It does not suspend and does not build workflows.
+
+Provide a title and at least one metric or table. The return value is
+`{ format: "json-render-v1", payload }`.
+
 ---
 
 ## Filesystem Tools (dynamic, conditional)
@@ -1432,7 +1440,7 @@ native tools active for the current request.
 
 The embedded Agent Builder uses the agents-module builder's own tool surface
 through `build-agent`. It does not receive the Instance AI domain registry. It
-inherits the orchestrator's safe MCP connector tools.
+inherits the orchestrator's safe MCP connector tools. The orchestrator also receives `render-ui` as an always-loaded display tool.
 
 ---
 

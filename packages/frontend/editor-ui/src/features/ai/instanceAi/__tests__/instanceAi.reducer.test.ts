@@ -810,6 +810,10 @@ describe('instanceAi.reducer', () => {
 			expect(getRenderHint('eval-setup-with-agent')).toBe('eval-setup');
 		});
 
+		test('returns json-render for render-ui', () => {
+			expect(getRenderHint('render-ui')).toBe('json-render');
+		});
+
 		test('returns planner render hint for create-tasks', () => {
 			expect(getRenderHint('create-tasks')).toBe('planner');
 		});
