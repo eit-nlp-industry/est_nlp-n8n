@@ -867,6 +867,7 @@ describe('AgentExecutionRepository', () => {
 				mock<AgentSandboxRuntimeService>({ isEnabled: () => sandboxEnabled }),
 				agentRepo,
 				new AiConfig(),
+				new AgentsConfig(),
 			);
 			const resume = async (
 				user: User,

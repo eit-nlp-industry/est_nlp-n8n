@@ -10,7 +10,7 @@ import type {
 } from '@n8n/api-types';
 import { N8N_CHAT_INTEGRATION_TYPE } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
-import { AiConfig } from '@n8n/config';
+import { AiConfig, AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Container, Service } from '@n8n/di';
 import { OperationalError, UserError } from 'n8n-workflow';
@@ -63,6 +63,7 @@ import { createAgentExecutionCounter } from './utils/agent-execution-counter';
 import { getPublishedAgentSnapshot } from './utils/agent-published-snapshot';
 import { getDelegatedChildCheckpoints } from './utils/delegated-child-checkpoints';
 import { buildInboundUserMessage } from './utils/inbound-attachments';
+import { debugModelIoOption } from './utils/debug-model-io-option';
 import { executionsToMessagesDto } from './utils/execution-to-message-mapper';
 
 export interface AgentMemoryScope {
@@ -271,6 +272,7 @@ export class AgentExecutionOrchestratorService {
 		private readonly agentSandboxRuntimeService: AgentSandboxRuntimeService,
 		private readonly agentRepository: AgentRepository,
 		private readonly aiConfig: AiConfig,
+		private readonly agentsConfig: AgentsConfig,
 	) {}
 
 	async getSessionMode(threadId: string): Promise<AgentSessionMode> {
@@ -552,6 +554,7 @@ export class AgentExecutionOrchestratorService {
 									runType,
 								}),
 								...modelStreamStallOptions(this.aiConfig),
+								...debugModelIoOption(this.agentsConfig.debugModelIo),
 								...(tracing ? { telemetry: tracing } : {}),
 								...(abortSignal ? { abortSignal } : {}),
 							},
@@ -1076,6 +1079,7 @@ export class AgentExecutionOrchestratorService {
 							runType: telemetry.runType,
 						}),
 						...modelStreamStallOptions(this.aiConfig),
+						...debugModelIoOption(this.agentsConfig.debugModelIo),
 						...(tracing ? { telemetry: tracing } : {}),
 						...(abortSignal ? { abortSignal } : {}),
 					},

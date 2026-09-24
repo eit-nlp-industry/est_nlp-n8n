@@ -12,7 +12,7 @@ import type {
 	SubAgentSpawnRequest,
 } from '@n8n/api-types';
 import type { Logger } from '@n8n/backend-common';
-import type { AiConfig } from '@n8n/config';
+import type { AiConfig, AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Container } from '@n8n/di';
 import type { Mocked } from 'vitest';
@@ -34,6 +34,7 @@ import type {
 } from '../sub-agent-source-resolver';
 
 const aiConfigMock = mock<AiConfig>();
+const agentsConfigMock = mock<AgentsConfig>({ debugModelIo: false });
 
 const projectId = 'project-1';
 const parentThreadId = 'parent-thread-1';
@@ -141,6 +142,7 @@ describe('SubAgentRunner', () => {
 			checkpointStorage,
 			logger,
 			aiConfigMock,
+			agentsConfigMock,
 		);
 
 		childAgent = mock<BuiltAgent>();

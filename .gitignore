@@ -89,19 +89,11 @@ packages/cli/src/commands/export/outputs
 .n8n
 *.log
 
-# Local demo environment (runtime data, not source)
-demo/.n8n-data/
-demo/*.log
-demo/n8n.pid
-demo/l3-status.txt
+# Local demo harness — keep on developer machines only (not for GitHub)
+demo/
 
-# Local planning notes and demo tooling are kept on developer machines only.
-.superpowers/sdd/2026-09-21-json-render-unified-interaction/progress.md
-docs/superpowers/plans/2026-09-21-json-render-unified-interaction.md
-demo/agents/
-demo/docker-compose.sandbox.yml
-demo/start-sandbox-compose.ps1
-demo/start-sandbox.ps1
+# Superpowers SDD execution ledgers (local only; plans/specs live in .agents/specs)
+.superpowers/
 
 lefthook-local.yml
 IMPROVEMENTS.md

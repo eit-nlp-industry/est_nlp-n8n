@@ -101,6 +101,8 @@ function labelForKey(key: string): string {
 			return i18n.baseText('agentSessions.timeline.agent');
 		case 'skill':
 			return i18n.baseText('agentSessions.timeline.skill');
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurn');
 		case 'tool':
 			return i18n.baseText('agentSessions.timeline.tool');
 		case 'workflow':
@@ -223,6 +225,9 @@ function shouldHandleShortcut() {
 }
 
 function timelineItemKey(item: TimelineItem): string {
+	if (item.kind === 'model-turn') {
+		return `${item.executionId}:model-turn:${item.turnIndex ?? item.timestamp}`;
+	}
 	return `${item.executionId}:${item.kind}:${item.toolCallId ?? item.timestamp}`;
 }
 

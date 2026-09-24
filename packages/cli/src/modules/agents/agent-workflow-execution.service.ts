@@ -8,7 +8,7 @@ import {
 	sanitizeAgentSkillBodies,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
-import { AiConfig } from '@n8n/config';
+import { AiConfig, AgentsConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import { context } from '@opentelemetry/api';
 import type { JSONSchema7 } from 'json-schema';
@@ -38,7 +38,7 @@ import {
 } from './agent-telemetry';
 import { AgentTurnExecutionService } from './agent-turn-execution.service';
 import type { Agent } from './entities/agent.entity';
-import type { ExecutionRecorder, MessageRecord } from './execution-recorder';
+import type { ExecutionRecorder, MessageRecord, TimelineEvent } from './execution-recorder';
 import { encodeIntegrationMessageContext } from './integrations/integration-message-context';
 import { IntegrationMessageContextService } from './integrations/integration-message-context.service';
 import { NodeToolAiGatewayService } from './json-config/node-tool-ai-gateway.service';
@@ -48,6 +48,7 @@ import { createInputDataTool } from './tools/input-data-tool';
 import { createWorkflowContextTool } from './tools/workflow-context-tool';
 import { createAgentCredentialProvider } from './utils/agent-credential-provider';
 import { createAgentExecutionCounter } from './utils/agent-execution-counter';
+import { debugModelIoOption } from './utils/debug-model-io-option';
 import { getPublishedAgentSnapshot } from './utils/agent-published-snapshot';
 import { streamAgentChunks } from './utils/agent-stream';
 import { validateNodeToolConfigs, validateNodeToolExpressions } from './utils/node-tool-validation';
@@ -132,6 +133,7 @@ export class AgentWorkflowExecutionService {
 		private readonly executionLevelTracer: ExecutionLevelTracer,
 		private readonly nodeToolAiGatewayService: NodeToolAiGatewayService,
 		private readonly aiConfig: AiConfig,
+		private readonly agentsConfig: AgentsConfig,
 		private readonly integrationMessageContextService: IntegrationMessageContextService,
 	) {}
 
@@ -364,6 +366,7 @@ export class AgentWorkflowExecutionService {
 						runType,
 					}),
 					...modelStreamStallOptions(this.aiConfig),
+					...debugModelIoOption(this.agentsConfig.debugModelIo),
 					...(telemetry ? { telemetry } : {}),
 				};
 				executionStarted = true;
@@ -499,6 +502,8 @@ export class AgentWorkflowExecutionService {
 			);
 		}
 
+		const modelTurns = modelTurnsFromTimeline(messageRecord.timeline);
+
 		return {
 			response: messageRecord.assistantResponse,
 			structuredOutput: structuredOutput ?? null,
@@ -512,6 +517,7 @@ export class AgentWorkflowExecutionService {
 			toolCalls,
 			finishReason: messageRecord.finishReason,
 			session,
+			...(modelTurns.length > 0 ? { modelTurns } : {}),
 		};
 	}
 
@@ -817,4 +823,32 @@ interface WorkflowAgentRunOutcome {
 	structuredOutput: unknown;
 	toolCalls: ExecuteAgentData['toolCalls'];
 	streamError?: Error;
+}
+
+function isModelTurnEvent(
+	event: TimelineEvent,
+): event is Extract<TimelineEvent, { type: 'model-turn' }> {
+	return event.type === 'model-turn';
+}
+
+function modelTurnsFromTimeline(
+	timeline: TimelineEvent[],
+): NonNullable<ExecuteAgentData['modelTurns']> {
+	return timeline.filter(isModelTurnEvent).map((event) => ({
+		turnIndex: event.turnIndex,
+		timestamp: event.timestamp,
+		endTime: event.endTime,
+		...(event.model !== undefined && { model: event.model }),
+		...(event.finishReason !== undefined && { finishReason: event.finishReason }),
+		...(event.usage !== undefined && { usage: event.usage }),
+		...(event.emptyRetries !== undefined &&
+			event.emptyRetries > 0 && { emptyRetries: event.emptyRetries }),
+		url: event.url,
+		...(event.method !== undefined && { method: event.method }),
+		...(event.status !== undefined && { status: event.status }),
+		...(event.streamed === true && { streamed: true }),
+		...(event.requestBody !== undefined && { requestBody: event.requestBody }),
+		...(event.responseBody !== undefined && { responseBody: event.responseBody }),
+		...(event.error !== undefined && { error: event.error }),
+	}));
 }

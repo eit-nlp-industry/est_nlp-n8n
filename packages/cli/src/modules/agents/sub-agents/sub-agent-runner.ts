@@ -24,7 +24,7 @@ import type {
 	SubAgentSpawnRequest,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
-import { AiConfig } from '@n8n/config';
+import { AiConfig, AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Container, Service } from '@n8n/di';
 import { isRecord } from '@n8n/utils/is-record';
@@ -50,6 +50,7 @@ import { buildProviderToolsForModel } from '../json-config/from-json-config';
 import { modelStreamStallOptions } from '../model-stream-stall-options';
 import type { WorkflowToolExecutionMode } from '../tools/workflow-tool-factory';
 import { streamAgentChunks } from '../utils/agent-stream';
+import { debugModelIoOption } from '../utils/debug-model-io-option';
 import { createAttributionTracker } from '../utils/mcp-attribution';
 import { SubAgentSourceResolver } from './sub-agent-source-resolver';
 
@@ -126,6 +127,7 @@ export class SubAgentRunner {
 		private readonly checkpointStorage: N8NCheckpointStorage,
 		private readonly logger: Logger,
 		private readonly aiConfig: AiConfig,
+		private readonly agentsConfig: AgentsConfig,
 	) {}
 
 	async run(
@@ -276,6 +278,7 @@ export class SubAgentRunner {
 				...(context.abortSignal !== undefined ? { abortSignal: context.abortSignal } : {}),
 				...(telemetry !== undefined ? { telemetry } : {}),
 				...modelStreamStallOptions(this.aiConfig),
+				...debugModelIoOption(this.agentsConfig.debugModelIo),
 				executionCounter: context.executionCounter,
 			};
 			executionStarted = operation.type === 'run';

@@ -548,6 +548,66 @@ describe('AgentSessionLangSmithExportService', () => {
 		});
 	});
 
+	it('exports model-turn debug snapshots as llm runs', async () => {
+		const { service, agentExecutionService, threadRepository } = setup();
+		agentExecutionService.getThreadDetail.mockResolvedValue({
+			thread: makeThread(),
+			executions: [
+				makeExecution({
+					timeline: [
+						{
+							type: 'model-turn',
+							turnIndex: 1,
+							timestamp: Date.parse('2026-08-14T09:00:00.100Z'),
+							endTime: Date.parse('2026-08-14T09:00:00.250Z'),
+							model: 'anthropic/claude-sonnet',
+							finishReason: 'stop',
+							usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
+							url: 'https://api.anthropic.com/v1/messages',
+							method: 'POST',
+							status: 200,
+							streamed: true,
+							requestBody: { messages: [{ role: 'user', content: 'Hello' }] },
+							responseBody: {
+								object: 'chat.completion',
+								choices: [{ message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' }],
+							},
+						},
+					],
+				}),
+			],
+		});
+		threadRepository.findByParentThreadId.mockResolvedValue([]);
+
+		await service.exportSession(input);
+
+		const modelTurnRun = submittedRuns().find(({ name }) => name === 'Model turn');
+		expect(modelTurnRun).toMatchObject({
+			run_type: 'llm',
+			inputs: {
+				url: 'https://api.anthropic.com/v1/messages',
+				method: 'POST',
+				requestBody: { messages: [{ role: 'user', content: 'Hello' }] },
+			},
+			outputs: {
+				status: 200,
+				streamed: true,
+				responseBody: {
+					object: 'chat.completion',
+					choices: [{ message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' }],
+				},
+			},
+			extra: {
+				metadata: {
+					turnIndex: 1,
+					model: 'anthropic/claude-sonnet',
+					finishReason: 'stop',
+					usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
+				},
+			},
+		});
+	});
+
 	it('rejects before loading data when the AI proxy is disabled', async () => {
 		const { service, agentExecutionService } = setup({ proxyEnabled: false });
 

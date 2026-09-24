@@ -183,6 +183,35 @@ describe('formatPreviewSessionContext', () => {
 		expect(block).toContain('error=boom');
 	});
 
+	it('summarizes model-turn debug snapshots without dumping request or response payloads', () => {
+		const executions = [
+			makeExecution({
+				timeline: [
+					{
+						type: 'model-turn',
+						turnIndex: 2,
+						timestamp: 1_000,
+						endTime: 1_400,
+						model: 'gpt-test',
+						url: 'https://api.example.com/v1/chat',
+						requestBody: { secret: 'secret-request-body' },
+						responseBody: { secret: 'secret-response-body' },
+					},
+					toolCallEvent(),
+				],
+			}),
+		];
+
+		const block = formatPreviewSessionContext(makeThread(), executions);
+
+		expect(block).toContain(
+			'LLM turn 3 | model=gpt-test | url=https://api.example.com/v1/chat | 400ms',
+		);
+		expect(block).not.toContain('secret-request-body');
+		expect(block).not.toContain('secret-response-body');
+		expect(block).toContain('Tool call: search_orders');
+	});
+
 	it('omits turns beyond the whole-block cap and reports the omission', () => {
 		const bigText = 'y'.repeat(3_900);
 		const executions = Array.from({ length: 40 }, (_, i) =>

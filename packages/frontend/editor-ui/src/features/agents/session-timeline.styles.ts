@@ -13,6 +13,8 @@ export function pillColors(
 			return { backgroundColor: 'var(--color--purple-200)', color: 'var(--color--purple-950)' };
 		case 'skill':
 			return { backgroundColor: 'var(--color--orange-200)', color: 'var(--color--orange-950)' };
+		case 'model-turn':
+			return { backgroundColor: 'var(--color--orange-200)', color: 'var(--color--orange-950)' };
 		case 'background-task-signal':
 		case 'subagent':
 			return { backgroundColor: 'var(--color--mint-200)', color: 'var(--color--mint-950)' };

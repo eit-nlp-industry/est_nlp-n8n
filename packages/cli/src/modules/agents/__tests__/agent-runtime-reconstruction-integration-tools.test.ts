@@ -3,7 +3,7 @@ import { type AgentJsonConfig } from '@n8n/api-types';
 import type { Logger } from '@n8n/backend-common';
 import type { CustomFetch, HttpTransport, OutboundHttp } from '@n8n/backend-network';
 import { mockLogger } from '@n8n/backend-test-utils';
-import type { AiConfig, GlobalConfig } from '@n8n/config';
+import type { AiConfig, AgentsConfig, GlobalConfig } from '@n8n/config';
 import type {
 	User,
 	CredentialsEntity,
@@ -285,6 +285,7 @@ describe('AgentRuntimeReconstructionService integration tools', () => {
 			agentSandboxRuntimeService,
 			agentRepository,
 			mock<AiConfig>(),
+			mock<AgentsConfig>({ debugModelIo: false }),
 		);
 		agentIntegrationPersistenceService = new AgentIntegrationPersistenceService(
 			agentRepository,
