@@ -1,11 +1,45 @@
 import { DeepSeekHarnessConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
+import { sanitizeErrorDetail } from '@n8n/utils/redaction/sanitize-error-detail';
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 
 export function getPnpmCommand(platform: NodeJS.Platform): string {
 	return platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+}
+
+/** Build the process used to create a profile via `--dump-config`. */
+export function getInitializeProfileInvocation(
+	harnessPath: string,
+	profile: string,
+	nodePath: string,
+	platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[] } {
+	const dumpArgs = [
+		'--profile',
+		profile,
+		'--from-default-profile',
+		'web',
+		'--dump-config',
+	] as const;
+
+	const trimmedNode = nodePath.trim();
+	if (trimmedNode) {
+		return {
+			command: trimmedNode,
+			args: [path.join(harnessPath, 'apps', 'cli', 'lib', 'bin.js'), ...dumpArgs],
+		};
+	}
+
+	const pnpmArgs = ['dsh', ...dumpArgs];
+	if (platform === 'win32') {
+		return {
+			command: process.env.ComSpec ?? 'cmd.exe',
+			args: ['/d', '/s', '/c', getPnpmCommand(platform), ...pnpmArgs],
+		};
+	}
+	return { command: getPnpmCommand(platform), args: [...pnpmArgs] };
 }
 
 const WORKSPACE_PATCH_MARKER = '# n8n-managed workspace directory';
@@ -32,8 +66,14 @@ function replaceWorkspacePatch(content: string, home: string): string {
 		if (!skippingManagedEntry) retained.push(line);
 	}
 
-	const base = retained.join('\n').trim();
-	if (base === '' || base === '[]') return managedPatch;
+	// Profile templates ship comments plus a bare `[]`. Strip that empty
+	// array so we can append real entries without invalid YAML.
+	const base = retained
+		.join('\n')
+		.trim()
+		.replace(/(?:^|\n)\[\]\s*$/u, '')
+		.trim();
+	if (base === '') return managedPatch;
 	return `${base}\n${managedPatch}`;
 }
 
@@ -43,8 +83,18 @@ async function execute(
 	options: Parameters<typeof execFile>[2],
 ): Promise<void> {
 	return await new Promise((resolve, reject) => {
-		execFile(command, [...args], options, (error) => {
+		execFile(command, [...args], options, (error, _stdout, stderr) => {
 			if (error) {
+				const detail = String(stderr ?? '')
+					.trim()
+					.split(/\r?\n/)
+					.slice(-5)
+					.join(' ')
+					.trim();
+				if (detail) {
+					reject(new Error(`${error.message}: ${sanitizeErrorDetail(detail, 2_048)}`));
+					return;
+				}
 				reject(error);
 				return;
 			}
@@ -76,24 +126,16 @@ export class DeepSeekHarnessCliService {
 		const profile = this.config.profile.trim();
 		if (!profile) throw new Error('N8N_DEEPSEEK_HARNESS_PROFILE cannot be empty');
 
-		const pnpmArgs = [
-			'dsh',
-			'--profile',
+		const invocation = getInitializeProfileInvocation(
+			harnessPath,
 			profile,
-			'--from-default-profile',
-			'web',
-			'--dump-config',
-		];
-		const isWindows = process.platform === 'win32';
-		await execute(
-			isWindows ? (process.env.ComSpec ?? 'cmd.exe') : getPnpmCommand(process.platform),
-			isWindows ? ['/d', '/s', '/c', getPnpmCommand(process.platform), ...pnpmArgs] : pnpmArgs,
-			{
-				cwd: harnessPath,
-				env: { ...process.env, DSH_HOME: home },
-				windowsHide: true,
-			},
+			this.config.nodePath ?? '',
 		);
+		await execute(invocation.command, invocation.args, {
+			cwd: harnessPath,
+			env: { ...process.env, DSH_HOME: home },
+			windowsHide: true,
+		});
 
 		const profilePath = path.join(home, 'profiles', profile);
 		try {

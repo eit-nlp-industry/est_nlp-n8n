@@ -78,7 +78,11 @@ process. Repeated requests for the same agent reuse the running process.
 - Studio launch APIs return `/deepseek-harness-studio/:projectId/:agentId/?…`
   instead of the Harness loopback URL.
 - n8n proxies HTTP and WebSocket traffic to the agent process on `127.0.0.1`.
-- Absolute `/api` literals in HTML/JS responses are rewritten to the proxy base.
+- The proxy strips the Studio mount prefix. Harness uses document-relative
+  routes, so HTML, JavaScript, and JSON bodies pass through unchanged.
+- The proxy preserves the public `Host`, `Origin`, and `Sec-Fetch-*` headers.
+  The Harness process receives the configured n8n host through
+  `--trusted-host` and applies its normal browser trust checks.
 - `Set-Cookie` `Path` values are rewritten to the proxy base so Harness auth
   cookies stay under the iframe origin path.
 - The proxy itself is unauthenticated; access still requires the Harness launch

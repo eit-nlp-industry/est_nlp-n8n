@@ -1,7 +1,7 @@
-import type { IncomingMessage, Server } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
-import type { Request, RequestHandler, Response } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import type { Request, RequestHandler } from 'express';
+import { createProxyMiddleware, fixRequestBody, responseInterceptor } from 'http-proxy-middleware';
 
 import type { DeepSeekHarnessWebService } from './deepseek-harness-web.service';
 
@@ -9,6 +9,15 @@ export const STUDIO_PROXY_PATH_PREFIX = '/deepseek-harness-studio';
 
 const STUDIO_PROXY_PATH_PATTERN =
 	/^\/deepseek-harness-studio\/(?<projectId>[^/]+)\/(?<agentId>[^/]+)(?:\/(?<rest>.*))?$/;
+
+const STUDIO_HOST_OWNERSHIP_SCRIPT =
+	'<script>globalThis.__DSH_TRANSPORT__={...(globalThis.__DSH_TRANSPORT__??{}),ownsHost:true};</script>';
+
+export function injectStudioHostOwnership(html: string): string {
+	const closingHeadIndex = html.search(/<\/head\s*>/iu);
+	if (closingHeadIndex === -1) return html;
+	return `${html.slice(0, closingHeadIndex)}${STUDIO_HOST_OWNERSHIP_SCRIPT}${html.slice(closingHeadIndex)}`;
+}
 
 export function studioProxyBasePath(projectId: string, agentId: string): string {
 	return `${STUDIO_PROXY_PATH_PREFIX}/${encodeURIComponent(projectId)}/${encodeURIComponent(agentId)}`;
@@ -22,13 +31,6 @@ export function buildStudioProxyUrl(
 ): string {
 	const search = new URL(runtimeUrl).search;
 	return `${studioProxyBasePath(projectId, agentId)}/${search}`;
-}
-
-export function rewriteHarnessApiPaths(body: string, proxyBasePath: string): string {
-	return body
-		.replaceAll('"/api', `"${proxyBasePath}/api`)
-		.replaceAll("'/api", `'${proxyBasePath}/api`)
-		.replaceAll('`/api', `\`${proxyBasePath}/api`);
 }
 
 export function rewriteSetCookiePaths(
@@ -59,106 +61,91 @@ function parseStudioProxyPath(urlPath: string): {
 	};
 }
 
-function shouldRewriteBody(contentType: string | undefined): boolean {
-	if (!contentType) return false;
-	const normalized = contentType.toLowerCase();
-	if (normalized.includes('sourcemap')) return false;
-	return (
-		normalized.includes('javascript') ||
-		normalized.includes('text/html') ||
-		normalized.includes('application/json') ||
-		normalized.includes('text/css')
-	);
-}
-
 type ProxyMiddleware = RequestHandler & {
 	upgrade?: (req: IncomingMessage, socket: Socket, head: Buffer) => void;
 };
 
 /**
- * Express middleware that forwards Studio traffic to the agent Harness process
- * and rewrites absolute `/api` references so the SPA works under a subpath.
+ * Forward Studio traffic while preserving the browser-facing authority.
+ * Harness validates Host, Origin, and Fetch Metadata against `--trusted-host`.
  */
 export function createStudioProxyMiddleware(
 	webService: DeepSeekHarnessWebService,
 ): ProxyMiddleware {
-	const proxy = createProxyMiddleware({
-		changeOrigin: true,
+	const router = (req: Request) => {
+		const projectId = req.params.projectId;
+		const agentId = req.params.agentId;
+		if (typeof projectId !== 'string' || typeof agentId !== 'string') {
+			throw new Error('DeepSeek Harness studio proxy is missing route params');
+		}
+		const origin = webService.getRunningOrigin(projectId, agentId);
+		if (!origin) {
+			throw new Error('DeepSeek Harness studio runtime is not running');
+		}
+		return origin;
+	};
+	const pathRewrite = (_path: string, req: Request) => {
+		const url = new URL(req.url, 'http://studio.invalid');
+		return `${url.pathname}${url.search}`;
+	};
+	const proxyReq = (outgoingRequest: Parameters<typeof fixRequestBody>[0], req: Request) => {
+		fixRequestBody(outgoingRequest, req);
+	};
+	const rewriteResponseCookies = (
+		setCookie: string | string[] | undefined,
+		req: Request,
+	): string[] | undefined => {
+		const projectId = req.params.projectId;
+		const agentId = req.params.agentId;
+		if (typeof projectId !== 'string' || typeof agentId !== 'string') return undefined;
+		return rewriteSetCookiePaths(setCookie, studioProxyBasePath(projectId, agentId));
+	};
+	const proxyError = (_error: Error, _req: Request, res: ServerResponse) => {
+		if (!res.headersSent) {
+			res.writeHead(502);
+			res.end('Bad Gateway');
+		}
+	};
+
+	const streamingProxy = createProxyMiddleware<Request>({
+		changeOrigin: false,
 		ws: true,
-		selfHandleResponse: true,
-		router: (req) => {
-			const projectId = req.params.projectId;
-			const agentId = req.params.agentId;
-			if (typeof projectId !== 'string' || typeof agentId !== 'string') {
-				throw new Error('DeepSeek Harness studio proxy is missing route params');
-			}
-			const origin = webService.getRunningOrigin(projectId, agentId);
-			if (!origin) {
-				throw new Error('DeepSeek Harness studio runtime is not running');
-			}
-			return origin;
-		},
-		pathRewrite: (_path, req) => {
-			const url = new URL(req.url ?? '/', 'http://studio.invalid');
-			return `${url.pathname}${url.search}`;
-		},
+		router,
+		pathRewrite,
 		on: {
-			proxyReq: (proxyReq) => {
-				// Avoid gzip so the response body can be rewritten safely.
-				proxyReq.setHeader('accept-encoding', 'identity');
+			proxyReq,
+			proxyRes: (proxyRes, req) => {
+				const rewrittenCookies = rewriteResponseCookies(proxyRes.headers['set-cookie'], req);
+				if (rewrittenCookies) proxyRes.headers['set-cookie'] = rewrittenCookies;
 			},
-			proxyRes: (proxyRes, req, res) => {
-				const expressReq = req as Request;
-				const expressRes = res as Response;
-				const projectId = expressReq.params.projectId;
-				const agentId = expressReq.params.agentId;
-				if (typeof projectId !== 'string' || typeof agentId !== 'string') {
-					expressRes.statusCode = 502;
-					expressRes.end('Bad Gateway');
-					return;
-				}
-
-				const proxyBasePath = studioProxyBasePath(projectId, agentId);
-				const headers = { ...proxyRes.headers };
-				const rewrittenCookies = rewriteSetCookiePaths(headers['set-cookie'], proxyBasePath);
-				if (rewrittenCookies) headers['set-cookie'] = rewrittenCookies;
-
-				const contentType = headers['content-type'];
-				const contentTypeValue = Array.isArray(contentType) ? contentType[0] : contentType;
-
-				if (!shouldRewriteBody(contentTypeValue)) {
-					expressRes.writeHead(proxyRes.statusCode ?? 502, headers);
-					proxyRes.pipe(expressRes);
-					return;
-				}
-
-				const chunks: Buffer[] = [];
-				proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk));
-				proxyRes.on('end', () => {
-					const original = Buffer.concat(chunks).toString('utf8');
-					const rewritten = rewriteHarnessApiPaths(original, proxyBasePath);
-					const body = Buffer.from(rewritten, 'utf8');
-					delete headers['content-length'];
-					headers['content-length'] = String(body.byteLength);
-					expressRes.writeHead(proxyRes.statusCode ?? 502, headers);
-					expressRes.end(body);
-				});
-				proxyRes.on('error', () => {
-					if (!expressRes.headersSent) {
-						expressRes.statusCode = 502;
-						expressRes.end('Bad Gateway');
-					}
-				});
-			},
-			error: (_error, _req, res) => {
-				if ('writeHead' in res && !res.headersSent) {
-					res.writeHead(502);
-					res.end('Bad Gateway');
-				}
-			},
+			error: proxyError,
 		},
-	}) as ProxyMiddleware;
+	});
 
+	const entryProxy = createProxyMiddleware<Request>({
+		changeOrigin: false,
+		selfHandleResponse: true,
+		router,
+		pathRewrite,
+		on: {
+			proxyReq,
+			proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
+				const rewrittenCookies = rewriteResponseCookies(proxyRes.headers['set-cookie'], req);
+				if (rewrittenCookies) res.setHeader('set-cookie', rewrittenCookies);
+				const contentType = proxyRes.headers['content-type'];
+				if (!contentType?.toLowerCase().includes('text/html')) return responseBuffer;
+				return injectStudioHostOwnership(responseBuffer.toString('utf8'));
+			}),
+			error: proxyError,
+		},
+	});
+
+	const proxy = (async (req, res, next) => {
+		const requestUrl = new URL(req.url, 'http://studio.invalid');
+		const isEntryRequest = req.method === 'GET' && requestUrl.pathname === '/';
+		await (isEntryRequest ? entryProxy(req, res, next) : streamingProxy(req, res, next));
+	}) as ProxyMiddleware;
+	proxy.upgrade = streamingProxy.upgrade;
 	return proxy;
 }
 

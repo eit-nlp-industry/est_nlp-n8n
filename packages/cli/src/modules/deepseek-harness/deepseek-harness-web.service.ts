@@ -1,6 +1,7 @@
-import { DeepSeekHarnessConfig } from '@n8n/config';
+import { DeepSeekHarnessConfig, GlobalConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import { OnShutdown } from '@n8n/decorators';
+import { sanitizeErrorDetail } from '@n8n/utils/redaction/sanitize-error-detail';
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import { join } from 'node:path';
@@ -16,18 +17,31 @@ import { DeepSeekHarnessAgentRepository } from './repositories/deepseek-harness-
 
 const STARTUP_TIMEOUT_MS = 30_000;
 const STOP_TIMEOUT_MS = 5_000;
+const STARTUP_OUTPUT_LIMIT = 4_096;
 const WEB_URL_PATTERN = /dsh web:\s+(https?:\/\/\S+)/;
 
 type SpawnProcess = typeof spawn;
 type Fetch = typeof fetch;
 type WebRuntime = { url: string; workspaceId: string };
 
+export function appendOutputTail(current: string, chunk: Buffer | string): string {
+	return `${current}${chunk.toString()}`.slice(-STARTUP_OUTPUT_LIMIT);
+}
+
+export function getPublicHost(config: Pick<GlobalConfig, 'editorBaseUrl' | 'host'>): string {
+	const editorBaseUrl = config.editorBaseUrl?.replace(/^["]+|["]+$/g, '');
+	return editorBaseUrl ? new URL(editorBaseUrl).hostname : config.host;
+}
+
 export function getWebProcessInvocation(
 	harnessPath: string,
 	profile: string,
+	nodePath: string = process.execPath,
+	trustedHost?: string,
 ): { command: string; args: string[] } {
+	const normalizedTrustedHost = trustedHost?.trim();
 	return {
-		command: process.execPath,
+		command: nodePath,
 		args: [
 			join(harnessPath, 'apps', 'cli', 'lib', 'bin.js'),
 			'--profile',
@@ -35,6 +49,7 @@ export function getWebProcessInvocation(
 			'--no-open',
 			'--port',
 			'0',
+			...(normalizedTrustedHost ? ['--trusted-host', normalizedTrustedHost] : []),
 		],
 	};
 }
@@ -51,6 +66,7 @@ export class DeepSeekHarnessWebService {
 		private readonly homeService: DeepSeekHarnessHomeService,
 		private readonly cliService: DeepSeekHarnessCliService,
 		private readonly config: DeepSeekHarnessConfig,
+		private readonly globalConfig: GlobalConfig,
 		private readonly spawnProcess: SpawnProcess = spawn,
 		private readonly fetchFn: Fetch = fetch,
 	) {}
@@ -143,7 +159,13 @@ export class DeepSeekHarnessWebService {
 		const workspacePath = registeredDefault
 			? undefined
 			: await this.homeService.createDefaultWorkspace(agent.userName, agent.name, agent.id);
-		const invocation = getWebProcessInvocation(harnessPath, profile);
+		const nodePath = this.config.nodePath?.trim() || process.execPath;
+		const invocation = getWebProcessInvocation(
+			harnessPath,
+			profile,
+			nodePath,
+			getPublicHost(this.globalConfig),
+		);
 		await this.repository.updateRuntimeState(agentId, {
 			status: 'starting',
 			pid: null,
@@ -162,6 +184,7 @@ export class DeepSeekHarnessWebService {
 
 		return await new Promise((resolve, reject) => {
 			let output = '';
+			let stderr = '';
 			let settled = false;
 			let startupHandled = false;
 			const timeout = setTimeout(() => {
@@ -188,11 +211,16 @@ export class DeepSeekHarnessWebService {
 				reject(error);
 			};
 
-			child.stdout?.on('data', async (chunk: Buffer | string) => {
-				output += chunk.toString();
+			const collectStderr = (chunk: Buffer | string) => {
+				stderr = appendOutputTail(stderr, chunk);
+			};
+			const inspectStdout = async (chunk: Buffer | string) => {
+				output = appendOutputTail(output, chunk);
 				const match = output.match(WEB_URL_PATTERN);
 				if (!match || settled || startupHandled) return;
 				startupHandled = true;
+				child.stdout?.off('data', inspectStdout);
+				child.stderr?.off('data', collectStderr);
 
 				try {
 					const workspaceId =
@@ -225,25 +253,30 @@ export class DeepSeekHarnessWebService {
 				} catch (error) {
 					fail(error instanceof Error ? error : new Error(String(error)));
 				}
-			});
+			};
+			child.stdout?.on('data', inspectStdout);
+
+			child.stderr?.on('data', collectStderr);
 
 			child.once('error', fail);
 			child.once('exit', (code) => {
 				this.children.delete(child);
 				this.childAgents.delete(child);
 				if (!settled) {
+					const detail = sanitizeErrorDetail(
+						stderr.trim().split(/\r?\n/).slice(-3).join(' ').trim(),
+						2_048,
+					);
+					const suffix = detail ? `: ${detail}` : '';
+					const message = `DeepSeek Harness Web process exited before startup${code === null ? '' : ` with code ${code}`}${suffix}`;
 					void this.repository.updateRuntimeState(agentId, {
 						status: 'error',
 						pid: null,
 						port: null,
 						url: null,
-						error: `Process exited before startup${code === null ? '' : ` with code ${code}`}`,
+						error: message,
 					});
-					fail(
-						new Error(
-							`DeepSeek Harness Web process exited before startup${code === null ? '' : ` with code ${code}`}`,
-						),
-					);
+					fail(new Error(message));
 				}
 			});
 		});

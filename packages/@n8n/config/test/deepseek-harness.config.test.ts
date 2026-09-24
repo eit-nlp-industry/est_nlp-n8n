@@ -23,4 +23,10 @@ describe('DeepSeekHarnessConfig', () => {
 
 		expect(Container.get(DeepSeekHarnessConfig).home).toBe('D:\\n8n-data\\deepseek');
 	});
+
+	it('reads an optional Node binary path from the environment', () => {
+		process.env.N8N_DEEPSEEK_HARNESS_NODE = '/opt/glibc-node/bin/node-glibc';
+
+		expect(Container.get(DeepSeekHarnessConfig).nodePath).toBe('/opt/glibc-node/bin/node-glibc');
+	});
 });
