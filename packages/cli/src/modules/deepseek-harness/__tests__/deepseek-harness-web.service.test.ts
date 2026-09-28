@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 
+import { getHarnessEnv } from '../deepseek-harness-cli.service';
 import {
 	appendOutputTail,
 	DeepSeekHarnessWebService,
@@ -91,7 +92,7 @@ describe('DeepSeekHarnessWebService', () => {
 			],
 			expect.objectContaining({
 				cwd: 'D:/deepseek-harness',
-				env: expect.objectContaining({ DSH_HOME: 'D:/dsh/user/Agent-agent-1' }),
+				env: getHarnessEnv('D:/deepseek-harness', 'D:/dsh/user/Agent-agent-1'),
 			}),
 		);
 		expect(repository.updateRuntimeState).toHaveBeenCalledWith('agent-1', {

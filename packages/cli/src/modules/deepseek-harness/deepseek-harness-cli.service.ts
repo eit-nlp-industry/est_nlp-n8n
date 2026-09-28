@@ -9,6 +9,27 @@ export function getPnpmCommand(platform: NodeJS.Platform): string {
 	return platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 }
 
+/**
+ * Build the environment for Harness child processes. The Harness bin
+ * directory goes first on PATH, so `pnpm` resolves even when the host PATH
+ * does not include it.
+ */
+export function getHarnessEnv(
+	harnessPath: string,
+	home: string,
+	env: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+	// Windows names the variable `Path`, so match the key case-insensitively.
+	const pathKey = Object.keys(env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+	const binDir = path.join(harnessPath, 'node_modules', '.bin');
+	const current = env[pathKey];
+	return {
+		...env,
+		DSH_HOME: home,
+		[pathKey]: current ? `${binDir}${path.delimiter}${current}` : binDir,
+	};
+}
+
 /** Build the process used to create a profile via `--dump-config`. */
 export function getInitializeProfileInvocation(
 	harnessPath: string,
@@ -133,7 +154,7 @@ export class DeepSeekHarnessCliService {
 		);
 		await execute(invocation.command, invocation.args, {
 			cwd: harnessPath,
-			env: { ...process.env, DSH_HOME: home },
+			env: getHarnessEnv(harnessPath, home),
 			windowsHide: true,
 		});
 

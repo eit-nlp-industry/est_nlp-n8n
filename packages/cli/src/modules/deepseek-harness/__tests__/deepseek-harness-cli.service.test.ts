@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 
 import {
 	DeepSeekHarnessCliService,
+	getHarnessEnv,
 	getInitializeProfileInvocation,
 	getPnpmCommand,
 } from '../deepseek-harness-cli.service';
@@ -54,6 +55,7 @@ describe('DeepSeekHarnessCliService', () => {
 			const options = args[2] as { env: NodeJS.ProcessEnv };
 			const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
 			expect(options.env.DSH_HOME).toBe(home);
+			expect(options.env).toEqual(getHarnessEnv(harnessPath, home));
 			void mkdir(profilePath, { recursive: true }).then(async () => {
 				await writeFile(path.join(profilePath, 'package.json'), '{}');
 				await writeFile(path.join(profilePath, 'cordis.patch.yml'), '[]\n');
@@ -223,6 +225,42 @@ describe('getInitializeProfileInvocation', () => {
 			command: 'pnpm',
 			args: ['dsh', '--profile', 'n8n-web', '--from-default-profile', 'web', '--dump-config'],
 		});
+	});
+});
+
+describe('getHarnessEnv', () => {
+	const binDir = path.join('/opt/dsh', 'node_modules', '.bin');
+
+	it('puts the Harness bin directory first on PATH', () => {
+		const env = getHarnessEnv('/opt/dsh', '/data/home', { PATH: '/usr/bin', FOO: 'bar' });
+
+		expect(env).toEqual({
+			PATH: `${binDir}${path.delimiter}/usr/bin`,
+			FOO: 'bar',
+			DSH_HOME: '/data/home',
+		});
+	});
+
+	it('keeps the existing PATH key casing', () => {
+		const env = getHarnessEnv('/opt/dsh', '/data/home', { Path: 'C:\\Windows' });
+
+		expect(env.Path).toBe(`${binDir}${path.delimiter}C:\\Windows`);
+		expect(env).not.toHaveProperty('PATH');
+	});
+
+	it('sets PATH to the Harness bin directory when PATH is missing', () => {
+		expect(getHarnessEnv('/opt/dsh', '/data/home', {})).toEqual({
+			PATH: binDir,
+			DSH_HOME: '/data/home',
+		});
+	});
+
+	it('does not mutate the source environment', () => {
+		const source = { PATH: '/usr/bin' };
+
+		getHarnessEnv('/opt/dsh', '/data/home', source);
+
+		expect(source).toEqual({ PATH: '/usr/bin' });
 	});
 });
 

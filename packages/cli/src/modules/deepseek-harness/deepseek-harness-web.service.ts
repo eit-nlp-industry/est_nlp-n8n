@@ -12,7 +12,7 @@ import {
 	DEFAULT_WORKSPACE_NAME,
 	DeepSeekHarnessHomeService,
 } from './deepseek-harness-home.service';
-import { DeepSeekHarnessCliService } from './deepseek-harness-cli.service';
+import { DeepSeekHarnessCliService, getHarnessEnv } from './deepseek-harness-cli.service';
 import { DeepSeekHarnessAgentRepository } from './repositories/deepseek-harness-agent.repository';
 
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -175,7 +175,7 @@ export class DeepSeekHarnessWebService {
 		});
 		const child = this.spawnProcess(invocation.command, invocation.args, {
 			cwd: harnessPath,
-			env: { ...process.env, DSH_HOME: home },
+			env: getHarnessEnv(harnessPath, home),
 			stdio: ['ignore', 'pipe', 'pipe'],
 			windowsHide: true,
 		});
