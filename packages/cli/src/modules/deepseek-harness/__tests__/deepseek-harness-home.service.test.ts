@@ -18,7 +18,11 @@ describe('DeepSeekHarnessHomeService', () => {
 			JSON.stringify({
 				tables: {
 					workspaces: {
-						first: { path: path.join(home, 'empty-workspace'), title: 'empty-workspace', sessionIds: [] },
+						first: {
+							path: path.join(home, 'empty-workspace'),
+							title: 'empty-workspace',
+							sessionIds: [],
+						},
 						second: { path: path.join(home, 'research'), title: 'Research', sessionIds: [] },
 					},
 				},
@@ -61,7 +65,7 @@ describe('DeepSeekHarnessHomeService', () => {
 		await expect(access(workspace)).resolves.toBeUndefined();
 	});
 
-	it('moves the profile without leaving a compatibility link after renaming', async () => {
+	it('keeps a compatibility link to the renamed profile', async () => {
 		const service = new DeepSeekHarnessHomeService({ home: root } as DeepSeekHarnessConfig);
 		const oldHome = await service.createHome('user@example.com', 'Old agent', 'agent-1');
 		const marker = path.join(oldHome, 'marker.txt');
@@ -73,7 +77,8 @@ describe('DeepSeekHarnessHomeService', () => {
 
 		const newHome = service.getHome('user@example.com', 'New agent', 'agent-1');
 		await expect(access(newHome)).resolves.toBeUndefined();
-		await expect(access(oldHome)).rejects.toThrow();
+		await expect(access(oldHome)).resolves.toBeUndefined();
+		await expect(access(path.join(oldHome, 'marker.txt'))).resolves.toBeUndefined();
 		await expect(access(path.join(newHome, 'marker.txt'))).resolves.toBeUndefined();
 	});
 
@@ -86,7 +91,9 @@ describe('DeepSeekHarnessHomeService', () => {
 		await service.removeHome('user@example.com', 'New agent', 'agent-1');
 
 		await expect(access(oldHome)).rejects.toThrow();
-		await expect(access(service.getHome('user@example.com', 'New agent', 'agent-1'))).rejects.toThrow();
+		await expect(
+			access(service.getHome('user@example.com', 'New agent', 'agent-1')),
+		).rejects.toThrow();
 	});
 
 	it('migrates and merges persisted workspace records without Harness changes', async () => {
@@ -97,15 +104,18 @@ describe('DeepSeekHarnessHomeService', () => {
 		const newWorkspace = path.join(newHome, 'empty-workspace');
 		const file = path.join(oldHome, 'storages', 'workspace.json');
 		await mkdir(path.dirname(file), { recursive: true });
-		await writeFile(file, JSON.stringify({
-			tables: {
-				workspaces: {
-					old: { path: oldWorkspace, sessionIds: ['old-session'] },
-					current: { path: newWorkspace, sessionIds: ['new-session'] },
+		await writeFile(
+			file,
+			JSON.stringify({
+				tables: {
+					workspaces: {
+						old: { path: oldWorkspace, sessionIds: ['old-session'] },
+						current: { path: newWorkspace, sessionIds: ['new-session'] },
+					},
 				},
-			},
-			global: { workspaceIds: ['old', 'current'] },
-		}));
+				global: { workspaceIds: ['old', 'current'] },
+			}),
+		);
 
 		await service.migrateWorkspacePaths(oldHome, newHome, 'agent-1');
 

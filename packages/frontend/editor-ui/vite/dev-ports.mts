@@ -50,6 +50,19 @@ export const devServerPlugin = (env: NodeJS.ProcessEnv): Plugin => ({
 			env.VUE_APP_URL_BASE_API = `http://localhost:${backendPort}/`;
 		}
 
-		return { server: { host: '0.0.0.0', port: editorPort, strictPort: true } };
+		return {
+			server: {
+				host: '0.0.0.0',
+				port: editorPort,
+				strictPort: true,
+				proxy: {
+					'/deepseek-harness-studio': {
+						target: `http://localhost:${backendPort}`,
+						ws: true,
+						changeOrigin: false,
+					},
+				},
+			},
+		};
 	},
 });

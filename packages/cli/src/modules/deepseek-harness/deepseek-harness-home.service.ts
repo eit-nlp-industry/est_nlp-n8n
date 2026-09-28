@@ -1,7 +1,17 @@
 import { DeepSeekHarnessConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import type { Dirent } from 'node:fs';
-import { lstat, mkdir, readdir, realpath, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import {
+	lstat,
+	mkdir,
+	readdir,
+	realpath,
+	readFile,
+	rename,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -180,20 +190,22 @@ export class DeepSeekHarnessHomeService {
 		const root = resolveHome(this.config.home);
 		const removed: string[] = [];
 		const failed: Array<{ path: string; error: unknown }> = [];
-		const userRoots: Dirent[] = await readdir(root, { withFileTypes: true }).catch((error: unknown) => {
-			if (isFileNotFoundError(error)) return [];
-			throw error;
-		});
+		const userRoots: Dirent[] = await readdir(root, { withFileTypes: true }).catch(
+			(error: unknown) => {
+				if (isFileNotFoundError(error)) return [];
+				throw error;
+			},
+		);
 
 		for (const userRoot of userRoots.filter(
 			(entry) => entry.isDirectory() && entry.name !== 'agents',
 		)) {
-			const directories: Dirent[] = await readdir(path.join(root, userRoot.name), { withFileTypes: true }).catch(
-				(error: unknown) => {
-					if (isFileNotFoundError(error)) return [];
-					throw error;
-				},
-			);
+			const directories: Dirent[] = await readdir(path.join(root, userRoot.name), {
+				withFileTypes: true,
+			}).catch((error: unknown) => {
+				if (isFileNotFoundError(error)) return [];
+				throw error;
+			});
 			for (const entry of directories) {
 				if (
 					!STAGED_HOME_PATTERN.test(entry.name) ||
@@ -211,10 +223,12 @@ export class DeepSeekHarnessHomeService {
 		}
 
 		const legacyRoot = path.join(root, 'agents');
-		const legacyEntries = await readdir(legacyRoot, { withFileTypes: true }).catch((error: unknown) => {
-			if (isFileNotFoundError(error)) return [];
-			throw error;
-		});
+		const legacyEntries = await readdir(legacyRoot, { withFileTypes: true }).catch(
+			(error: unknown) => {
+				if (isFileNotFoundError(error)) return [];
+				throw error;
+			},
+		);
 		for (const entry of legacyEntries) {
 			if (
 				!STAGED_HOME_PATTERN.test(entry.name) ||
@@ -246,11 +260,17 @@ export class DeepSeekHarnessHomeService {
 	}
 
 	async removeStagedHomes(staged: StagedDeepSeekHarnessHome[]): Promise<void> {
-		await Promise.all(staged.map(async ({ stagedPath }) => await rm(stagedPath, { recursive: true, force: true })));
+		await Promise.all(
+			staged.map(async ({ stagedPath }) => await rm(stagedPath, { recursive: true, force: true })),
+		);
 	}
 
 	async stageLegacyHomeForDeletion(agentId: string): Promise<StagedDeepSeekHarnessHome[]> {
-		const originalPath = path.join(resolveHome(this.config.home), 'agents', resolveSegment(agentId));
+		const originalPath = path.join(
+			resolveHome(this.config.home),
+			'agents',
+			resolveSegment(agentId),
+		);
 		if (!(await lstat(originalPath).catch(() => undefined))) return [];
 		const stagedPath = `${originalPath}.deleting-${randomUUID()}`;
 		await rename(originalPath, stagedPath);
@@ -381,6 +401,7 @@ export class DeepSeekHarnessHomeService {
 			throw new Error(`DeepSeek Harness target home already exists: ${newHome}`);
 		}
 		await rename(sourceHome, newHome);
+		await symlink(newHome, oldHome, process.platform === 'win32' ? 'junction' : 'dir');
 	}
 
 	async removeLegacyHome(agentId: string): Promise<void> {
