@@ -48,6 +48,8 @@ import {
 	useWorkflowDocumentStore,
 } from '@/app/stores/workflowDocument.store';
 import { disposeNDVStore, useNDVStore } from '@/features/ndv/shared/ndv.store';
+import { isRenderInteractionNodeType } from '@n8n/api-types';
+import RenderInteractionConfigJsonPanel from './RenderInteractionConfigJsonPanel.vue';
 
 const props = defineProps<{
 	initialNode: INode;
@@ -138,6 +140,10 @@ const showNoParametersNotice = computed(
 	() => parametersByTab.value.params.filter((item) => item.type !== 'notice').length === 0,
 );
 
+const isRenderInteractionTool = computed(
+	() => node.value !== null && isRenderInteractionNodeType(node.value.type),
+);
+
 const hasParameterIssues = computed(() => {
 	if (!nodeTypeDescription.value || !node.value) {
 		return false;
@@ -224,6 +230,14 @@ function handleChangeParameter(updateData: IUpdateInformation) {
 	node.value = {
 		...node.value,
 		parameters: newParameters,
+	};
+}
+
+function applyRenderInteractionJsonParameters(parameters: INodeParameters) {
+	if (!node.value) return;
+	node.value = {
+		...node.value,
+		parameters: deepCopy(parameters),
 	};
 }
 
@@ -423,6 +437,11 @@ defineExpose({ node, isValid, nodeTypeDescription, handleChangeName });
 
 <template>
 	<div :class="$style.container">
+		<RenderInteractionConfigJsonPanel
+			v-if="node && isRenderInteractionTool && activeTab === 'params'"
+			:parameters="node.parameters"
+			@apply="applyRenderInteractionJsonParameters"
+		/>
 		<N8nTabs
 			v-if="tabOptions.length > 1"
 			:model-value="activeTab"

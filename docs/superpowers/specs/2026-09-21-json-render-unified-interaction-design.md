@@ -1,6 +1,7 @@
 # Unified json-render interaction design
 
 Date: 2026-09-21
+Updated: 2026-09-29
 
 ## Goal
 
@@ -11,6 +12,8 @@ Make display and interactive `json-render-v1` documents use the same stateful re
 3. Instance AI.
 
 The change must reduce host-owned form rendering code, keep submitted forms visible as read-only cards, and preserve the existing robot-dog agent orchestration and tool contracts.
+
+Add reusable `Steps` and `Step` elements to the same rendering path. Render Dashboard can use them as display-only progress. Render Interaction can show them beside a form without changing the suspend and resume contract.
 
 ## Non-goals
 
@@ -24,6 +27,9 @@ The change must reduce host-owned form rendering code, keep submitted forms visi
 - Do not make json-render execute robot or workflow side effects. It only renders state and emits user interaction events.
 - Do not change the existing React renderer's default behavior. Existing React consumers remain editable unless they explicitly opt into a read-only presentation helper.
 - Do not require restarting Postgres, Redis, Mailpit, proxy, or other service containers.
+- Do not make `Steps` clickable in this phase.
+- Do not add previous-step or next-step state actions in this phase.
+- Do not add `Steps` or `Step` to the React or Ant Design registries in this phase. A later change will add those implementations.
 
 ## Current problems
 
@@ -44,9 +50,11 @@ This is a `json-render-v1` cleanup and runtime enhancement that makes the canoni
 - The canonical form representation is `spec.elements.DynamicForm.props.fields` plus spec action bindings such as `form.submit` and `form.cancel`.
 - Remove `meta.dynamicForm` from the v1 schema, builders, helpers, runtimes, demos, tests, and all n8n producers/consumers.
 - Do not add a legacy normalizer or fallback reader. Payloads must contain a canonical `DynamicForm` element to render an interaction.
-- Keep current node input schemas and node output envelopes valid.
+- Keep existing node configurations valid. Add Steps only through optional node parameters. Keep node output envelopes unchanged.
 - Do not require the robot-dog Agent configuration to change.
 - Add new public runtime and registry APIs without removing existing exports.
+- Define `Steps` as a neutral display element. The host or tool decides whether the payload interrupts execution.
+- Keep the active step zero-based. Allow values from zero through the number of steps. A value equal to the number of steps means that all steps are complete.
 
 Existing display-only payloads continue to render. Historical interaction payloads that only contain `meta.dynamicForm` are intentionally unsupported after this migration.
 
@@ -66,6 +74,32 @@ Add framework-independent helpers and constants for interaction rendering:
 The presentation helper is framework-independent. A host can request read-only rendering with one option; by default payloads remain editable. In read-only mode it disables form fields and hides or disables submit/cancel actions without changing the persisted document.
 
 The v1 payload schema no longer accepts `meta.dynamicForm`. New builders emit forms in `spec` only.
+
+Add framework-independent step types and builders:
+
+```ts
+interface JsonRenderStepInput {
+  title: string;
+  description?: string;
+  status?: 'wait' | 'process' | 'finish' | 'error' | 'success';
+}
+
+interface JsonRenderStepsInput {
+  active: number;
+  items: JsonRenderStepInput[];
+  direction?: 'horizontal' | 'vertical';
+  alignCenter?: boolean;
+  simple?: boolean;
+  processStatus?: 'wait' | 'process' | 'finish' | 'error' | 'success';
+  finishStatus?: 'wait' | 'process' | 'finish' | 'error' | 'success';
+}
+```
+
+Add a non-mutating `appendStepsToSpec(spec, steps)` helper. It creates one `Steps` element and one `Step` child element for each item. It allocates collision-safe element keys and appends the `Steps` element to the current root. It rejects fewer than two items, non-integer active values, and active values outside the inclusive range from zero through `items.length`.
+
+Add `buildDisplayDashboardSpec(input)` as the shared dashboard composition helper. It builds the Card, description, Steps, metrics, and table elements without applying display-only content requirements. Extend `buildDisplayDashboardPayload(input)` to call that helper and to accept Steps as valid dashboard content. The display payload builder requires at least one of Steps, metrics, or a table.
+
+Keep the generic v1 element envelope open for future components. Add exported component-level schemas for `Steps` and `Step` props so builders and tests can validate their stable contract without turning the generic payload parser into a closed component registry.
 
 ### Vue runtime package
 
@@ -103,9 +137,13 @@ Add registry components for the field types already supported by the protocol:
 - Select;
 - MultipleSelect;
 - FormActions;
-- Button.
+- Button;
+- Steps;
+- Step.
 
 Components use Element Plus theme variables and avoid host-specific hard-coded colors. They honor the canonical field and action state produced by the protocol presentation helper. Submit and Cancel emit standardized json-render events containing the current form state.
+
+`Steps` maps to `ElSteps`. `Step` maps to `ElStep`. The registry maps the protocol property names to the Element Plus property names. The components do not emit n8n lifecycle events and do not change local state in this phase.
 
 No n8n package or n8n Design System dependency is added to eit-json-render.
 
@@ -117,6 +155,43 @@ The React runtime and Ant Design registry already render canonical `DynamicForm`
 - Remove its `meta.dynamicForm` runtime fallback and render canonical forms only.
 - Add regression coverage proving canonical forms still render with unchanged default behavior.
 - Hosts using React may opt into the same protocol presentation helper for submitted values and read-only display, but no existing consumer is switched automatically.
+
+React and Ant Design do not receive `Steps` support in this phase. A Steps payload rendered through a registry without `Steps` and `Step` continues to use the existing unknown-component fallback. This temporary limitation must be documented in the protocol release notes. It does not change existing React payload behavior.
+
+## Steps composition
+
+Steps are parallel to `DynamicForm` in the json-render spec. They are not a form field and do not cause suspension.
+
+Display-only payload:
+
+```text
+Card
+└── Stack
+    ├── Description
+    ├── Steps
+    │   ├── Step
+    │   ├── Step
+    │   └── Step
+    ├── Metrics
+    └── Table
+```
+
+Interactive payload:
+
+```text
+Card
+├── Stack
+│   ├── Description
+│   ├── Steps
+│   ├── Metrics
+│   └── Table
+├── DynamicForm
+└── Form Actions
+```
+
+Render Dashboard displays the first structure and does not suspend execution. Render Interaction displays the second structure and suspends because it contains the existing canonical form actions. Adding Steps never changes the lifecycle by itself.
+
+The initial Steps implementation is presentation-only. Node builders use a resolved numeric `active` value. A raw json-render spec can bind the component property to a `$state` read through the existing dynamic-value envelope. The component-level schema accepts both forms, while the builder input schema validates the resolved number. No component in this phase increments or decrements it. A future wizard design can add local state actions, conditional step content, per-step validation, and previous or next controls.
 
 ## n8n host migration
 
@@ -130,6 +205,24 @@ Create one thin shared n8n wrapper around `JsonRenderPanel`. Its responsibilitie
 
 It does not render individual form fields.
 
+The shared registry automatically renders Steps in all Vue hosts. No host-specific Steps component is added. Read-only interaction preparation leaves Steps visible and only disables or hides the existing decision controls.
+
+### Render Dashboard node
+
+Add an optional Steps parameter group with active step, direction, alignment, simple mode, process status, finish status, and two or more step items. Each item contains a title, optional description, and optional explicit status.
+
+Change node validation so that Steps, metrics, or a table is sufficient content. Replace the n8n-owned dashboard spec implementation with `buildDisplayDashboardPayload()` from `@eit/json-render-protocol`. Remove the local builder after parity tests pass. Keep the node output wrapper unchanged.
+
+This is the first migration step away from n8n-owned dashboard spec composition. Later changes can move other producers to the same protocol builders without blocking Steps.
+
+### Render Interaction node
+
+Add the same optional Steps parameter group. Continue to require at least one form field in this phase. Build the base content with `buildDisplayDashboardSpec()`, including Steps when present, and then call `appendDynamicFormToSpec()`.
+
+Keep the existing output wrapper, `phase: 'decision'`, suspension behavior, form submit payload, and resume result unchanged.
+
+Extend the Render Interaction JSON configuration with a top-level `steps` property. Use `null` when the node has no Steps configuration. A configured value uses the protocol input structure. Best-effort export includes incomplete step items. Strict Copy and Apply validation requires at least two valid items and a valid active range. Model-defined values use the existing structured `$fromAI` representation and preserve the model key, description, type, and optional default.
+
 ### Top-level Agent Chat
 
 - Replace the host-rendered form in `JsonRenderInteractionPanel.vue` with the shared stateful renderer.
@@ -139,6 +232,7 @@ It does not render individual form fields.
 - Render submitted values in read-only mode after resolution.
 - Render cancelled interactions in read-only mode with an explicit cancelled state.
 - Use the tool call ID in the renderer instance ID.
+- Render Steps through the shared registry for both display and interaction cards.
 
 ### Workflow `@n8n/chat`
 
@@ -146,6 +240,7 @@ It does not render individual form fields.
 - Preserve the existing `json-render-interaction-response` transport envelope and current Chat-node wait/resume behavior.
 - After Submit or Cancel, keep the card mounted and render it read-only.
 - Preserve `blockUserInput` behavior.
+- Render Steps through the shared registry without changing the interaction response envelope.
 
 ### Instance AI
 
@@ -153,6 +248,7 @@ It does not render individual form fields.
 - Preserve the existing Instance AI confirmation request and resume DTOs.
 - Keep the resolved interaction visible as read-only wherever the confirmation transcript retains the tool call.
 - Do not change `collect-decision` tool behavior or the runtime suspension contract.
+- Render Steps through the shared registry without adding an Instance AI-specific Steps implementation.
 
 ## Read-only card behavior
 
@@ -194,6 +290,10 @@ Resolved cards must never emit another resume request.
 - Element Plus registry tests for all supported current form field types;
 - parser tests proving `meta.dynamicForm` is stripped or rejected according to the strict parse API contract.
 - React/Ant Design regression tests proving canonical spec forms remain unchanged after fallback removal.
+- protocol tests for Steps input validation, active boundaries, collision-safe keys, immutability, dashboard-only Steps payloads, and mixed dashboard content;
+- Element Plus tests for horizontal and vertical Steps, descriptions, explicit statuses, completed state, and registry registration;
+- Vue runtime regression tests proving a Steps payload renders and does not emit an interaction event;
+- React and Ant Design regression tests proving existing payloads remain unchanged. Steps rendering in those registries is deferred.
 
 ### n8n
 
@@ -202,6 +302,10 @@ Resolved cards must never emit another resume request.
 - Instance AI tests for unchanged confirmation/resume DTOs and read-only rendering;
 - regression tests for display-only Dashboard rendering;
 - regression tests for unchanged Render Interaction suspend/resume tool output.
+- Render Dashboard tests for Steps-only output and mixed Steps, metrics, and table output;
+- Render Interaction tests for Steps plus form output and unchanged form decision actions;
+- Render Interaction JSON editor tests for best-effort export, strict validation, `$fromAI` round trips, Apply, Copy, and old configurations without Steps;
+- host regression tests proving display Steps do not suspend and interaction Steps remain visible after submit or cancel.
 
 ## Build and restart procedure
 
@@ -212,6 +316,8 @@ After implementation:
 3. run the n8n repository build with output redirected to a build log, because the change crosses frontend, API, and linked package boundaries;
 4. restart local n8n backend and frontend development processes so they reload linked package output;
 5. perform a manual end-to-end check in all three hosts.
+
+Because n8n consumes git-based `@eit/json-render-*` packages, update the pinned dependency commit after the eit-json-render changes pass. Reinstall and rebuild the affected n8n packages before host verification.
 
 Docker service containers do not need to restart because no database, Redis, mail, proxy, or service-container contract changes. If the n8n application itself is running inside a Docker image instead of through local dev processes, that application image/container must be rebuilt or restarted, but the dependency service containers remain untouched.
 
@@ -227,5 +333,15 @@ Docker service containers do not need to restart because no database, Redis, mai
 - Submitted and cancelled interactions remain visible as non-interactive historical cards.
 - Read-only presentation is host-controlled and defaults to editable when not requested.
 - Existing canonical `json-render-v1` interactions still render; meta-only interaction payloads are intentionally unsupported.
+- Render Dashboard can render a Steps-only card without suspending execution.
+- Render Interaction can render Steps beside its form without changing when or how execution suspends and resumes.
+- The same Steps and Step protocol elements render through the shared Element Plus registry in all three Vue hosts.
+- Steps alone never emit submit, cancel, or resume events.
+- Active step zero, an intermediate active step, and the all-complete value render correctly.
+- Render Dashboard calls the protocol dashboard builder and no longer owns a duplicate dashboard spec builder.
+- Render Interaction uses the protocol dashboard spec helper before it appends the canonical DynamicForm.
+- Render Interaction JSON import and export represent every Steps parameter and preserve `$fromAI` metadata.
+- Existing payloads without Steps remain valid and render unchanged.
+- React and Ant Design behavior remains unchanged. Their Steps implementation is explicitly deferred.
 - Robot-dog tool names, tool schemas, instructions, selection logic, MCP calls, and suspend/resume result shapes are unchanged.
 - A full n8n build succeeds, affected tests pass, and the three manual host flows pass.

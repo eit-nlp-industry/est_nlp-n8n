@@ -41,3 +41,4 @@ export {
 	type CancellationResumeData,
 } from '../agent-builder-interactive';
 export * from './agent-interaction.schema';
+export * from '../render-interaction-config.schema';
