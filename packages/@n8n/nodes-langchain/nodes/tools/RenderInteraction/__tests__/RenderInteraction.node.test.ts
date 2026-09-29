@@ -1,9 +1,96 @@
-import type { IExecuteFunctions } from 'n8n-workflow';
+import type { IExecuteFunctions, INode, NodeParameterValueType } from 'n8n-workflow';
 import { mock } from 'vitest-mock-extended';
 
 import { RenderInteraction } from '../RenderInteraction.node';
 
 describe('RenderInteraction node', () => {
+	function createExecuteFunctions(parameters: Record<string, unknown>) {
+		const executeFunctions = mock<IExecuteFunctions>({
+			getInputData: () => [{ json: {} }],
+			continueOnFail: () => false,
+		});
+
+		executeFunctions.getNode.mockReturnValue(mock<INode>({ name: 'Render Interaction' }));
+		executeFunctions.getNodeParameter.mockImplementation((name, _itemIndex, fallback) => {
+			return (parameters[name] ?? fallback) as object | NodeParameterValueType;
+		});
+		return executeFunctions;
+	}
+
+	it('renders Steps before the canonical form', async () => {
+		const node = new RenderInteraction();
+		const executeFunctions = createExecuteFunctions({
+			title: 'Deployment approval',
+			steps: {
+				active: 1,
+				items: { items: [{ title: 'Build' }, { title: 'Approve' }] },
+			},
+			'fields.field': [{ key: 'decision', label: 'Decision', type: 'input' }],
+		});
+
+		const result = await node.execute.call(executeFunctions);
+		const payload = result[0][0].json.payload as {
+			spec: { root: string; elements: Record<string, { type: string; children?: string[] }> };
+		};
+		const rootChildren = payload.spec.elements[payload.spec.root]?.children ?? [];
+		const formKey = rootChildren.find((key) => payload.spec.elements[key]?.type === 'DynamicForm');
+
+		expect(payload.spec.elements.steps).toMatchObject({ type: 'Steps' });
+		expect(payload.spec.elements.body?.children).toContain('steps');
+		expect(rootChildren.indexOf('body')).toBeLessThan(rootChildren.indexOf(formKey ?? ''));
+	});
+
+	it('keeps the decision wrapper and form actions unchanged with Steps', async () => {
+		const node = new RenderInteraction();
+		const executeFunctions = createExecuteFunctions({
+			title: 'Deployment approval',
+			steps: {
+				active: 2,
+				items: { items: [{ title: 'Build' }, { title: 'Approve' }] },
+			},
+			'fields.field': [
+				{ key: 'decision', label: 'Decision', type: 'input', defaultValue: 'approve' },
+			],
+		});
+
+		const result = await node.execute.call(executeFunctions);
+		const output = result[0][0].json;
+		const payload = output.payload as {
+			spec: {
+				elements: Record<
+					string,
+					{ type: string; props?: Record<string, unknown>; on?: Record<string, { action: string }> }
+				>;
+			};
+			state: { initial: { form: Record<string, unknown> } };
+		};
+		const actions = Object.values(payload.spec.elements).flatMap((element) =>
+			Object.values(element.on ?? {}).map((binding) => binding.action),
+		);
+
+		expect(output).toMatchObject({ format: 'json-render-v1', phase: 'decision' });
+		expect(
+			Object.values(payload.spec.elements).filter((element) => element.type === 'DynamicForm'),
+		).toHaveLength(1);
+		expect(actions).toEqual(expect.arrayContaining(['form.submit', 'form.cancel']));
+		expect(payload.state.initial.form).toEqual({ decision: 'approve' });
+	});
+
+	it('still rejects an interaction without form fields', async () => {
+		const node = new RenderInteraction();
+		const executeFunctions = createExecuteFunctions({
+			title: 'Progress only',
+			steps: {
+				active: 1,
+				items: { items: [{ title: 'Build' }, { title: 'Approve' }] },
+			},
+		});
+
+		await expect(node.execute.call(executeFunctions)).rejects.toThrow(
+			'Render Interaction requires at least one form field',
+		);
+	});
+
 	it('builds a json-render interaction payload with form fields', async () => {
 		const node = new RenderInteraction();
 		const executeFunctions = mock<IExecuteFunctions>();
@@ -79,7 +166,9 @@ describe('RenderInteraction node', () => {
 		const payload = result[0][0].json.payload as {
 			spec: { elements: Record<string, { type: string; props?: Record<string, unknown> }> };
 		};
-		const form = Object.values(payload.spec.elements).find((element) => element.type === 'DynamicForm');
+		const form = Object.values(payload.spec.elements).find(
+			(element) => element.type === 'DynamicForm',
+		);
 		const fields = form?.props?.fields as Array<{
 			key: string;
 			value?: { options?: unknown[] };

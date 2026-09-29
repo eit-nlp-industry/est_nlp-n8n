@@ -273,7 +273,7 @@ git commit -m "feat: add steps to render dashboard"
 - Consumes: `buildDisplayDashboardSpec()`, `appendDynamicFormToSpec()`, and `JsonRenderStepsInput` from Task 1.
 - Produces: optional Steps before the canonical DynamicForm and unchanged decision output.
 
-- [ ] **Step 1: Write failing Render Interaction tests**
+- [x] **Step 1: Write failing Render Interaction tests**
 
 Add tests named:
 
@@ -283,7 +283,7 @@ Add tests named:
 
 Assert the output keeps `format: 'json-render-v1'`, `phase: 'decision'`, one `DynamicForm`, `form.submit`, `form.cancel`, and the same initial form state.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 From `packages/@n8n/nodes-langchain`, run:
 
@@ -291,15 +291,15 @@ From `packages/@n8n/nodes-langchain`, run:
 
 Expected: FAIL because the interaction node does not read or render Steps.
 
-- [ ] **Step 3: Add the same optional Steps parameter group**
+- [x] **Step 3: Add the same optional Steps parameter group**
 
 Use the same names, defaults, status values, and conversion helper as Render Dashboard. Extract shared node-parameter definitions only if this prevents literal duplication without changing the node UI contract.
 
-- [ ] **Step 4: Refactor the interaction payload builder**
+- [x] **Step 4: Refactor the interaction payload builder**
 
 Replace its local description, metrics, table, Stack, and Card construction with `buildDisplayDashboardSpec()`. Pass Steps with the base input. Append the canonical form through `appendDynamicFormToSpec()`. Preserve current initial form state and metadata extensions.
 
-- [ ] **Step 5: Run focused tests, typecheck, and lint**
+- [x] **Step 5: Run focused tests, typecheck, and lint**
 
 From `packages/@n8n/nodes-langchain`, run:
 
@@ -311,7 +311,7 @@ pnpm lint
 
 Expected: all commands pass.
 
-- [ ] **Step 6: Commit the interaction composition**
+- [x] **Step 6: Commit the interaction composition**
 
 ```bash
 git add packages/@n8n/nodes-langchain/nodes/tools/RenderInteraction

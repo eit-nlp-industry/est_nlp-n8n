@@ -1,3 +1,4 @@
+import type { JsonRenderStepsInput } from '@eit/json-render-protocol';
 import {
 	NodeConnectionTypes,
 	NodeOperationError,
@@ -8,6 +9,7 @@ import {
 	type INodeTypeDescription,
 } from 'n8n-workflow';
 
+import { readRenderStepsInput, renderStepsParameter } from '../render-steps';
 import {
 	buildRenderInteractionPayload,
 	type InteractionFormField,
@@ -72,15 +74,19 @@ function readInteractionInput(
 ): {
 	title: string;
 	description?: string;
+	steps?: JsonRenderStepsInput;
 	metrics?: DashboardMetric[];
 	table?: DashboardTable;
 	fields: InteractionFormField[];
 } {
 	const title = context.getNodeParameter('title', itemIndex, '') as string;
 	const description = context.getNodeParameter('description', itemIndex, '') as string;
+	const steps = readRenderStepsInput(context, itemIndex);
 	const metrics = context.getNodeParameter('metrics.metrics', itemIndex, []) as DashboardMetric[];
 	const tableColumns = context.getNodeParameter('tableColumns', itemIndex, []) as string[];
-	const tableRowsRaw = context.getNodeParameter('tableRows', itemIndex, '[]') as string | string[][];
+	const tableRowsRaw = context.getNodeParameter('tableRows', itemIndex, '[]') as
+		| string
+		| string[][];
 	let tableRows: string[][] = [];
 	if (Array.isArray(tableRowsRaw)) {
 		tableRows = tableRowsRaw;
@@ -162,6 +168,7 @@ function readInteractionInput(
 	return {
 		title,
 		...(description ? { description } : {}),
+		...(steps ? { steps } : {}),
 		...(metrics.length > 0 ? { metrics } : {}),
 		...(table ? { table } : {}),
 		fields,
@@ -209,6 +216,7 @@ export class RenderInteraction implements INodeType {
 				default: '',
 				description: 'Optional summary under the title',
 			},
+			renderStepsParameter,
 			{
 				displayName: 'Metrics',
 				name: 'metrics',

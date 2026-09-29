@@ -1,18 +1,10 @@
-import { appendDynamicFormToSpec, type JsonRenderSpec } from '@eit/json-render-protocol';
+import {
+	appendDynamicFormToSpec,
+	buildDisplayDashboardSpec,
+	type DisplayDashboardInput,
+} from '@eit/json-render-protocol';
 
 const JSON_RENDER_V1_FORMAT = 'json-render-v1';
-
-type DashboardMetric = {
-	label: string;
-	value: string;
-	trend?: 'up' | 'down' | 'neutral';
-	trendLabel?: string;
-};
-
-type DashboardTable = {
-	columns: string[];
-	rows: string[][];
-};
 
 export type InteractionSelectOption = {
 	value: string;
@@ -49,11 +41,7 @@ export type InteractionFormField =
 			placeholder?: string;
 	  };
 
-export type RenderInteractionInput = {
-	title: string;
-	description?: string;
-	metrics?: DashboardMetric[];
-	table?: DashboardTable;
+export type RenderInteractionInput = DisplayDashboardInput & {
 	fields: InteractionFormField[];
 };
 
@@ -100,70 +88,8 @@ function toProtocolFormField(field: InteractionFormField) {
 }
 
 export function buildRenderInteractionPayload(input: RenderInteractionInput) {
-	const elements: JsonRenderSpec['elements'] = {};
-	const bodyChildren: string[] = [];
-
-	if (input.description) {
-		elements.description = {
-			type: 'Text',
-			props: { content: input.description, variant: 'muted' },
-		};
-		bodyChildren.push('description');
-	}
-
-	if (input.metrics?.length) {
-		const metricIds: string[] = [];
-		for (const [index, metric] of input.metrics.entries()) {
-			const id = `metric-${index}`;
-			elements[id] = {
-				type: 'Metric',
-				props: {
-					label: metric.label,
-					value: metric.value,
-					...(metric.trend ? { trend: metric.trend } : {}),
-					...(metric.trendLabel ? { trendLabel: metric.trendLabel } : {}),
-				},
-			};
-			metricIds.push(id);
-		}
-		elements.metrics = {
-			type: 'Stack',
-			props: { direction: 'horizontal', gap: 'md', align: 'stretch' },
-			children: metricIds,
-		};
-		bodyChildren.push('metrics');
-	}
-
-	if (input.table) {
-		elements.table = {
-			type: 'Table',
-			props: {
-				columns: input.table.columns,
-				rows: input.table.rows,
-			},
-		};
-		bodyChildren.push('table');
-	}
-
-	if (bodyChildren.length > 0) {
-		elements.body = {
-			type: 'Stack',
-			props: { direction: 'vertical', gap: 'md', align: 'stretch' },
-			children: bodyChildren,
-		};
-		elements.root = {
-			type: 'Card',
-			props: { title: input.title, variant: 'outlined' },
-			children: ['body'],
-		};
-	} else {
-		elements.root = {
-			type: 'Card',
-			props: { title: input.title, variant: 'outlined' },
-		};
-	}
-
 	const protocolFields = input.fields.map(toProtocolFormField);
+	const dashboardSpec = buildDisplayDashboardSpec(input);
 
 	return {
 		format: JSON_RENDER_V1_FORMAT,
@@ -175,7 +101,7 @@ export function buildRenderInteractionPayload(input: RenderInteractionInput) {
 				...(input.description ? { description: input.description } : {}),
 				extensions: { renderModule: 'element-plus', phase: 'decision' },
 			},
-			spec: appendDynamicFormToSpec({ root: 'root', elements }, protocolFields),
+			spec: appendDynamicFormToSpec(dashboardSpec, protocolFields),
 			state: {
 				initial: {
 					form: Object.fromEntries(
