@@ -55,7 +55,7 @@
 - Produces: `buildDisplayDashboardSpec(input: DisplayDashboardInput): JsonRenderSpec`.
 - Extends: `DisplayDashboardInput` with `steps?: JsonRenderStepsInput`.
 
-- [ ] **Step 1: Write failing protocol tests for valid Steps composition**
+- [x] **Step 1: Write failing protocol tests for valid Steps composition**
 
 Add tests named:
 
@@ -65,27 +65,27 @@ Add tests named:
 
 Assert that two input items produce one `Steps` element, two ordered `Step` children, unchanged source objects, and preserved titles, descriptions, statuses, direction, alignment, simple mode, process status, and finish status.
 
-- [ ] **Step 2: Write failing validation tests**
+- [x] **Step 2: Write failing validation tests**
 
 Add table tests that reject one item, active `-1`, active above `items.length`, a fractional active value, an empty title, and an unsupported status.
 
-- [ ] **Step 3: Run the new protocol test and verify failure**
+- [x] **Step 3: Run the new protocol test and verify failure**
 
 Run: `pnpm --filter @eit/json-render-protocol test -- src/__tests__/steps.test.ts`
 
 Expected: FAIL because the Steps exports do not exist.
 
-- [ ] **Step 4: Implement the Steps schemas, types, key allocation, and append helper**
+- [x] **Step 4: Implement the Steps schemas, types, key allocation, and append helper**
 
 Implement the interfaces exactly as listed above. Keep component-level validation in `steps.ts`. Keep the generic v1 element envelope open. Clone the input elements before insertion and append the new `Steps` key to the current root children.
 
-- [ ] **Step 5: Run the Steps test and verify success**
+- [x] **Step 5: Run the Steps test and verify success**
 
 Run: `pnpm --filter @eit/json-render-protocol test -- src/__tests__/steps.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 6: Write failing dashboard builder tests**
+- [x] **Step 6: Write failing dashboard builder tests**
 
 Add tests named:
 
@@ -95,15 +95,15 @@ Add tests named:
 
 Assert that `buildDisplayDashboardSpec()` can create an empty Card for later form composition, while `buildDisplayDashboardPayload()` enforces display content.
 
-- [ ] **Step 7: Refactor the dashboard builder around `buildDisplayDashboardSpec()`**
+- [x] **Step 7: Refactor the dashboard builder around `buildDisplayDashboardSpec()`**
 
 Make `buildDisplayDashboardPayload()` validate content, call `buildDisplayDashboardSpec()`, and pass the result to `buildJsonRenderPayload()`. Use `appendStepsToSpec()` inside the spec builder when Steps are present.
 
-- [ ] **Step 8: Export the public APIs and update protocol guidance**
+- [x] **Step 8: Export the public APIs and update protocol guidance**
 
 Export the new file from `packages/protocol/src/index.ts`. Add Steps types and builder ownership to `packages/protocol/AGENTS.md`.
 
-- [ ] **Step 9: Run protocol tests and build**
+- [x] **Step 9: Run protocol tests and build**
 
 Run:
 
@@ -114,7 +114,7 @@ pnpm --filter @eit/json-render-protocol build
 
 Expected: all tests and the build pass.
 
-- [ ] **Step 10: Commit the protocol change**
+- [x] **Step 10: Commit the protocol change**
 
 ```bash
 git add packages/protocol
@@ -140,7 +140,7 @@ git commit -m "feat: add steps protocol builders"
 - Produces: `Steps` and `Step` `JsonRenderVueComponent` exports.
 - Produces: `elementPlusRegistry.components.Steps` and `.Step`.
 
-- [ ] **Step 1: Write failing Element Plus rendering tests**
+- [x] **Step 1: Write failing Element Plus rendering tests**
 
 Add tests named:
 
@@ -150,29 +150,29 @@ Add tests named:
 
 Mount `JsonRenderPanel` with `elementPlusRegistry`. Assert `ElSteps` props, the number and order of `ElStep` components, visible text, and status props.
 
-- [ ] **Step 2: Run the registry test and verify failure**
+- [x] **Step 2: Run the registry test and verify failure**
 
 Run: `pnpm --filter @eit/json-render-element-plus test -- src/__tests__/registry.test.ts`
 
 Expected: FAIL because the registry reports unknown Steps components.
 
-- [ ] **Step 3: Implement `Steps` and `Step` components**
+- [x] **Step 3: Implement `Steps` and `Step` components**
 
 Map `Steps` to `ElSteps` and `Step` to `ElStep`. Map protocol camelCase props to Element Plus props. Pass rendered Step VNodes as the default slot. Do not attach change, click, submit, or state-update handlers.
 
-- [ ] **Step 4: Register and export the components**
+- [x] **Step 4: Register and export the components**
 
 Add both components to `elementPlusComponents`, export them from the package entry point, and add `steps` to the Element Plus module supported scenes.
 
-- [ ] **Step 5: Add the Vue runtime no-event regression test**
+- [x] **Step 5: Add the Vue runtime no-event regression test**
 
 Extend the test registry with `Steps` and `Step`. Render a Steps-only payload with an `onJsonRenderEvent` spy. Assert that it renders and the spy remains empty.
 
-- [ ] **Step 6: Update package and root documentation**
+- [x] **Step 6: Update package and root documentation**
 
 List Steps and Step in `packages/element-plus/AGENTS.md` and the Vue + Element Plus section of `README.md`. State that React and Ant Design support is deferred.
 
-- [ ] **Step 7: Run affected tests and builds**
+- [x] **Step 7: Run affected tests and builds**
 
 Run:
 
@@ -186,7 +186,7 @@ pnpm verify:git-consumer
 
 Expected: all commands pass.
 
-- [ ] **Step 8: Commit the Element Plus change**
+- [x] **Step 8: Commit the Element Plus change**
 
 ```bash
 git add README.md packages/element-plus/AGENTS.md packages/element-plus/src/steps-components.ts packages/element-plus/src/registry.ts packages/element-plus/src/index.ts packages/element-plus/src/module.ts packages/element-plus/src/__tests__/registry.test.ts packages/vue/src/__tests__/JsonRenderPanel.test.ts
@@ -210,11 +210,11 @@ git commit -m "feat: render steps with element plus"
 - Consumes: `buildDisplayDashboardPayload()` and `JsonRenderStepsInput` from Task 1.
 - Produces: optional Render Dashboard Steps parameters and unchanged `{ format, payload }` node output.
 
-- [ ] **Step 1: Make the new eit-json-render commit consumable by n8n**
+- [x] **Step 1: Make the new eit-json-render commit consumable by n8n**
 
 Push or otherwise expose the Task 1 and Task 2 commits on the approved git ref. Update the three `@eit/json-render-*` dependency refs together. Run `pnpm install` without editing lockfiles by hand.
 
-- [ ] **Step 2: Write failing Render Dashboard node tests**
+- [x] **Step 2: Write failing Render Dashboard node tests**
 
 Add tests named:
 
@@ -224,7 +224,7 @@ Add tests named:
 
 Assert the node output wrapper is unchanged and the payload contains one Steps element with ordered Step children.
 
-- [ ] **Step 3: Run the focused test and verify failure**
+- [x] **Step 3: Run the focused test and verify failure**
 
 From `packages/@n8n/nodes-langchain`, run:
 
@@ -232,15 +232,15 @@ From `packages/@n8n/nodes-langchain`, run:
 
 Expected: FAIL because the node has no Steps parameters and still uses its local builder.
 
-- [ ] **Step 4: Add the optional Steps parameter group**
+- [x] **Step 4: Add the optional Steps parameter group**
 
 Add active step, direction, align center, simple mode, process status, finish status, and repeatable items with title, description, and status. Read the group into `JsonRenderStepsInput`. Treat an absent group as `undefined`.
 
-- [ ] **Step 5: Replace local spec construction with the protocol builder**
+- [x] **Step 5: Replace local spec construction with the protocol builder**
 
 Import `buildDisplayDashboardPayload()` from `@eit/json-render-protocol`. Keep the existing outer node output wrapper. Change validation so Steps, metrics, or table content is sufficient. Delete `render-dashboard-payload.ts` after parity tests pass.
 
-- [ ] **Step 6: Run focused tests, typecheck, and lint**
+- [x] **Step 6: Run focused tests, typecheck, and lint**
 
 From `packages/@n8n/nodes-langchain`, run:
 
@@ -252,7 +252,7 @@ pnpm lint
 
 Expected: all commands pass.
 
-- [ ] **Step 7: Commit the Dashboard migration**
+- [x] **Step 7: Commit the Dashboard migration**
 
 ```bash
 git add pnpm-lock.yaml pnpm-workspace.yaml packages/@n8n/nodes-langchain/package.json packages/@n8n/nodes-langchain/nodes/tools/RenderDashboard

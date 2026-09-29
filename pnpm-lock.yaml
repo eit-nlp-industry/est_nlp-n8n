@@ -123,15 +123,6 @@ catalogs:
     '@e965/xlsx':
       specifier: 0.20.3
       version: 0.20.3
-    '@eit/json-render-element-plus':
-      specifier: github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/element-plus
-      version: 0.1.0
-    '@eit/json-render-protocol':
-      specifier: github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/protocol
-      version: 0.1.0
-    '@eit/json-render-vue':
-      specifier: github:eit-nlp-industry/eit-json-render#interactive-server&path:packages/vue
-      version: 0.1.0
     '@iconify-json/lucide':
       specifier: ^1.2.112
       version: 1.2.114
@@ -749,9 +740,9 @@ catalogs:
       version: 7.29.0
 
 overrides:
-  '@eit/json-render-element-plus': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus
-  '@eit/json-render-protocol': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol
-  '@eit/json-render-vue': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue
+  '@eit/json-render-element-plus': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/element-plus
+  '@eit/json-render-protocol': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/protocol
+  '@eit/json-render-vue': git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/vue
   '@eit/json-render-protocol>zod': ^4.4.3
   libphonenumber-js: npm:empty-npm-package@1.0.0
   '@browserbasehq/stagehand': npm:empty-npm-package@1.0.0
@@ -2693,8 +2684,8 @@ importers:
         specifier: 'catalog:'
         version: 0.20.3
       '@eit/json-render-protocol':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/protocol
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
       '@n8n/agents':
         specifier: workspace:*
         version: link:../agents
@@ -3241,8 +3232,8 @@ importers:
         specifier: 12.1.0
         version: 12.1.0(supports-color@8.1.1)
       '@eit/json-render-protocol':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/protocol
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
       '@getzep/zep-cloud':
         specifier: 1.0.6
         version: 1.0.6(457e10c9c36b8125fa69315c3bf7d4c2)
@@ -5082,14 +5073,14 @@ importers:
   packages/frontend/@n8n/chat:
     dependencies:
       '@eit/json-render-element-plus':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/element-plus
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))
       '@eit/json-render-protocol':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/protocol
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
       '@eit/json-render-vue':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/vue
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
       '@n8n/design-system':
         specifier: workspace:*
         version: link:../design-system
@@ -6116,14 +6107,14 @@ importers:
         specifier: ^1.1.4
         version: 1.1.4
       '@eit/json-render-element-plus':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/element-plus
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/element-plus
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))
       '@eit/json-render-protocol':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/protocol
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/protocol
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
       '@eit/json-render-vue':
-        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#interactive-server&path:packages/vue
-        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
+        specifier: git+ssh://git@github.com:eit-nlp-industry/eit-json-render.git#codex/json-render-steps&path:packages/vue
+        version: git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
       '@faker-js/faker':
         specifier: ^8.0.2
         version: 8.4.1
@@ -9406,8 +9397,8 @@ packages:
     peerDependencies:
       '@noble/ciphers': ^1.0.0
 
-  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus':
-    resolution: {commit: 0fc0ba2698876d67bb96d2d03ee74b99db842c14, path: packages/element-plus, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
+  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/element-plus':
+    resolution: {commit: ffba611163054a7daac9804a98e95c4e03da26e8, path: packages/element-plus, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
     version: 0.1.0
     peerDependencies:
       '@eit/json-render-protocol': 0.1.0
@@ -9415,12 +9406,12 @@ packages:
       element-plus: '>=2.8.0'
       vue: '>=3.4.0'
 
-  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol':
-    resolution: {commit: 0fc0ba2698876d67bb96d2d03ee74b99db842c14, path: packages/protocol, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
+  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol':
+    resolution: {commit: ffba611163054a7daac9804a98e95c4e03da26e8, path: packages/protocol, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
     version: 0.1.0
 
-  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue':
-    resolution: {commit: 0fc0ba2698876d67bb96d2d03ee74b99db842c14, path: packages/vue, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
+  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue':
+    resolution: {commit: ffba611163054a7daac9804a98e95c4e03da26e8, path: packages/vue, repo: git@github.com:eit-nlp-industry/eit-json-render.git, type: git}
     version: 0.1.0
     peerDependencies:
       '@eit/json-render-protocol': 0.1.0
@@ -14701,10 +14692,6 @@ packages:
     resolution: {integrity: sha512-hvJUjNVeBMp77qPINuUvYXj4FyWeeMMKZkxEATEU3hqBAQ7qdTBCUFT7Sp0Zu0faeEtFf+ldXxMEDr/bk73ISg==}
     peerDependencies:
       typescript: '*'
-
-  '@typespec/ts-http-runtime@0.3.6':
-    resolution: {integrity: sha512-jIXhD0eWQ1JA6ln/5Dltyx22UxWNrw0hZmhy2rlv6m6KgF7kplHx3g0fzi09lNmTJQRR91OlemYp3xFnvDK9og==}
-    engines: {node: '>=20.0.0'}
 
   '@typespec/ts-http-runtime@0.3.9':
     resolution: {integrity: sha512-edSdeAqkdxBVzA1yL1LrLCml1YjyCVvPMtMqJpbF+6K609tHe8V6sQUzFQSGcYNhcuhOceZtjvN32+mpIth30A==}
@@ -26467,7 +26454,7 @@ snapshots:
       '@azure/core-tracing': 1.3.1
       '@azure/core-util': 1.13.1(supports-color@8.1.1)
       '@azure/logger': 1.3.0(supports-color@8.1.1)
-      '@typespec/ts-http-runtime': 0.3.6(supports-color@8.1.1)
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@8.1.1)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -26479,7 +26466,7 @@ snapshots:
   '@azure/core-util@1.13.1(supports-color@8.1.1)':
     dependencies:
       '@azure/abort-controller': 2.1.2
-      '@typespec/ts-http-runtime': 0.3.6(supports-color@8.1.1)
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@8.1.1)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -26552,7 +26539,7 @@ snapshots:
 
   '@azure/logger@1.3.0(supports-color@8.1.1)':
     dependencies:
-      '@typespec/ts-http-runtime': 0.3.6(supports-color@8.1.1)
+      '@typespec/ts-http-runtime': 0.3.9(supports-color@8.1.1)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -26615,7 +26602,7 @@ snapshots:
       '@azure/core-auth': 1.10.1(supports-color@8.1.1)
       '@azure/core-client': 1.10.2(supports-color@8.1.1)
       '@azure/core-http-compat': 2.4.0(@azure/core-client@1.10.2(supports-color@8.1.1))(@azure/core-rest-pipeline@1.24.0(supports-color@8.1.1))
-      '@azure/core-lro': 2.4.0(supports-color@8.1.1)
+      '@azure/core-lro': 2.7.2(supports-color@8.1.1)
       '@azure/core-paging': 1.6.2
       '@azure/core-rest-pipeline': 1.24.0(supports-color@8.1.1)
       '@azure/core-tracing': 1.3.1
@@ -28705,21 +28692,21 @@ snapshots:
     dependencies:
       '@noble/ciphers': 1.3.0
 
-  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))':
+  '@eit/json-render-element-plus@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/element-plus(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2)))(element-plus@2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2)))(vue@3.5.26(typescript@6.0.2))':
     dependencies:
-      '@eit/json-render-protocol': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
-      '@eit/json-render-vue': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
+      '@eit/json-render-protocol': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
+      '@eit/json-render-vue': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))
       element-plus: 2.4.3(patch_hash=fbab57fe3750e430abd5d5e7c04cbf1b6a8f9f1c9676b14c73b77d3e06ba9eee)(vue@3.5.26(typescript@6.0.2))
       vue: 3.5.26(typescript@6.0.2)
 
-  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol':
+  '@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol':
     dependencies:
       uuid: 13.0.1
       zod: 4.6.1
 
-  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))':
+  '@eit/json-render-vue@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/vue(@eit/json-render-protocol@git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol)(vue@3.5.26(typescript@6.0.2))':
     dependencies:
-      '@eit/json-render-protocol': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#0fc0ba2698876d67bb96d2d03ee74b99db842c14&path:packages/protocol
+      '@eit/json-render-protocol': git+ssh://git@github.com/eit-nlp-industry/eit-json-render.git#ffba611163054a7daac9804a98e95c4e03da26e8&path:packages/protocol
       vue: 3.5.26(typescript@6.0.2)
 
   '@electron-internal/extract-zip@1.0.3': {}
@@ -29518,7 +29505,7 @@ snapshots:
   '@jridgewell/trace-mapping@0.3.31':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   '@jridgewell/trace-mapping@0.3.9':
     dependencies:
@@ -34427,14 +34414,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typespec/ts-http-runtime@0.3.6(supports-color@8.1.1)':
-    dependencies:
-      http-proxy-agent: 7.0.2(supports-color@8.1.1)
-      https-proxy-agent: 7.0.6(supports-color@8.1.1)
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@typespec/ts-http-runtime@0.3.9(supports-color@8.1.1)':
     dependencies:
       http-proxy-agent: 7.0.2(supports-color@8.1.1)
@@ -34680,14 +34659,6 @@ snapshots:
 
   '@volar/source-map@2.4.28': {}
 
-  '@volar/typescript@2.4.12(@typescript/typescript6@6.0.2)':
-    dependencies:
-      '@volar/language-core': 2.4.12
-      path-browserify: 1.0.1
-      vscode-uri: 3.0.8
-    optionalDependencies:
-      typescript: '@typescript/typescript6@6.0.2'
-
   '@volar/typescript@2.4.12(typescript@6.0.2)':
     dependencies:
       '@volar/language-core': 2.4.12
@@ -34696,14 +34667,13 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.2
 
-  '@volar/typescript@2.4.12(typescript@7.0.2)':
+  '@volar/typescript@2.4.28(@typescript/typescript6@6.0.2)':
     dependencies:
-      '@volar/language-core': 2.4.12
+      '@volar/language-core': 2.4.28
       path-browserify: 1.0.1
       vscode-uri: 3.0.8
     optionalDependencies:
-      typescript: 7.0.2
-    optional: true
+      typescript: '@typescript/typescript6@6.0.2'
 
   '@volar/typescript@2.4.28(typescript@6.0.2)':
     dependencies:
@@ -34712,6 +34682,15 @@ snapshots:
       vscode-uri: 3.0.8
     optionalDependencies:
       typescript: 6.0.2
+
+  '@volar/typescript@2.4.28(typescript@7.0.2)':
+    dependencies:
+      '@volar/language-core': 2.4.28
+      path-browserify: 1.0.1
+      vscode-uri: 3.0.8
+    optionalDependencies:
+      typescript: 7.0.2
+    optional: true
 
   '@vscode/markdown-it-katex@1.1.2':
     dependencies:
@@ -34830,7 +34809,7 @@ snapshots:
 
   '@vue/language-core@2.2.8(@typescript/typescript6@6.0.2)':
     dependencies:
-      '@volar/language-core': 2.4.12
+      '@volar/language-core': 2.4.28
       '@vue/compiler-dom': 3.5.40
       '@vue/compiler-vue2': 2.7.16
       '@vue/shared': 3.5.40
@@ -34843,7 +34822,7 @@ snapshots:
 
   '@vue/language-core@2.2.8(typescript@6.0.2)':
     dependencies:
-      '@volar/language-core': 2.4.12
+      '@volar/language-core': 2.4.28
       '@vue/compiler-dom': 3.5.40
       '@vue/compiler-vue2': 2.7.16
       '@vue/shared': 3.5.40
@@ -34856,7 +34835,7 @@ snapshots:
 
   '@vue/language-core@2.2.8(typescript@7.0.2)':
     dependencies:
-      '@volar/language-core': 2.4.12
+      '@volar/language-core': 2.4.28
       '@vue/compiler-dom': 3.5.40
       '@vue/compiler-vue2': 2.7.16
       '@vue/shared': 3.5.40
@@ -40538,7 +40517,7 @@ snapshots:
 
   magic-string@0.30.21:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   magic-string@0.30.8:
     dependencies:
@@ -46246,19 +46225,19 @@ snapshots:
 
   vue-tsc@2.2.8(patch_hash=e2aee939ccac8a57fe449bfd92bedd8117841579526217bc39aca26c6b8c317f)(@typescript/typescript6@6.0.2):
     dependencies:
-      '@volar/typescript': 2.4.12(@typescript/typescript6@6.0.2)
+      '@volar/typescript': 2.4.28(@typescript/typescript6@6.0.2)
       '@vue/language-core': 2.2.8(@typescript/typescript6@6.0.2)
       typescript: '@typescript/typescript6@6.0.2'
 
   vue-tsc@2.2.8(patch_hash=e2aee939ccac8a57fe449bfd92bedd8117841579526217bc39aca26c6b8c317f)(typescript@6.0.2):
     dependencies:
-      '@volar/typescript': 2.4.12(typescript@6.0.2)
+      '@volar/typescript': 2.4.28(typescript@6.0.2)
       '@vue/language-core': 2.2.8(typescript@6.0.2)
       typescript: 6.0.2
 
   vue-tsc@2.2.8(patch_hash=e2aee939ccac8a57fe449bfd92bedd8117841579526217bc39aca26c6b8c317f)(typescript@7.0.2):
     dependencies:
-      '@volar/typescript': 2.4.12(typescript@7.0.2)
+      '@volar/typescript': 2.4.28(typescript@7.0.2)
       '@vue/language-core': 2.2.8(typescript@7.0.2)
       typescript: 7.0.2
     optional: true
