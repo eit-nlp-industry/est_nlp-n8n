@@ -29,6 +29,10 @@ vi.mock('../data-tables.tool', () => ({
 	})),
 }));
 
+vi.mock('../deepseek-harness.tool', () => ({
+	createDeepSeekHarnessTool: vi.fn(() => ({ id: 'deepseek-harness' })),
+}));
+
 vi.mock('../executions.tool', () => ({
 	createExecutionsTool: vi.fn(() => ({ id: 'executions' })),
 }));
@@ -216,6 +220,21 @@ describe('domain tool construction', () => {
 
 		const enabled = makeContext({ mcpService: {} as InstanceAiContext['mcpService'] });
 		expect(createOrchestratorDomainTools(enabled).get('mcp-servers')).toBeDefined();
+	});
+
+	it('gates the deepseek-harness tool on the host-wired service', () => {
+		const disabled = makeContext();
+		expect(createOrchestratorDomainTools(disabled).get('deepseek-harness')).toBeUndefined();
+
+		const enabled = makeContext({
+			deepSeekHarnessService: {} as InstanceAiContext['deepSeekHarnessService'],
+		});
+		expect(createOrchestratorDomainTools(enabled).get('deepseek-harness')).toBeDefined();
+		expect(getActiveOrchestratorDomainToolNames(enabled)).toContain('deepseek-harness');
+	});
+
+	it('never defers deepseek-harness behind search_tools', () => {
+		expect(ALWAYS_LOADED_TOOL_NAMES.has('deepseek-harness')).toBe(true);
 	});
 
 	it('reports the same active names that the domain registry exposes', () => {

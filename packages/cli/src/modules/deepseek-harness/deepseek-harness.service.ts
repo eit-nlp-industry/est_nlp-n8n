@@ -10,6 +10,10 @@ import { DeepSeekHarnessHomeService } from './deepseek-harness-home.service';
 import { DeepSeekHarnessCliService } from './deepseek-harness-cli.service';
 import { buildStudioProxyUrl } from './deepseek-harness-studio-proxy';
 import { DeepSeekHarnessWebService } from './deepseek-harness-web.service';
+import type {
+	DeepSeekHarnessModelCatalog,
+	DeepSeekHarnessModelSelection,
+} from './deepseek-harness-web.service';
 import { DeepSeekHarnessRpcService } from './deepseek-harness-rpc.service';
 import { DeepSeekHarnessAgent } from './entities/deepseek-harness-agent.entity';
 import { DeepSeekHarnessAgentRepository } from './repositories/deepseek-harness-agent.repository';
@@ -108,6 +112,7 @@ export class DeepSeekHarnessService {
 		allowUnpublished = false,
 		sendResponseChunk?: (type: ChunkType, content?: string) => Promise<void>,
 		workspaceId?: string,
+		reuseSession = false,
 	) {
 		return await this.withAgentExecution(
 			agentId,
@@ -118,7 +123,7 @@ export class DeepSeekHarnessService {
 					projectId,
 					message,
 					sessionId,
-					{ allowUnpublished, sendResponseChunk, workspaceId },
+					{ allowUnpublished, sendResponseChunk, workspaceId, reuseSession },
 				),
 		);
 	}
@@ -149,6 +154,11 @@ export class DeepSeekHarnessService {
 		return await this.withAgentLifecycleLock(id, projectId, async () => {
 			const agent = await this.repository.findByIdAndProjectId(id, projectId);
 			if (!agent) return null;
+
+			const configuration = await this.webService.getConfigurationStatusForAgent(id, projectId);
+			if (!configuration.configured) {
+				throw new ConflictError('Harness profile is not configured with a model and Credential');
+			}
 
 			await this.webService.startForAgent(id, projectId);
 			try {
@@ -198,15 +208,18 @@ export class DeepSeekHarnessService {
 		}
 	}
 
-	async createForProject(userName: string, projectId: string): Promise<DeepSeekHarnessAgentDto> {
+	async createProfileForProject(
+		userName: string,
+		projectId: string,
+		requestedName: string = DEFAULT_AGENT_NAME,
+	): Promise<DeepSeekHarnessAgentDto> {
 		for (let attempt = 0; attempt < 3; attempt++) {
-			const normalizedName = await this.getUniqueName(DEFAULT_AGENT_NAME);
+			const normalizedName = await this.getUniqueName(requestedName.trim() || DEFAULT_AGENT_NAME);
 			const agent = this.repository.create({
 				id: generateNanoId(),
 				projectId,
 				name: normalizedName,
 				userName,
-				status: 'created',
 			});
 
 			const home = await this.homeService.createHome(userName, normalizedName, agent.id);
@@ -228,6 +241,29 @@ export class DeepSeekHarnessService {
 		}
 
 		throw new ConflictError('Could not allocate a unique DeepSeek Harness agent name');
+	}
+
+	async getModelCatalogForProject(
+		id: string,
+		projectId: string,
+	): Promise<DeepSeekHarnessModelCatalog | null> {
+		const agent = await this.repository.findByIdAndProjectId(id, projectId);
+		if (!agent) return null;
+		return await this.webService.getModelCatalogForAgent(id, projectId);
+	}
+
+	async configureModelForProject(
+		id: string,
+		projectId: string,
+		selection: DeepSeekHarnessModelSelection,
+	): Promise<DeepSeekHarnessAgentDto | null> {
+		return await this.withAgentLifecycleLock(id, projectId, async () => {
+			const agent = await this.repository.findByIdAndProjectId(id, projectId);
+			if (!agent) return null;
+
+			await this.webService.configureModelForAgent(id, projectId, selection);
+			return this.toDto(agent);
+		});
 	}
 
 	private async getUniqueName(requestedName: string): Promise<string> {
@@ -275,8 +311,7 @@ export class DeepSeekHarnessService {
 			if (!newName) throw new Error('DeepSeek Harness agent name cannot be empty');
 			if (newName === agent.name) return this.toDto(agent);
 			const oldName = agent.name;
-			const shouldRestart =
-				agent.published || agent.runtimeStatus === 'running' || agent.runtimeStatus === 'starting';
+			const shouldRestart = agent.published;
 			let stopped = false;
 			let renamed = false;
 			let saved = false;
@@ -410,12 +445,7 @@ export class DeepSeekHarnessService {
 			id: agent.id,
 			projectId: agent.projectId,
 			name: agent.name,
-			status: agent.status,
 			published: agent.published ?? false,
-			runtimeStatus: agent.runtimeStatus ?? 'stopped',
-			runtimePort: agent.runtimePort ?? null,
-			runtimeUrl: null,
-			runtimeError: agent.runtimeError ?? null,
 			createdAt: agent.createdAt,
 			updatedAt: agent.updatedAt,
 		};

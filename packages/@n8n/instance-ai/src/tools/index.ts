@@ -23,6 +23,9 @@ const loadConversationHistoryTool = lazyMod(
 const loadDataTablesTool = lazyMod(
 	() => require('./data-tables.tool') as typeof import('./data-tables.tool'),
 );
+const loadDeepSeekHarnessTool = lazyMod(
+	() => require('./deepseek-harness.tool') as typeof import('./deepseek-harness.tool'),
+);
 const loadEvalConfigTool = lazyMod(
 	() => require('./evals/eval-config.tool') as typeof import('./evals/eval-config.tool'),
 );
@@ -46,6 +49,10 @@ const loadAgentsTool = lazyMod(() => require('./agents.tool') as typeof import('
 const loadBuildAgentTool = lazyMod(
 	() =>
 		require('./orchestration/build-agent.tool') as typeof import('./orchestration/build-agent.tool'),
+);
+const loadBuildHarnessTool = lazyMod(
+	() =>
+		require('./orchestration/build-harness.tool') as typeof import('./orchestration/build-harness.tool'),
 );
 const loadListAgentCapabilitiesTool = lazyMod(
 	() =>
@@ -131,6 +138,13 @@ function getOrchestratorDomainToolFactories(
 		tools.push([
 			DOMAIN_TOOL_IDS.EVAL_CONFIG,
 			() => loadEvalConfigTool().createEvalConfigTool(context),
+		]);
+	}
+
+	if (context.deepSeekHarnessService) {
+		tools.push([
+			DOMAIN_TOOL_IDS.DEEPSEEK_HARNESS,
+			() => loadDeepSeekHarnessTool().createDeepSeekHarnessTool(context),
 		]);
 	}
 
@@ -228,6 +242,13 @@ export function createOrchestrationTools(context: OrchestrationContext): Instanc
 			loadListAgentCapabilitiesTool().createListAgentCapabilitiesTool(context),
 		]);
 		tools.push([DOMAIN_TOOL_IDS.AGENTS, loadAgentsTool().createAgentsTool(context)]);
+	}
+
+	if (context.domainContext?.deepSeekHarnessService) {
+		tools.push([
+			ORCHESTRATION_TOOL_IDS.BUILD_HARNESS,
+			loadBuildHarnessTool().createBuildHarnessTool(context),
+		]);
 	}
 
 	if (context.domainContext?.agentPreviewSession && context.domainContext?.resolvePreviewSession) {

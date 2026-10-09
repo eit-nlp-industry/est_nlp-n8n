@@ -861,6 +861,70 @@ export interface InstanceAiMcpService {
 	listConnections(): Promise<Array<{ slug: string }>>;
 }
 
+export interface DeepSeekHarnessProfileSummary {
+	agentId: string;
+	name: string;
+	published: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** DeepSeek Harness profile operations bound to the current user and project. */
+export interface InstanceAiDeepSeekHarnessService {
+	list(): Promise<DeepSeekHarnessProfileSummary[]>;
+	createProfile(name?: string): Promise<DeepSeekHarnessProfileSummary>;
+	get(agentId: string): Promise<DeepSeekHarnessProfileSummary | null>;
+	publish(agentId: string): Promise<DeepSeekHarnessProfileSummary | null>;
+	getModelCatalog(agentId: string): Promise<DeepSeekHarnessModelCatalog | null>;
+	configureModel(
+		agentId: string,
+		selection: DeepSeekHarnessModelSelection,
+		credentialId: string,
+	): Promise<DeepSeekHarnessProfileSummary | null>;
+	test(
+		agentId: string,
+		message: string,
+		sessionId?: string,
+		reuseSession?: boolean,
+	): Promise<{ success: boolean; message?: string; sessionId?: string }>;
+}
+
+/** Project-scoped delegate used by the interactive Harness Builder. */
+export interface InstanceAiHarnessBuilderDelegate {
+	createProfile(name?: string): Promise<DeepSeekHarnessProfileSummary>;
+	getProfile(profileId: string): Promise<DeepSeekHarnessProfileSummary | null>;
+	getModelCatalog(profileId: string): Promise<DeepSeekHarnessModelCatalog | null>;
+	listCredentials(): Promise<CredentialSummary[]>;
+	configureModel(
+		profileId: string,
+		selection: DeepSeekHarnessModelSelection,
+		credentialId: string,
+	): Promise<DeepSeekHarnessProfileSummary | null>;
+	test(
+		profileId: string,
+		message: string,
+		sessionId?: string,
+		reuseSession?: boolean,
+	): Promise<{ success: boolean; message?: string; sessionId?: string }>;
+	publish(profileId: string): Promise<DeepSeekHarnessProfileSummary | null>;
+}
+
+export interface DeepSeekHarnessModelCatalog {
+	default?: { provider: string; model: string };
+	routableProviders: string[];
+	groups: Array<{
+		id: string;
+		name: string;
+		models: Array<{ id: string; name: string; description?: string; reasoning?: boolean }>;
+	}>;
+	failures: Array<{ id: string; name: string; message: string }>;
+}
+
+export interface DeepSeekHarnessModelSelection {
+	provider: string;
+	model: string;
+}
+
 export interface ExploreResourcesParams {
 	nodeType: string;
 	version: number;
@@ -1500,6 +1564,20 @@ export interface InstanceAiContext {
 	dataTableService: InstanceAiDataTableService;
 	/** Optional — present when the host wires config-based eval support. */
 	evaluationConfigService?: InstanceAiEvaluationConfigService;
+	/** Optional. Presence gates the DeepSeek Harness profile tool. */
+	deepSeekHarnessService?: InstanceAiDeepSeekHarnessService;
+	/** Thread target for the interactive Harness Builder. */
+	harnessBuilderTarget?: {
+		profileId: string;
+		projectId: string;
+		name?: string;
+		phase: 'selection' | 'baseline' | 'completed';
+		baselineSessionId?: string;
+		provider?: string;
+		model?: string;
+	};
+	/** Project-scoped operations owned by the Harness Builder host adapter. */
+	harnessBuilderDelegate?: InstanceAiHarnessBuilderDelegate;
 	/** Optional — present when the host allows MCP registry discovery for this
 	 *  user. Presence gates the `mcp-servers` tool. */
 	mcpService?: InstanceAiMcpService;

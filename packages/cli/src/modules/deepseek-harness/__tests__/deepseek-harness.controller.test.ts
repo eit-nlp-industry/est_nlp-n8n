@@ -1,9 +1,9 @@
 import { DeepSeekHarnessController } from '../deepseek-harness.controller';
 
 describe('DeepSeekHarnessController', () => {
-	it('creates an agent for the requested project', async () => {
+	it('creates a profile for the requested project', async () => {
 		const service = {
-			createForProject: vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Research' }),
+			createProfileForProject: vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Research' }),
 		};
 		const controller = new DeepSeekHarnessController(service as never);
 
@@ -13,7 +13,7 @@ describe('DeepSeekHarnessController', () => {
 			{} as never,
 		);
 
-		expect(service.createForProject).toHaveBeenCalledWith('user@example.com', 'project-1');
+		expect(service.createProfileForProject).toHaveBeenCalledWith('user@example.com', 'project-1');
 	});
 
 	it('deletes an agent for the requested project', async () => {

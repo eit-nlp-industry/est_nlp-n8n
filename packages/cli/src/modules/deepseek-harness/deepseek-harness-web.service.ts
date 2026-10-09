@@ -1,6 +1,7 @@
 import { DeepSeekHarnessConfig, GlobalConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import { OnShutdown } from '@n8n/decorators';
+import { isRecord } from '@n8n/utils/is-record';
 import { sanitizeErrorDetail } from '@n8n/utils/redaction/sanitize-error-detail';
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -18,11 +19,101 @@ import { DeepSeekHarnessAgentRepository } from './repositories/deepseek-harness-
 const STARTUP_TIMEOUT_MS = 30_000;
 const STOP_TIMEOUT_MS = 5_000;
 const STARTUP_OUTPUT_LIMIT = 4_096;
+const RPC_TIMEOUT_MS = 30_000;
 const WEB_URL_PATTERN = /dsh web:\s+(https?:\/\/\S+)/;
+const MODEL_SETTINGS_NAMESPACE = 'agent-default-model';
 
 type SpawnProcess = typeof spawn;
 type Fetch = typeof fetch;
 type WebRuntime = { url: string; workspaceId: string };
+export type DeepSeekHarnessRuntimeState = {
+	status: 'stopped' | 'starting' | 'running' | 'error';
+	pid: number | null;
+	port: number | null;
+	url: string | null;
+	error: string | null;
+};
+
+const STOPPED_RUNTIME_STATE: DeepSeekHarnessRuntimeState = {
+	status: 'stopped',
+	pid: null,
+	port: null,
+	url: null,
+	error: null,
+};
+
+export type DeepSeekHarnessModel = {
+	id: string;
+	name: string;
+	description?: string;
+	reasoning?: boolean;
+};
+
+export type DeepSeekHarnessModelGroup = {
+	id: string;
+	name: string;
+	models: DeepSeekHarnessModel[];
+};
+
+export type DeepSeekHarnessModelCatalog = {
+	default?: { provider: string; model: string };
+	routableProviders: string[];
+	groups: DeepSeekHarnessModelGroup[];
+	failures: Array<{ id: string; name: string; message: string }>;
+};
+
+export type DeepSeekHarnessModelSelection = {
+	provider: string;
+	model: string;
+	apiKey: string;
+};
+
+export type DeepSeekHarnessConfigurationStatus = {
+	configured: boolean;
+	provider: string | null;
+	model: string | null;
+	credentialRef: string | null;
+};
+
+const MODEL_CREDENTIAL_REFS: Record<string, string> = {
+	deepseek: 'DEEPSEEK_API_KEY',
+	'deepseek-official': 'DEEPSEEK_API_KEY',
+	openai: 'OPENAI_API_KEY',
+	anthropic: 'ANTHROPIC_API_KEY',
+};
+
+type HarnessSettingsDescription = {
+	namespaces?: Array<{ ns: string; value?: unknown }>;
+};
+
+type HarnessCredentialsDescription = Record<string, { configured?: boolean }>;
+
+export function getHarnessCredentialRef(provider: string | null | undefined): string | null {
+	if (!provider) return null;
+	return MODEL_CREDENTIAL_REFS[provider.trim().toLowerCase()] ?? null;
+}
+
+export function getHarnessConfigurationStatus(
+	settings: HarnessSettingsDescription,
+	credentials: HarnessCredentialsDescription,
+): DeepSeekHarnessConfigurationStatus {
+	const modelNamespace = settings.namespaces?.find(
+		({ ns }) => ns === MODEL_SETTINGS_NAMESPACE,
+	);
+	const modelValue = isRecord(modelNamespace?.value) ? modelNamespace.value : undefined;
+	const provider = typeof modelValue?.provider === 'string' ? modelValue.provider.trim() : null;
+	const model = typeof modelValue?.model === 'string' ? modelValue.model.trim() : null;
+	const credentialRef = getHarnessCredentialRef(provider);
+
+	return {
+		configured: Boolean(
+			provider && model && credentialRef && credentials[credentialRef]?.configured === true,
+		),
+		provider: provider || null,
+		model: model || null,
+		credentialRef,
+	};
+}
 
 export function appendOutputTail(current: string, chunk: Buffer | string): string {
 	return `${current}${chunk.toString()}`.slice(-STARTUP_OUTPUT_LIMIT);
@@ -58,8 +149,8 @@ export function getWebProcessInvocation(
 export class DeepSeekHarnessWebService {
 	private readonly processes = new Map<string, { child: ChildProcess } & WebRuntime>();
 	private readonly starting = new Map<string, Promise<WebRuntime>>();
+	private readonly runtimeStates = new Map<string, DeepSeekHarnessRuntimeState>();
 	private readonly children = new Set<ChildProcess>();
-	private readonly childAgents = new Map<ChildProcess, string>();
 
 	constructor(
 		private readonly repository: DeepSeekHarnessAgentRepository,
@@ -78,6 +169,10 @@ export class DeepSeekHarnessWebService {
 		return new URL(running.url).origin;
 	}
 
+	getRuntimeState(projectId: string, agentId: string): DeepSeekHarnessRuntimeState {
+		return { ...(this.runtimeStates.get(`${projectId}:${agentId}`) ?? STOPPED_RUNTIME_STATE) };
+	}
+
 	async startForAgent(agentId: string, projectId: string): Promise<WebRuntime> {
 		const key = `${projectId}:${agentId}`;
 		const running = this.processes.get(key);
@@ -91,6 +186,13 @@ export class DeepSeekHarnessWebService {
 		this.starting.set(key, promise);
 		try {
 			return await promise;
+		} catch (error) {
+			this.runtimeStates.set(key, {
+				...STOPPED_RUNTIME_STATE,
+				status: 'error',
+				error: error instanceof Error ? error.message : String(error),
+			});
+			throw error;
 		} finally {
 			this.starting.delete(key);
 		}
@@ -108,17 +210,125 @@ export class DeepSeekHarnessWebService {
 
 		this.processes.delete(key);
 		this.children.delete(running.child);
-		this.childAgents.delete(running.child);
 		const exitPromise = this.waitForExit(running.child);
 		running.child.kill();
 		await exitPromise;
-		await this.repository.updateRuntimeState(agentId, {
-			status: 'stopped',
-			pid: null,
-			port: null,
-			url: null,
-			error: null,
+		this.runtimeStates.set(key, { ...STOPPED_RUNTIME_STATE });
+	}
+
+	/** Return the model catalog exposed by the running Harness profile. */
+	async getModelCatalogForAgent(
+		agentId: string,
+		projectId: string,
+	): Promise<DeepSeekHarnessModelCatalog> {
+		const runtime = await this.startForAgent(agentId, projectId);
+		const { origin, cookie } = await this.authenticate(runtime.url);
+		return await this.callRpc<DeepSeekHarnessModelCatalog>(
+			origin,
+			cookie,
+			'session/modelCatalog',
+			{},
+		);
+	}
+
+	/** Read the non-secret model and credential state of a running profile. */
+	async getConfigurationStatusForAgent(
+		agentId: string,
+		projectId: string,
+	): Promise<DeepSeekHarnessConfigurationStatus> {
+		const runtime = await this.startForAgent(agentId, projectId);
+		return await this.getConfigurationStatusForRuntime(runtime.url);
+	}
+
+	/** Read configuration from a Harness Web process that is already running. */
+	async getConfigurationStatusForRuntime(
+		runtimeUrl: string,
+	): Promise<DeepSeekHarnessConfigurationStatus> {
+		const { origin, cookie } = await this.authenticate(runtimeUrl);
+		const [settings, credentials] = await Promise.all([
+			this.callRpc<HarnessSettingsDescription>(origin, cookie, 'settings/describe', {}),
+			this.callRpc<HarnessCredentialsDescription>(origin, cookie, 'credentials/describe', {
+				refs: [...new Set(Object.values(MODEL_CREDENTIAL_REFS))],
+			}),
+		]);
+		return getHarnessConfigurationStatus(settings, credentials);
+	}
+
+	/** Persist a provider, model, and its credential in the Harness profile. */
+	async configureModelForAgent(
+		agentId: string,
+		projectId: string,
+		selection: DeepSeekHarnessModelSelection,
+	): Promise<void> {
+		const credentialRef = getHarnessCredentialRef(selection.provider);
+		if (!credentialRef) {
+			throw new Error(`DeepSeek Harness provider "${selection.provider}" is not supported by n8n`);
+		}
+
+		const runtime = await this.startForAgent(agentId, projectId);
+		const { origin, cookie } = await this.authenticate(runtime.url);
+		await this.callRpc(origin, cookie, 'credentials/set', {
+			ref: credentialRef,
+			value: selection.apiKey,
 		});
+
+		const described = await this.callRpc<{ namespaces?: Array<{ ns: string; revision: number }> }>(
+			origin,
+			cookie,
+			'settings/describe',
+			{},
+		);
+		const modelSettings = described.namespaces?.find(
+			(namespace) => namespace.ns === MODEL_SETTINGS_NAMESPACE,
+		);
+		await this.callRpc(origin, cookie, 'settings/update', {
+			ns: MODEL_SETTINGS_NAMESPACE,
+			patch: { provider: selection.provider, model: selection.model },
+			expectedRevision: modelSettings?.revision,
+		});
+
+		await this.stopForAgent(agentId, projectId);
+		await this.startForAgent(agentId, projectId);
+	}
+
+	private async authenticate(runtimeUrl: string): Promise<{ origin: string; cookie: string }> {
+		const response = await this.fetchFn(runtimeUrl, {
+			redirect: 'manual',
+			signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+		});
+		const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];
+		if (response.status !== 303 || !cookie) {
+			throw new Error('DeepSeek Harness Web authentication failed while configuring the profile');
+		}
+		return { origin: new URL(runtimeUrl).origin, cookie };
+	}
+
+	private async callRpc<T = void>(
+		origin: string,
+		cookie: string,
+		endpoint: string,
+		args: object,
+	): Promise<T> {
+		const response = await this.fetchFn(`${origin}/api/${endpoint}`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie },
+			signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+			body: JSON.stringify({
+				type: 'client-request',
+				rpcId: `n8n-${crypto.randomUUID()}`,
+				method: endpoint,
+				payload: { args },
+			}),
+		});
+		if (!response.ok) throw new Error(`DeepSeek Harness ${endpoint} failed`);
+
+		const body = (await response.json()) as {
+			result?: { ok?: boolean; value?: T; error?: { message?: string } };
+		};
+		if (body.result?.ok !== true) {
+			throw new Error(body.result?.error?.message ?? `DeepSeek Harness ${endpoint} failed`);
+		}
+		return body.result.value as T;
 	}
 
 	private async waitForExit(child: ChildProcess): Promise<void> {
@@ -136,6 +346,7 @@ export class DeepSeekHarnessWebService {
 	}
 
 	private async start(key: string, agentId: string, projectId: string): Promise<WebRuntime> {
+		this.runtimeStates.set(key, { ...STOPPED_RUNTIME_STATE, status: 'starting' });
 		const agent = await this.repository.findByIdAndProjectId(agentId, projectId);
 		if (!agent) throw new NotFoundError(`DeepSeek Harness agent "${agentId}" not found`);
 		if (!agent.userName) throw new Error(`DeepSeek Harness agent "${agentId}" has no user`);
@@ -166,13 +377,6 @@ export class DeepSeekHarnessWebService {
 			nodePath,
 			getPublicHost(this.globalConfig),
 		);
-		await this.repository.updateRuntimeState(agentId, {
-			status: 'starting',
-			pid: null,
-			port: null,
-			url: null,
-			error: null,
-		});
 		const child = this.spawnProcess(invocation.command, invocation.args, {
 			cwd: harnessPath,
 			env: getHarnessEnv(harnessPath, home),
@@ -180,7 +384,6 @@ export class DeepSeekHarnessWebService {
 			windowsHide: true,
 		});
 		this.children.add(child);
-		this.childAgents.set(child, agentId);
 
 		return await new Promise((resolve, reject) => {
 			let output = '';
@@ -196,17 +399,12 @@ export class DeepSeekHarnessWebService {
 				if (settled) return;
 				settled = true;
 				clearTimeout(timeout);
-				void this.repository
-					.updateRuntimeState(agentId, {
-						status: 'error',
-						pid: null,
-						port: null,
-						url: null,
-						error: error.message,
-					})
-					.catch(() => {});
+				this.runtimeStates.set(key, {
+					...STOPPED_RUNTIME_STATE,
+					status: 'error',
+					error: error.message,
+				});
 				this.children.delete(child);
-				this.childAgents.delete(child);
 				child.kill();
 				reject(error);
 			};
@@ -227,27 +425,25 @@ export class DeepSeekHarnessWebService {
 						registeredDefault?.id ??
 						(await this.registerDefaultWorkspace(match[1], workspacePath!));
 					const entry = { child, url: match[1], workspaceId };
-					await this.repository.updateRuntimeState(agentId, {
-						status: 'running',
-						pid: child.pid ?? null,
-						port: Number(new URL(entry.url).port) || null,
-						url: null,
-						error: null,
-					});
 					settled = true;
 					clearTimeout(timeout);
 					this.processes.set(key, entry);
+					this.runtimeStates.set(key, {
+						status: 'running',
+						pid: child.pid ?? null,
+						port: Number(new URL(entry.url).port) || null,
+						url: entry.url,
+						error: null,
+					});
 					child.once('exit', () => {
-						if (this.childAgents.has(child)) {
-							void this.repository.updateRuntimeState(agentId, {
-								status: 'error',
-								pid: null,
-								port: null,
-								url: null,
-								error: 'Process exited after startup',
-							});
-						}
-						if (this.processes.get(key)?.child === child) this.processes.delete(key);
+						this.children.delete(child);
+						if (this.processes.get(key)?.child !== child) return;
+						this.processes.delete(key);
+						this.runtimeStates.set(key, {
+							...STOPPED_RUNTIME_STATE,
+							status: 'error',
+							error: 'Process exited after startup',
+						});
 					});
 					resolve({ url: entry.url, workspaceId: entry.workspaceId });
 				} catch (error) {
@@ -261,7 +457,6 @@ export class DeepSeekHarnessWebService {
 			child.once('error', fail);
 			child.once('exit', (code) => {
 				this.children.delete(child);
-				this.childAgents.delete(child);
 				if (!settled) {
 					const detail = sanitizeErrorDetail(
 						stderr.trim().split(/\r?\n/).slice(-3).join(' ').trim(),
@@ -269,13 +464,6 @@ export class DeepSeekHarnessWebService {
 					);
 					const suffix = detail ? `: ${detail}` : '';
 					const message = `DeepSeek Harness Web process exited before startup${code === null ? '' : ` with code ${code}`}${suffix}`;
-					void this.repository.updateRuntimeState(agentId, {
-						status: 'error',
-						pid: null,
-						port: null,
-						url: null,
-						error: message,
-					});
 					fail(new Error(message));
 				}
 			});
@@ -328,24 +516,11 @@ export class DeepSeekHarnessWebService {
 	@OnShutdown()
 	async shutdown(): Promise<void> {
 		const children = [...this.children];
-		const agentIds = [
-			...new Set(children.map((child) => this.childAgents.get(child)).filter(Boolean)),
-		];
 		this.processes.clear();
 		this.children.clear();
-		this.childAgents.clear();
 		for (const child of children) child.kill();
-		await Promise.all(
-			agentIds.map(async (agentId) => {
-				if (!agentId) return;
-				await this.repository.updateRuntimeState(agentId, {
-					status: 'stopped',
-					pid: null,
-					port: null,
-					url: null,
-					error: null,
-				});
-			}),
-		);
+		for (const key of this.runtimeStates.keys()) {
+			this.runtimeStates.set(key, { ...STOPPED_RUNTIME_STATE });
+		}
 	}
 }

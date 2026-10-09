@@ -22,11 +22,10 @@ describe('DeepSeekHarnessService', () => {
 			undefined as never,
 		);
 
-		const result = await service.createForProject('user@example.com', 'project-1');
+		const result = await service.createProfileForProject('user@example.com', 'project-1');
 
 		expect(result.name).toBe('DeepSeek Harness');
 		expect(result.projectId).toBe('project-1');
-		expect(result.status).toBe('created');
 		expect(homeService.createHome).toHaveBeenCalledWith(
 			'user@example.com',
 			'DeepSeek Harness',
@@ -41,7 +40,6 @@ describe('DeepSeekHarnessService', () => {
 				projectId: 'project-1',
 				name: 'DeepSeek Harness',
 				userName: 'user@example.com',
-				status: 'created',
 			}),
 		);
 	});
@@ -67,7 +65,7 @@ describe('DeepSeekHarnessService', () => {
 			undefined as never,
 		);
 
-		await expect(service.createForProject('user@example.com', 'project-1')).rejects.toThrow(
+		await expect(service.createProfileForProject('user@example.com', 'project-1')).rejects.toThrow(
 			'database unavailable',
 		);
 		expect(homeService.removeHome).toHaveBeenCalledWith(
@@ -100,7 +98,7 @@ describe('DeepSeekHarnessService', () => {
 			undefined as never,
 		);
 
-		await expect(service.createForProject('user@example.com', 'project-1')).rejects.toThrow(
+		await expect(service.createProfileForProject('user@example.com', 'project-1')).rejects.toThrow(
 			'Harness initialization failed',
 		);
 		expect(repository.save).not.toHaveBeenCalled();
@@ -132,7 +130,7 @@ describe('DeepSeekHarnessService', () => {
 			undefined as never,
 		);
 
-		const result = await service.createForProject('user@example.com', 'project-1');
+		const result = await service.createProfileForProject('user@example.com', 'project-1');
 
 		expect(result.name).toBe('DeepSeek Harness 3');
 		expect(repository.findStartingWith).toHaveBeenCalledWith('DeepSeek Harness');
@@ -156,7 +154,7 @@ describe('DeepSeekHarnessService', () => {
 			undefined as never,
 		);
 
-		await expect(service.createForProject('user@example.com', 'project-1')).resolves.toEqual(
+		await expect(service.createProfileForProject('user@example.com', 'project-1')).resolves.toEqual(
 			expect.objectContaining({ name: 'DeepSeek Harness' }),
 		);
 	});
@@ -168,7 +166,6 @@ describe('DeepSeekHarnessService', () => {
 			name: 'Agent',
 			userName: 'user@example.com',
 			published: false,
-			status: 'created',
 		};
 		const repository = {
 			findByIdAndProjectId: vi.fn().mockResolvedValue(agent),
@@ -176,6 +173,7 @@ describe('DeepSeekHarnessService', () => {
 		};
 		const webService = {
 			startForAgent: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43123' }),
+			getConfigurationStatusForAgent: vi.fn().mockResolvedValue({ configured: true }),
 			stopForAgent: vi.fn().mockResolvedValue(undefined),
 		};
 		const service = new DeepSeekHarnessService(
@@ -190,6 +188,63 @@ describe('DeepSeekHarnessService', () => {
 		);
 		expect(webService.startForAgent).toHaveBeenCalledWith('agent-1', 'project-1');
 		expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ published: true }));
+	});
+
+	it('does not publish an agent when its Harness profile is not configured', async () => {
+		const agent = {
+			id: 'agent-1',
+			projectId: 'project-1',
+			name: 'Agent',
+			userName: 'user@example.com',
+			published: false,
+		};
+		const repository = {
+			findByIdAndProjectId: vi.fn().mockResolvedValue(agent),
+			save: vi.fn(),
+		};
+		const webService = {
+			getConfigurationStatusForAgent: vi.fn().mockResolvedValue({ configured: false }),
+			startForAgent: vi.fn(),
+		};
+		const service = new DeepSeekHarnessService(
+			repository as never,
+			{} as never,
+			{} as never,
+			webService as never,
+		);
+
+		await expect(service.publishForProject('agent-1', 'project-1')).rejects.toThrow(
+			/Harness profile is not configured/,
+		);
+		expect(webService.startForAgent).not.toHaveBeenCalled();
+		expect(repository.save).not.toHaveBeenCalled();
+	});
+
+	it('unpublishes an agent before stopping its Web process', async () => {
+		const agent = {
+			id: 'agent-1',
+			projectId: 'project-1',
+			name: 'Agent',
+			userName: 'user@example.com',
+			published: true,
+		};
+		const repository = {
+			findByIdAndProjectId: vi.fn().mockResolvedValue(agent),
+			save: vi.fn().mockImplementation(async (value: unknown) => value),
+		};
+		const webService = { stopForAgent: vi.fn().mockResolvedValue(undefined) };
+		const service = new DeepSeekHarnessService(
+			repository as never,
+			{} as never,
+			{} as never,
+			webService as never,
+		);
+
+		await expect(service.unpublishForProject('agent-1', 'project-1')).resolves.toEqual(
+			expect.objectContaining({ published: false }),
+		);
+		expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ published: false }));
+		expect(webService.stopForAgent).toHaveBeenCalledWith('agent-1', 'project-1');
 	});
 
 	it('restarts Studio by stopping then starting the Web process', async () => {
@@ -229,7 +284,6 @@ describe('DeepSeekHarnessService', () => {
 			name: 'Agent',
 			userName: 'user@example.com',
 			published: false,
-			status: 'created',
 		};
 		const repository = {
 			findByIdAndProjectId: vi.fn().mockResolvedValue(agent),
@@ -237,6 +291,7 @@ describe('DeepSeekHarnessService', () => {
 		};
 		const webService = {
 			startForAgent: vi.fn().mockImplementation(async () => await start),
+			getConfigurationStatusForAgent: vi.fn().mockResolvedValue({ configured: true }),
 			stopForAgent: vi.fn().mockResolvedValue(undefined),
 		};
 		const service = new DeepSeekHarnessService(
@@ -406,7 +461,6 @@ describe('DeepSeekHarnessService', () => {
 			name: 'DeepSeek Harness',
 			userName: 'user@example.com',
 			published: true,
-			runtimeStatus: 'running',
 		};
 		const repository = {
 			findByIdAndProjectId: vi.fn().mockResolvedValue(agent),

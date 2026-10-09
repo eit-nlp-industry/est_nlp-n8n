@@ -6,9 +6,44 @@ import { getHarnessEnv } from '../deepseek-harness-cli.service';
 import {
 	appendOutputTail,
 	DeepSeekHarnessWebService,
+	getHarnessConfigurationStatus,
 	getPublicHost,
 	getWebProcessInvocation,
 } from '../deepseek-harness-web.service';
+
+describe('getHarnessConfigurationStatus', () => {
+	it('reports a configured profile when the selected model and credential are present', () => {
+		expect(
+			getHarnessConfigurationStatus(
+				{
+					namespaces: [{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } }],
+				},
+				{ OPENAI_API_KEY: { configured: true } },
+			),
+		).toEqual({
+			configured: true,
+			provider: 'openai',
+			model: 'gpt-4.1',
+			credentialRef: 'OPENAI_API_KEY',
+		});
+	});
+
+	it('reports an unconfigured profile when the selected credential is missing', () => {
+		expect(
+			getHarnessConfigurationStatus(
+				{
+					namespaces: [{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } }],
+				},
+				{ OPENAI_API_KEY: { configured: false } },
+			),
+		).toEqual({
+			configured: false,
+			provider: 'openai',
+			model: 'gpt-4.1',
+			credentialRef: 'OPENAI_API_KEY',
+		});
+	});
+});
 
 function createChild() {
 	const child = new EventEmitter() as EventEmitter & Partial<ChildProcess>;
@@ -46,7 +81,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const homeService = {
 			getHome: vi.fn().mockReturnValue('D:/dsh/user/Agent-agent-1'),
@@ -65,6 +99,13 @@ describe('DeepSeekHarnessWebService', () => {
 		);
 
 		const first = service.startForAgent('agent-1', 'project-1');
+		expect(service.getRuntimeState('project-1', 'agent-1')).toEqual({
+			status: 'starting',
+			pid: null,
+			port: null,
+			url: null,
+			error: null,
+		});
 		await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 		child.stdout?.emit('data', Buffer.from('dsh web: http://127.0.0.1:43123/?token=secret\n'));
 		child.stdout?.emit('data', Buffer.from('dsh web: http://127.0.0.1:43123/?token=secret\n'));
@@ -76,6 +117,13 @@ describe('DeepSeekHarnessWebService', () => {
 			workspaceId: 'workspace-1',
 		});
 		expect(secondUrl).toEqual(firstUrl);
+		expect(service.getRuntimeState('project-1', 'agent-1')).toEqual({
+			status: 'running',
+			pid: 43123,
+			port: 43123,
+			url: 'http://127.0.0.1:43123/?token=secret',
+			error: null,
+		});
 		expect(spawn).toHaveBeenCalledTimes(1);
 		expect(fetchFn).toHaveBeenCalledTimes(2);
 		expect(spawn).toHaveBeenCalledWith(
@@ -95,25 +143,18 @@ describe('DeepSeekHarnessWebService', () => {
 				env: getHarnessEnv('D:/deepseek-harness', 'D:/dsh/user/Agent-agent-1'),
 			}),
 		);
-		expect(repository.updateRuntimeState).toHaveBeenCalledWith('agent-1', {
-			status: 'running',
-			pid: 43123,
-			port: 43123,
-			url: null,
-			error: null,
-		});
 		expect(child.stdout?.listenerCount('data')).toBe(0);
 		expect(child.stderr?.listenerCount('data')).toBe(0);
 
 		await service.shutdown();
-		expect(child.kill).toHaveBeenCalled();
-		expect(repository.updateRuntimeState).toHaveBeenLastCalledWith('agent-1', {
+		expect(service.getRuntimeState('project-1', 'agent-1')).toEqual({
 			status: 'stopped',
 			pid: null,
 			port: null,
 			url: null,
 			error: null,
 		});
+		expect(child.kill).toHaveBeenCalled();
 	});
 
 	it('uses a configured Node binary for the Web process', async () => {
@@ -139,7 +180,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const homeService = {
 			getHome: vi.fn().mockReturnValue('/data/dsh/user/Agent-agent-1'),
@@ -190,7 +230,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const service = new DeepSeekHarnessWebService(
 			repository as never,
@@ -242,7 +281,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const homeService = {
 			getHome: vi.fn().mockReturnValue('D:/dsh/user/Agent-agent-1'),
@@ -303,7 +341,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const homeService = {
 			getHome: vi.fn().mockReturnValue('D:/dsh/user/Agent-agent-1'),
@@ -360,7 +397,6 @@ describe('DeepSeekHarnessWebService', () => {
 					name: 'Agent',
 					userName: 'user@example.com',
 				}),
-				updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 			} as never,
 			{
 				getHome: vi.fn().mockReturnValue('D:/dsh/home'),
@@ -392,7 +428,6 @@ describe('DeepSeekHarnessWebService', () => {
 				name: 'Agent',
 				userName: 'user@example.com',
 			}),
-			updateRuntimeState: vi.fn().mockResolvedValue(undefined),
 		};
 		const service = new DeepSeekHarnessWebService(
 			repository as never,
@@ -427,13 +462,6 @@ describe('DeepSeekHarnessWebService', () => {
 		await service.stopForAgent('agent-1', 'project-1');
 
 		expect(child.kill).toHaveBeenCalled();
-		expect(repository.updateRuntimeState).toHaveBeenLastCalledWith('agent-1', {
-			status: 'stopped',
-			pid: null,
-			port: null,
-			url: null,
-			error: null,
-		});
 	});
 });
 

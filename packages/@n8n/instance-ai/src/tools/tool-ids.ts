@@ -20,6 +20,7 @@ export const DOMAIN_TOOL_IDS = {
 	MCP_SERVERS: 'mcp-servers',
 	CONVERSATION_HISTORY: 'conversation-history',
 	ACTIVITY: 'activity',
+	DEEPSEEK_HARNESS: 'deepseek-harness',
 } as const;
 
 /** Trace-only chain-typed child run emitted by `build-workflow` with the
@@ -40,6 +41,7 @@ export const ORCHESTRATION_TOOL_IDS = {
 	REPORT_VERIFICATION_VERDICT: 'report-verification-verdict',
 	APPLY_WORKFLOW_CREDENTIALS: 'apply-workflow-credentials',
 	BUILD_AGENT: 'build-agent',
+	BUILD_HARNESS: 'build-harness',
 	LIST_AGENT_CAPABILITIES: 'list-agent-capabilities',
 	GET_SESSION: 'get-session',
 } as const;
@@ -86,6 +88,8 @@ export const ALWAYS_LOADED_TOOL_NAMES = new Set<string>([
 	// this would price every expand at search_tools + load_tool. It is only registered when the
 	// reader is enabled, so an instance without the feature pays nothing for the entry.
 	DOMAIN_TOOL_IDS.ACTIVITY,
+	DOMAIN_TOOL_IDS.DEEPSEEK_HARNESS,
+	ORCHESTRATION_TOOL_IDS.BUILD_HARNESS,
 	'web-search',
 	'fetch-url',
 	// build-agent is the primary route for agent-anchored intents; deferring it

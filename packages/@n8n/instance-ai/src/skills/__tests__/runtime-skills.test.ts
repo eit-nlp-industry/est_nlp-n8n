@@ -280,6 +280,16 @@ describe('Instance AI runtime skills', () => {
 		expect(loaded?.instructions).toContain('Never say Runs tab');
 	});
 
+	it('loads the bundled Harness Builder skill', async () => {
+		const source = loadInstanceAiRuntimeSkillSource();
+		const loaded = await source.loadSkill('harness-builder');
+
+		expect(loaded?.instructions).toContain('build-harness');
+		expect(loaded?.instructions).toContain('deepseek-harness');
+		expect(loaded?.instructions).toContain('n8n-nodes-base.deepSeekHarness');
+		expect(loaded?.instructions).toContain('Never ask the user to paste an API key');
+	});
+
 	it('loads the bundled Computer Use credential setup skill', async () => {
 		const source = loadInstanceAiRuntimeSkillSource();
 		const skill = source.registry.skills.find(

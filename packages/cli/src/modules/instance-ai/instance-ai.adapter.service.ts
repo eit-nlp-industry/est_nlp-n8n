@@ -16,7 +16,7 @@ import {
 	INSTANCE_AI_PROGRESSIVE_BUILDING_FLAG,
 	INSTANCE_AI_PROGRESSIVE_BUILDING_ENABLED_VARIANT,
 } from '@n8n/api-types';
-import type { AiGatewayConfigDto } from '@n8n/api-types';
+import type { AiGatewayConfigDto, DeepSeekHarnessAgentDto } from '@n8n/api-types';
 import { LicenseState, Logger, ModuleRegistry } from '@n8n/backend-common';
 import { OutboundHttp } from '@n8n/backend-network';
 import { GlobalConfig } from '@n8n/config';
@@ -80,6 +80,9 @@ import type {
 	UpsertEvaluationConfigInput,
 	InstanceAiActivityService,
 	InstanceAiMcpService,
+	InstanceAiDeepSeekHarnessService,
+	InstanceAiHarnessBuilderDelegate,
+	DeepSeekHarnessProfileSummary,
 	InstanceAiExecuteNodeService,
 	ExecuteNodeResult as InstanceAiExecuteNodeResult,
 	McpRegistryConnectServerSummary,
@@ -155,6 +158,7 @@ import { AgentsCredentialProvider } from '@/modules/agents/adapters/agents-crede
 import { InstanceAiBuilderDelegateAdapterService } from '@/modules/agents/instance-ai-builder-delegate.adapter';
 import { DataTableRepository } from '@/modules/data-table/data-table.repository';
 import { DataTableService } from '@/modules/data-table/data-table.service';
+import { DeepSeekHarnessService } from '@/modules/deepseek-harness/deepseek-harness.service';
 import {
 	MCP_REGISTRY_PACKAGE_NAME,
 	getMcpRegistryCredentialOptions,
@@ -483,12 +487,17 @@ export class InstanceAiAdapterService {
 		// the network, and telemetry must never block context creation.
 		void this.trackGatewayAvailability();
 		const builderDelegateAdapter = this.getBuilderDelegateAdapter();
+		const deepSeekHarnessService = projectId ? this.getDeepSeekHarnessService() : null;
 		const credentialService = this.createCredentialAdapter(
 			user,
 			projectId,
 			getCredentialIdAllowlist,
 			shouldBypassCredentialTest,
 		);
+		const deepSeekHarnessAdapter =
+			deepSeekHarnessService && projectId
+				? this.createDeepSeekHarnessAdapter(deepSeekHarnessService, user, projectId)
+				: undefined;
 		return {
 			userId: user.id,
 			projectId,
@@ -502,6 +511,16 @@ export class InstanceAiAdapterService {
 			credentialService,
 			nodeService: this.createNodeAdapter(user),
 			dataTableService: this.createDataTableAdapter(user, projectId),
+			...(deepSeekHarnessAdapter ? { deepSeekHarnessService: deepSeekHarnessAdapter } : {}),
+			...(deepSeekHarnessAdapter && projectId
+				? {
+						harnessBuilderDelegate: this.createHarnessBuilderDelegate(
+							deepSeekHarnessAdapter,
+							credentialService,
+							projectId,
+						),
+					}
+				: {}),
 			...(configEvalsEnabled && this.evaluationConfigService
 				? {
 						evaluationConfigService: this.createEvaluationConfigAdapter(
@@ -574,6 +593,135 @@ export class InstanceAiAdapterService {
 			});
 			return null;
 		}
+	}
+
+	private getDeepSeekHarnessService(): DeepSeekHarnessService | null {
+		if (!Container.get(ModuleRegistry).isActive('deepseek-harness')) return null;
+		try {
+			return Container.get(DeepSeekHarnessService);
+		} catch (error) {
+			this.logger.warn('Failed to resolve DeepSeek Harness service; profile tools disabled', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return null;
+		}
+	}
+
+	private createDeepSeekHarnessAdapter(
+		service: DeepSeekHarnessService,
+		user: User,
+		projectId: string,
+	): InstanceAiDeepSeekHarnessService {
+		const { assertProjectScope } = this.createProjectScopeHelpers(user, projectId);
+		const toSummary = (profile: DeepSeekHarnessAgentDto): DeepSeekHarnessProfileSummary => ({
+			agentId: profile.id,
+			name: profile.name,
+			published: profile.published,
+			createdAt: profile.createdAt.toISOString(),
+			updatedAt: profile.updatedAt.toISOString(),
+		});
+
+		return {
+			list: async () => {
+				await assertProjectScope(['agent:list'], projectId);
+				return (await service.listForProject(projectId)).map(toSummary);
+			},
+			createProfile: async (name) => {
+				this.assertInstanceNotReadOnly('DeepSeek Harness profiles');
+				await assertProjectScope(['agent:create'], projectId);
+				return toSummary(await service.createProfileForProject(user.email, projectId, name));
+			},
+			get: async (agentId) => {
+				await assertProjectScope(['agent:read'], projectId);
+				const profile = await service.getForProject(agentId, projectId);
+				return profile ? toSummary(profile) : null;
+			},
+			publish: async (agentId) => {
+				this.assertInstanceNotReadOnly('DeepSeek Harness profiles');
+				await assertProjectScope(['agent:update'], projectId);
+				const profile = await service.publishForProject(agentId, projectId);
+				return profile ? toSummary(profile) : null;
+			},
+			getModelCatalog: async (agentId) => {
+				await assertProjectScope(['agent:read'], projectId);
+				return await service.getModelCatalogForProject(agentId, projectId);
+			},
+			configureModel: async (agentId, selection, credentialId) => {
+				this.assertInstanceNotReadOnly('DeepSeek Harness profiles');
+				await assertProjectScope(['agent:update'], projectId);
+
+				const catalog = await service.getModelCatalogForProject(agentId, projectId);
+				const modelAvailable = catalog?.groups.some(
+					(group) =>
+						group.id === selection.provider &&
+						group.models.some((model) => model.id === selection.model),
+				);
+				if (!modelAvailable) {
+					throw new UserError(
+						`The Harness runtime does not support model "${selection.model}" for provider "${selection.provider}".`,
+					);
+				}
+
+				const credential = await new AgentsCredentialProvider(
+					this.credentialsService,
+					projectId,
+					user,
+				).resolve(credentialId);
+				if (typeof credential.apiKey !== 'string' || !credential.apiKey.trim()) {
+					throw new UserError('The selected credential does not contain an API key.');
+				}
+
+				const profile = await service.configureModelForProject(agentId, projectId, {
+					...selection,
+					apiKey: credential.apiKey,
+				});
+				return profile ? toSummary(profile) : null;
+			},
+			test: async (agentId, message, sessionId, reuseSession = false) => {
+				await assertProjectScope(['agent:read'], projectId);
+				const requestedSessionId = sessionId ?? `harness-test-${nanoid()}`;
+				try {
+					const result = await service.executeForWorkflow(
+						agentId,
+						projectId,
+						message,
+						requestedSessionId,
+						true,
+						undefined,
+						undefined,
+						reuseSession,
+					);
+					return {
+						success: true,
+						sessionId: result.session?.sessionId ?? requestedSessionId,
+					};
+				} catch (error) {
+					return {
+						success: false,
+						sessionId: requestedSessionId,
+						message: error instanceof Error ? error.message : String(error),
+					};
+				}
+			},
+		};
+	}
+
+	private createHarnessBuilderDelegate(
+		service: InstanceAiDeepSeekHarnessService,
+		credentialService: InstanceAiCredentialService,
+		projectId: string,
+	): InstanceAiHarnessBuilderDelegate {
+		return {
+			createProfile: async (name) => await service.createProfile(name),
+			getProfile: async (profileId) => await service.get(profileId),
+			getModelCatalog: async (profileId) => await service.getModelCatalog(profileId),
+			listCredentials: async () => await credentialService.list({ projectId }),
+			configureModel: async (profileId, selection, credentialId) =>
+				await service.configureModel(profileId, selection, credentialId),
+				test: async (profileId, message, sessionId, reuseSession) =>
+					await service.test(profileId, message, sessionId, reuseSession),
+			publish: async (profileId) => await service.publish(profileId),
+		};
 	}
 
 	/**
