@@ -2,6 +2,7 @@
 import {
 	N8nActionDropdown,
 	N8nButton,
+	N8nIcon,
 	N8nIconButton,
 	N8nTooltip,
 	type ActionDropdownItem,
@@ -58,16 +59,23 @@ function onSelect(action: 'publish' | 'unpublish') {
 			<template #content>
 				{{ i18n.baseText('deepseekHarness.studio.restart.tooltip') }}
 			</template>
-			<N8nIconButton
+			<N8nButton
 				:class="$style.restartButton"
-				variant="ghost"
-				icon="refresh-cw"
-				:loading="props.restarting"
+				variant="outline"
 				:disabled="props.restarting"
 				:aria-label="i18n.baseText('deepseekHarness.studio.restart')"
 				data-test-id="deepseek-harness-restart-button"
 				@click="restart"
-			/>
+			>
+				<template #icon>
+					<N8nIcon icon="refresh-cw" :spin="props.restarting" />
+				</template>
+				{{
+					props.restarting
+						? i18n.baseText('deepseekHarness.studio.restarting')
+						: i18n.baseText('deepseekHarness.studio.restart')
+				}}
+			</N8nButton>
 		</N8nTooltip>
 		<div :class="$style.publishButtonWrapper">
 			<div :class="$style.buttonGroup">

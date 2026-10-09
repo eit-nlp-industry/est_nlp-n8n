@@ -152,7 +152,7 @@ export function resolveNpmInstallFlags(workspace: SandboxWorkspace): string {
  * deadline a timed-out first attempt would hand a second, equally long attempt to the
  * retry below.
  */
-const INSTALL_STEP_BUDGET_MS = 120_000;
+const INSTALL_STEP_BUDGET_MS = 300_000;
 
 /**
  * Versions pinned from the host's installed packages. Pinning is load-bearing
