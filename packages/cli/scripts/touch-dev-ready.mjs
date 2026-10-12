@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
 
-const markerPath = resolve('dist/.dev-ready');
+const markerPath = new URL('../dist/.dev-ready', import.meta.url);
 
-await mkdir(dirname(markerPath), { recursive: true });
+await mkdir(new URL('../dist/', import.meta.url), { recursive: true });
 await writeFile(markerPath, `${Date.now()}\n`);
