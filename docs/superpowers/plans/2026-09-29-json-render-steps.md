@@ -332,7 +332,7 @@ git commit -m "feat: add steps to render interaction"
 - Produces: `steps: null | RenderInteractionStepsConfig` in canonical editor JSON.
 - Preserves: structured `$fromAI` values with key, description, type, and optional default.
 
-- [ ] **Step 1: Write failing JSON export and compatibility tests**
+- [x] **Step 1: Write failing JSON export and compatibility tests**
 
 Add tests named:
 
@@ -342,11 +342,11 @@ Add tests named:
 
 Assert that the existing top-level parameters remain unchanged.
 
-- [ ] **Step 2: Write failing strict validation and round-trip tests**
+- [x] **Step 2: Write failing strict validation and round-trip tests**
 
 Cover two valid items, one invalid item, duplicate or empty titles if prohibited by the protocol schema, active `-1`, active above item count, active equal to item count, and `$fromAI` values for active, title, and description. Assert invalid JSON does not produce node parameters.
 
-- [ ] **Step 3: Run the API test and verify failure**
+- [x] **Step 3: Run the API test and verify failure**
 
 From `packages/@n8n/api-types`, run:
 
@@ -354,15 +354,15 @@ From `packages/@n8n/api-types`, run:
 
 Expected: FAIL because the canonical schema does not contain `steps`.
 
-- [ ] **Step 4: Extend canonical, draft, legacy, and node conversion paths**
+- [x] **Step 4: Extend canonical, draft, legacy, and node conversion paths**
 
 Add a nullable Steps schema. Always emit the top-level `steps` key. Convert model expressions through the existing `$fromAI` helpers. Keep best-effort export permissive and strict Copy or Apply validation aligned with the protocol builder constraints.
 
-- [ ] **Step 5: Update the editor template**
+- [x] **Step 5: Update the editor template**
 
 Add `steps: null` to the inserted minimal template. Do not add a second JSON editor or a Steps-specific modal.
 
-- [ ] **Step 6: Run API and frontend checks**
+- [x] **Step 6: Run API and frontend checks**
 
 Run:
 
@@ -403,17 +403,17 @@ git commit -m "feat: configure interaction steps as json"
 - Consumes: the final git-consumable eit-json-render packages and both updated n8n nodes.
 - Produces: verified display, active interaction, submitted history, and cancelled history behavior in all Vue hosts.
 
-- [ ] **Step 1: Add host regression fixtures**
+- [x] **Step 1: Add host regression fixtures**
 
 Use a shared Steps payload fixture where practical. Assert that display rendering does not call a resume callback. Assert that active interaction rendering includes Steps. Assert that submitted and cancelled read-only cards keep Steps visible and do not emit a second response.
 
-- [ ] **Step 2: Run affected n8n frontend tests**
+- [x] **Step 2: Run affected n8n frontend tests**
 
 Run the exact Vitest files from their owning package directories. Include both `@n8n/chat` interaction tests, Agent Chat interaction rendering, and json-render display utility tests.
 
 Expected: all affected tests pass.
 
-- [ ] **Step 3: Run the complete eit-json-render verification**
+- [x] **Step 3: Run the complete eit-json-render verification**
 
 From `D:/work/project/eit-json-render`, run:
 
@@ -425,7 +425,7 @@ pnpm verify:git-consumer
 
 Expected: all commands pass and the git consumer can import the new public APIs.
 
-- [ ] **Step 4: Run the complete affected n8n verification**
+- [x] **Step 4: Run the complete affected n8n verification**
 
 Run package tests, lint, and typecheck for `@n8n/nodes-langchain`, `@n8n/api-types`, `@n8n/chat`, and editor-ui. Then run the repository build with redirected output:
 
@@ -445,7 +445,7 @@ Verify:
 4. Cancel preserves Steps in a read-only card and returns the same cancellation envelope.
 5. Agent Chat, workflow chat, and Instance AI use the same Element Plus rendering.
 
-- [ ] **Step 6: Confirm deferred React behavior**
+- [x] **Step 6: Confirm deferred React behavior**
 
 Run existing React and Ant Design regression tests without adding Steps components. Confirm existing payloads remain unchanged and document the unknown-component fallback for Steps.
 

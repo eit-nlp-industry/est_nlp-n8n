@@ -12,7 +12,14 @@ const dashboardPayload = {
 	spec: {
 		root: 'root',
 		elements: {
-			root: { type: 'Card', props: { title: 'Weather snapshot' }, children: ['metric'] },
+			root: {
+				type: 'Card',
+				props: { title: 'Weather snapshot' },
+				children: ['steps', 'metric'],
+			},
+			steps: { type: 'Steps', props: { active: 1 }, children: ['step-0', 'step-1'] },
+			'step-0': { type: 'Step', props: { title: 'Collect' } },
+			'step-1': { type: 'Step', props: { title: 'Render' } },
 			metric: { type: 'Metric', props: { label: 'Shanghai', value: '22°C' } },
 		},
 	},
@@ -99,6 +106,20 @@ describe('collectJsonRenderCards', () => {
 				args: { title: 'Weather snapshot' },
 			},
 		]);
+	});
+
+	it('keeps Steps in a display card without creating interaction state', () => {
+		const toolCall = {
+			tool: 'Render_Dashboard',
+			toolCallId: 'tc-steps',
+			state: TOOL_CALL_STATE.DONE,
+			output: { status: 'success', data: [{ json: nodeWrapper }] },
+		} satisfies ToolCall;
+
+		const [card] = collectJsonRenderCards([toolCall]);
+		const extracted = extractJsonRenderPayload(card?.result);
+		expect(extracted?.spec.elements.steps).toMatchObject({ type: 'Steps' });
+		expect(card).not.toHaveProperty('resumeData');
 	});
 
 	it('shows a loading card for a named dashboard tool that is still running', () => {

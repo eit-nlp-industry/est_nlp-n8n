@@ -1,4 +1,8 @@
-import { appendDynamicFormToSpec, type JsonRenderPayload } from '@eit/json-render-protocol';
+import {
+	appendDynamicFormToSpec,
+	appendStepsToSpec,
+	type JsonRenderPayload,
+} from '@eit/json-render-protocol';
 import { mount } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 
@@ -27,14 +31,21 @@ vi.mock('@eit/json-render-vue', () => ({
 			});
 			return () => {
 				const elements = Object.values(readPayload().spec.elements);
+				const stepTitles = elements
+					.filter((element) => element.type === 'Step')
+					.map((element) => element.props?.title)
+					.filter((title): title is string => typeof title === 'string');
 				const fields = elements.find((element) => element.type === 'DynamicForm')?.props?.fields;
 				const field = Array.isArray(fields) ? (fields[0] as unknown) : undefined;
-				const actions = elements.filter((element) => element.type === 'Button' && element.visible !== false);
+				const actions = elements.filter(
+					(element) => element.type === 'Button' && element.visible !== false,
+				);
 				const fieldKey =
 					field && typeof field === 'object' && 'key' in field && typeof field.key === 'string'
 						? field.key
 						: undefined;
 				return h('div', [
+					...stepTitles.map((title) => h('span', { class: 'step-title' }, title)),
 					fieldKey && field
 						? h('input', {
 								value: form.value[fieldKey],
@@ -71,7 +82,10 @@ import JsonRenderInteraction from '../components/JsonRenderInteraction.vue';
 const payload: JsonRenderPayload = {
 	format: 'json-render-v1',
 	spec: appendDynamicFormToSpec(
-		{ root: 'root', elements: { root: { type: 'Card', children: [] } } },
+		appendStepsToSpec(
+			{ root: 'root', elements: { root: { type: 'Card', children: [] } } },
+			{ active: 1, items: [{ title: 'Prepare' }, { title: 'Approve' }] },
+		),
 		[{ type: 'input', key: 'name', label: 'Name', value: 'Ada' }],
 	),
 };
@@ -91,21 +105,31 @@ describe('JsonRenderInteraction', () => {
 		expect(wrapper.emitted('submit')).toEqual([[{ name: 'Grace' }]]);
 	});
 
-	it('renders resolved values as a non-interactive card', () => {
-		const wrapper = mount(JsonRenderInteraction, {
-			props: {
-				payload,
-				instanceId: 'interaction-2',
-				values: { name: 'Lin' },
-				readOnly: true,
-				status: 'submitted',
-			},
-		});
+	it.each([
+		{ status: 'submitted' as const, values: { name: 'Lin' } },
+		{ status: 'cancelled' as const, values: undefined },
+	])(
+		'keeps Steps visible in a resolved $status card without another response',
+		({ status, values }) => {
+			const wrapper = mount(JsonRenderInteraction, {
+				props: {
+					payload,
+					instanceId: 'interaction-2',
+					values,
+					readOnly: true,
+					status,
+				},
+			});
 
-		expect(wrapper.attributes('data-status')).toBe('submitted');
-		expect(wrapper.find('input').attributes('disabled')).toBeDefined();
-		expect(wrapper.findAll('button')).toHaveLength(0);
-	});
+			expect(wrapper.attributes('data-status')).toBe(status);
+			expect(wrapper.text()).toContain('Prepare');
+			expect(wrapper.text()).toContain('Approve');
+			expect(wrapper.find('input').attributes('disabled')).toBeDefined();
+			expect(wrapper.findAll('button')).toHaveLength(0);
+			expect(wrapper.emitted('submit')).toBeUndefined();
+			expect(wrapper.emitted('cancel')).toBeUndefined();
+		},
+	);
 
 	it('renders invalid payloads safely', () => {
 		const wrapper = mount(JsonRenderInteraction, {

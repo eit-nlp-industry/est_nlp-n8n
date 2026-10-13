@@ -1,0 +1,15 @@
+@use 'element-plus/theme-chalk/src/steps';
+@use 'element-plus/theme-chalk/src/step';
+
+.json-render-panel .el-steps {
+	/* Element Plus requires these public theme variable names. */
+	/* stylelint-disable @n8n/css-var-naming */
+	--el-color-primary: var(--background--brand, #409eff);
+	--el-color-success: var(--icon-color--success, #67c23a);
+	--el-color-danger: var(--icon-color--danger, #f56c6c);
+	--el-text-color-primary: var(--text-color, #303133);
+	--el-text-color-placeholder: var(--text-color--disabled, #a8abb2);
+	--el-bg-color: var(--background--surface, #fff);
+	--el-fill-color-light: var(--background--subtle, #f5f7fa);
+	/* stylelint-enable @n8n/css-var-naming */
+}

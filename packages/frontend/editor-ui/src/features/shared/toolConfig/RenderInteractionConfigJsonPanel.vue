@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
 	buildRenderInteractionEditorText,
-	formatRenderInteractionConfig,
+	buildRenderInteractionTemplateText,
 	nodeParametersToRenderInteractionConfig,
 	parseRenderInteractionConfigText,
 	renderInteractionConfigToNodeParameters,
@@ -85,24 +85,8 @@ function applyJson() {
 	closeDialog();
 }
 
-function insertMinimalTemplate() {
-	editorText.value = formatRenderInteractionConfig({
-		title: 'Interaction title',
-		description: '',
-		metrics: [],
-		tableColumns: [],
-		tableRows: [],
-		fields: [
-			{
-				key: 'action',
-				label: 'Action',
-				type: 'select',
-				options: [{ value: 'confirm', label: 'Confirm' }],
-				optionsJson: [],
-				defaultValue: '',
-			},
-		],
-	});
+function insertTemplate() {
+	editorText.value = buildRenderInteractionTemplateText();
 	validationError.value = '';
 }
 </script>
@@ -158,7 +142,7 @@ function insertMinimalTemplate() {
 				</N8nText>
 
 				<N8nDialogFooter>
-					<N8nButton variant="subtle" @click="insertMinimalTemplate">
+					<N8nButton variant="subtle" @click="insertTemplate">
 						{{ i18n.baseText('renderInteraction.configJson.insertTemplate') }}
 					</N8nButton>
 					<N8nButton

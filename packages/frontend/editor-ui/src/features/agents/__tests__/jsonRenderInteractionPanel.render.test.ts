@@ -16,7 +16,25 @@ const suspend = {
 				root: {
 					type: 'Card',
 					props: { title: '请选择要前往的实验室', variant: 'outlined' },
-					children: ['form', 'form-actions'],
+					children: ['body', 'form', 'form-actions'],
+				},
+				body: {
+					type: 'Stack',
+					props: { direction: 'vertical', gap: 'md', align: 'stretch' },
+					children: ['steps'],
+				},
+				steps: {
+					type: 'Steps',
+					props: { active: 1 },
+					children: ['step-0', 'step-1'],
+				},
+				'step-0': {
+					type: 'Step',
+					props: { title: '搜索地点', description: '获取候选地点' },
+				},
+				'step-1': {
+					type: 'Step',
+					props: { title: '确认目的地' },
 				},
 				form: {
 					type: 'DynamicForm',
@@ -86,6 +104,34 @@ describe('real json-render interaction panel', () => {
 		const html = wrapper.html();
 		expect(html).toContain('下一步');
 		expect(html).toContain('去哪个地点');
+		expect(html).toContain('搜索地点');
+		expect(html).toContain('确认目的地');
 		expect(html).toContain('Submit');
 	});
+
+	it.each(['submitted', 'cancelled'] as const)(
+		'keeps Steps visible in a read-only %s card without emitting another response',
+		async (status) => {
+			const wrapper = mount(JsonRenderInteractionPanel, {
+				props: {
+					payload: suspend.jsonRender as JsonRenderPayload,
+					instanceId: `call-${status}`,
+					disabled: true,
+					status,
+				},
+				global: {
+					stubs: {
+						N8nText: { template: '<div class="intro"><slot /></div>' },
+					},
+				},
+			});
+			await wrapper.vm.$nextTick();
+
+			expect(wrapper.text()).toContain('搜索地点');
+			expect(wrapper.text()).toContain('确认目的地');
+			expect(wrapper.findAll('button')).toHaveLength(0);
+			expect(wrapper.emitted('submit')).toBeUndefined();
+			expect(wrapper.emitted('cancel')).toBeUndefined();
+		},
+	);
 });

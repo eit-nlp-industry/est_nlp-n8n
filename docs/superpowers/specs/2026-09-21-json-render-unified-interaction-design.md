@@ -223,6 +223,10 @@ Keep the existing output wrapper, `phase: 'decision'`, suspension behavior, form
 
 Extend the Render Interaction JSON configuration with a top-level `steps` property. Use `null` when the node has no Steps configuration. A configured value uses the protocol input structure. Best-effort export includes incomplete step items. Strict Copy and Apply validation requires at least two valid items and a valid active range. Model-defined values use the existing structured `$fromAI` representation and preserve the model key, description, type, and optional default.
 
+The canonical editor JSON writes every Steps property. It uses `status: null` when an item uses the automatic status. Old JSON without `steps` normalizes to `steps: null`.
+
+The Insert template action writes one valid and complete example. The example includes Steps, metrics, table data, and every supported form field type. It shows every property that applies to those parameter groups and can be applied to the node without further edits.
+
 ### Top-level Agent Chat
 
 - Replace the host-rendered form in `JsonRenderInteractionPanel.vue` with the shared stateful renderer.

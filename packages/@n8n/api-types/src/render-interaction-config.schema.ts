@@ -19,6 +19,43 @@ const fromAIValueSchema = z.object({
 const textValueSchema = z.union([z.string(), fromAIValueSchema]);
 const requiredTextValueSchema = z.union([z.string().min(1), fromAIValueSchema]);
 const numberValueSchema = z.union([z.number(), z.literal(''), fromAIValueSchema]);
+const booleanValueSchema = z.union([z.boolean(), fromAIValueSchema]);
+const stepStatusSchema = z.enum(['wait', 'process', 'finish', 'error', 'success']);
+const stepStatusValueSchema = z.union([stepStatusSchema, fromAIValueSchema]);
+const stepTitleValueSchema = z.union([
+	z
+		.string()
+		.min(1)
+		.refine((value) => value.trim().length > 0, {
+			message: 'String must contain at least one non-whitespace character',
+		}),
+	fromAIValueSchema,
+]);
+
+const renderInteractionStepSchema = z.object({
+	title: stepTitleValueSchema,
+	description: textValueSchema,
+	status: stepStatusValueSchema.nullable(),
+});
+const renderInteractionStepsSchema = z
+	.object({
+		active: z.union([z.number().int().min(0), fromAIValueSchema]),
+		direction: z.union([z.enum(['horizontal', 'vertical']), fromAIValueSchema]),
+		alignCenter: booleanValueSchema,
+		simple: booleanValueSchema,
+		processStatus: stepStatusValueSchema,
+		finishStatus: stepStatusValueSchema,
+		items: z.array(renderInteractionStepSchema).min(2),
+	})
+	.superRefine((steps, ctx) => {
+		if (typeof steps.active === 'number' && steps.active > steps.items.length) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'Active step must not exceed the number of items',
+				path: ['active'],
+			});
+		}
+	});
 
 const renderInteractionOptionSchema = z.object({
 	value: requiredTextValueSchema,
@@ -75,6 +112,7 @@ export const renderInteractionConfigSchema = z
 	.object({
 		title: requiredTextValueSchema,
 		description: textValueSchema,
+		steps: renderInteractionStepsSchema.nullable(),
 		metrics: z.array(renderInteractionMetricSchema),
 		tableColumns: z.array(requiredTextValueSchema),
 		tableRows: tableRowsValueSchema,
@@ -171,6 +209,31 @@ function optionsJsonValue(raw: unknown): unknown {
 	return fromAIValue(raw) ?? optionList(raw);
 }
 
+function stepsDraftFromNodeParameters(parameters: INodeParameters): Record<string, unknown> | null {
+	const steps = readNestedRecord(parameters, 'steps');
+	if (!steps || Object.keys(steps).length === 0) return null;
+	const itemsCollection = isRecord(steps.items) ? steps.items : undefined;
+	const items = Array.isArray(itemsCollection?.items) ? itemsCollection.items : [];
+
+	return {
+		active: fromAIValue(steps.active) ?? steps.active ?? 0,
+		direction: fromAIValue(steps.direction) ?? steps.direction ?? 'horizontal',
+		alignCenter: fromAIValue(steps.alignCenter) ?? steps.alignCenter ?? false,
+		simple: fromAIValue(steps.simpleStyle) ?? steps.simpleStyle ?? false,
+		processStatus: fromAIValue(steps.processStatus) ?? steps.processStatus ?? 'process',
+		finishStatus: fromAIValue(steps.finishStatus) ?? steps.finishStatus ?? 'finish',
+		items: items.map((item) => {
+			const value = isRecord(item) ? item : {};
+			const status = value.status === '' ? null : (value.status ?? null);
+			return {
+				title: textValue(value.title),
+				description: textValue(value.description),
+				status: fromAIValue(value.status) ?? status,
+			};
+		}),
+	};
+}
+
 function fieldDraftFromNodeParameters(
 	field: Record<string, unknown>,
 ): Record<string, unknown> | null {
@@ -232,6 +295,7 @@ function buildRenderInteractionDraft(parameters: INodeParameters): Record<string
 	return {
 		title: textValue(parameters.title),
 		description: textValue(parameters.description),
+		steps: stepsDraftFromNodeParameters(parameters),
 		metrics,
 		tableColumns,
 		tableRows,
@@ -335,6 +399,25 @@ function fieldToNodeParameters(field: RenderInteractionConfigField): INodeParame
 	}
 }
 
+function stepsToNodeParameters(steps: RenderInteractionConfig['steps']): INodeParameters['steps'] {
+	if (!steps) return {};
+	return {
+		active: nodeValue(steps.active),
+		direction: nodeValue(steps.direction),
+		alignCenter: nodeValue(steps.alignCenter),
+		simpleStyle: nodeValue(steps.simple),
+		processStatus: nodeValue(steps.processStatus),
+		finishStatus: nodeValue(steps.finishStatus),
+		items: {
+			items: steps.items.map((item) => ({
+				title: nodeValue(item.title),
+				description: nodeValue(item.description),
+				status: item.status === null ? '' : nodeValue(item.status),
+			})),
+		},
+	};
+}
+
 export function renderInteractionConfigToNodeParameters(
 	config: RenderInteractionConfig,
 	existing: INodeParameters = {},
@@ -343,6 +426,7 @@ export function renderInteractionConfigToNodeParameters(
 		...existing,
 		title: nodeValue(config.title),
 		description: nodeValue(config.description),
+		steps: stepsToNodeParameters(config.steps),
 		metrics: {
 			metrics: config.metrics.map((metric) => ({
 				label: nodeValue(metric.label),
@@ -361,6 +445,60 @@ export function renderInteractionConfigToNodeParameters(
 
 export function formatRenderInteractionConfig(config: RenderInteractionConfig): string {
 	return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+export function buildRenderInteractionTemplateText(): string {
+	return formatRenderInteractionConfig({
+		title: 'Interaction title',
+		description: 'Review the information and select the next action.',
+		steps: {
+			active: 1,
+			direction: 'horizontal',
+			alignCenter: false,
+			simple: false,
+			processStatus: 'process',
+			finishStatus: 'finish',
+			items: [
+				{ title: 'Prepare', description: 'Prepare the request', status: 'finish' },
+				{ title: 'Confirm', description: 'Confirm the next action', status: null },
+			],
+		},
+		metrics: [{ label: 'Candidates', value: '10', trend: 'up', trendLabel: '+2' }],
+		tableColumns: ['Name', 'Status'],
+		tableRows: [['Candidate A', 'Ready']],
+		fields: [
+			{
+				key: 'action',
+				label: 'Action',
+				type: 'select',
+				options: [{ value: 'confirm', label: 'Confirm' }],
+				optionsJson: [],
+				defaultValue: 'confirm',
+			},
+			{
+				key: 'labels',
+				label: 'Labels',
+				type: 'multipleSelect',
+				options: [{ value: 'priority', label: 'Priority' }],
+				optionsJson: [],
+				defaultValues: ['priority'],
+			},
+			{
+				key: 'quantity',
+				label: 'Quantity',
+				type: 'inputNumber',
+				defaultValue: 1,
+				placeholder: 'Enter a quantity',
+			},
+			{
+				key: 'note',
+				label: 'Note',
+				type: 'input',
+				defaultValue: '',
+				placeholder: 'Enter a note',
+			},
+		],
+	});
 }
 
 export function formatZodIssues(error: z.ZodError): string {
@@ -407,10 +545,34 @@ function normalizeLegacyConfig(value: unknown): unknown {
 	return {
 		...value,
 		description: value.description ?? '',
+		steps: normalizeStepsConfig(value.steps),
 		metrics: value.metrics ?? [],
 		tableColumns: value.tableColumns ?? legacyTable?.columns ?? [],
 		tableRows: value.tableRows ?? legacyTable?.rows ?? [],
 		fields,
+	};
+}
+
+function normalizeStepsConfig(value: unknown): unknown {
+	if (value === undefined || value === null) return null;
+	if (!isRecord(value)) return value;
+	const rawItems: unknown[] = Array.isArray(value.items) ? value.items : [];
+	return {
+		...value,
+		active: value.active ?? 0,
+		direction: value.direction ?? 'horizontal',
+		alignCenter: value.alignCenter ?? false,
+		simple: value.simple ?? value.simpleStyle ?? false,
+		processStatus: value.processStatus ?? 'process',
+		finishStatus: value.finishStatus ?? 'finish',
+		items: rawItems.map((item) => {
+			if (!isRecord(item)) return item;
+			return {
+				...item,
+				description: item.description ?? '',
+				status: item.status === '' ? null : (item.status ?? null),
+			};
+		}),
 	};
 }
 

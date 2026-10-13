@@ -1,4 +1,8 @@
-import type { JsonRenderPayload } from '@eit/json-render-protocol';
+import {
+	appendDynamicFormToSpec,
+	appendStepsToSpec,
+	type JsonRenderPayload,
+} from '@eit/json-render-protocol';
 import { flushPromises, shallowMount } from '@vue/test-utils';
 import { ref } from 'vue';
 
@@ -12,10 +16,39 @@ vi.mock('../composables/useI18n', () => ({
 
 const payload: JsonRenderPayload = {
 	format: 'json-render-v1',
-	spec: { root: 'root', elements: { root: { type: 'Card', children: [] } } },
+	spec: appendDynamicFormToSpec(
+		appendStepsToSpec(
+			{ root: 'root', elements: { root: { type: 'Card', children: [] } } },
+			{ active: 1, items: [{ title: 'Prepare' }, { title: 'Approve' }] },
+		),
+		[{ type: 'input', key: 'name', label: 'Name', value: 'Ada' }],
+	),
 };
 
 describe('MessageJsonRenderInteraction', () => {
+	it.each([
+		{ approved: true, status: 'submitted', value: { name: 'Lin' } },
+		{ approved: false, status: 'cancelled', value: undefined },
+	])('keeps the Steps payload in resolved $status history', ({ approved, status, value }) => {
+		const wrapper = shallowMount(MessageJsonRenderInteraction, {
+			props: { payload, resolved: { approved, value } },
+			global: {
+				provide: {
+					[ChatSymbol as symbol]: {
+						messages: ref([]),
+						currentSessionId: ref('session'),
+						waitingForResponse: ref(false),
+						blockUserInput: ref(false),
+					},
+				},
+			},
+		});
+		const interaction = wrapper.findComponent(JsonRenderInteraction);
+
+		expect(interaction.props('payload').spec.elements.steps).toMatchObject({ type: 'Steps' });
+		expect(interaction.props()).toMatchObject({ readOnly: true, status, values: value });
+	});
+
 	it('offers an explicit retry after an HTTP failure without duplicating the decision bubble', async () => {
 		const sendMessage = vi
 			.fn()
