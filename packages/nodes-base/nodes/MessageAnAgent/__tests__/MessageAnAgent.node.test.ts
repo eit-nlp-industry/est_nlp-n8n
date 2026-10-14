@@ -799,6 +799,8 @@ describe('MessageAnAgent Node', () => {
 			mockParams();
 			executeFunctions.getChatTrigger.mockReturnValue(chatTriggerNode);
 			executeFunctions.getExecutionContext.mockReturnValue({
+				version: 1,
+				establishedAt: 1,
 				source: 'chat',
 				triggerNode: chatTriggerNode,
 			});
@@ -822,6 +824,8 @@ describe('MessageAnAgent Node', () => {
 			mockParams();
 			executeFunctions.getChatTrigger.mockReturnValue(chatTriggerNode);
 			executeFunctions.getExecutionContext.mockReturnValue({
+				version: 1,
+				establishedAt: 1,
 				source: 'manual',
 				triggerNode: chatTriggerNode,
 			});
@@ -838,6 +842,56 @@ describe('MessageAnAgent Node', () => {
 				'exec-123',
 				0,
 			);
+		});
+
+		it('returns a json-render suspension as a json-render agent interaction', async () => {
+			executeFunctions.getInputData.mockReturnValue([{ json: { sessionId: 'manual-session' } }]);
+			mockParams();
+			executeFunctions.getChatTrigger.mockReturnValue(chatTriggerNode);
+			executeFunctions.getExecutionContext.mockReturnValue({
+				version: 1,
+				establishedAt: 1,
+				source: 'manual',
+				triggerNode: chatTriggerNode,
+			});
+			executeFunctions.evaluateExpression.mockImplementation((expression: string) =>
+				expression === '{{ $json.sessionId }}' ? 'manual-session' : undefined,
+			);
+			const payload = {
+				type: 'json-render-interaction',
+				jsonRender: {
+					format: 'json-render-v1',
+					spec: { root: 'form', elements: { form: { type: 'form' } } },
+				},
+			};
+			executeFunctions.executeAgent.mockResolvedValue({
+				...mockAgentResult,
+				suspension: {
+					agentId: 'agent-1',
+					threadId: 'thread-1',
+					suspensions: [
+						{
+							runId: 'run-1',
+							toolCallId: 'tool-call-1',
+							toolName: 'render_refund_form',
+							suspendPayload: payload,
+						},
+					],
+				},
+			});
+
+			const result = await node.execute.call(executeFunctions);
+
+			expect(result[0][0].sendMessage).toEqual({
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					interactionType: 'json_render',
+					payload,
+					blockUserInput: true,
+				},
+			});
 		});
 
 		it('falls back to a per-execution session when nothing resolves', async () => {

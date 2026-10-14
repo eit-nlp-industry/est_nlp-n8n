@@ -174,6 +174,37 @@ describe('deepseek-harness-studio-proxy', () => {
 			await Promise.all([close(proxyServer), close(backend)]);
 		}
 	});
+
+	it('closes a WebSocket connection when the backend is unavailable', async () => {
+		const unavailableBackend = createServer();
+		const unavailableBackendPort = await listen(unavailableBackend);
+		await close(unavailableBackend);
+
+		const webService = {
+			getRunningOrigin: () => `http://127.0.0.1:${unavailableBackendPort}`,
+		};
+		const app = express();
+		const proxy = createStudioProxyMiddleware(webService as never);
+		app.use('/deepseek-harness-studio/:projectId/:agentId', proxy);
+		const proxyServer = createServer(app);
+		attachStudioProxyUpgrade(proxyServer, webService as never, proxy);
+		const proxyPort = await listen(proxyServer);
+		const webSocket = new WebSocket(
+			`ws://127.0.0.1:${proxyPort}/deepseek-harness-studio/project-1/agent-1/api/remote.mux`,
+		);
+
+		try {
+			await expect(
+				new Promise<void>((resolve, reject) => {
+					webSocket.once('error', () => resolve());
+					webSocket.once('open', () => reject(new Error('WebSocket connected unexpectedly')));
+				}),
+			).resolves.toBeUndefined();
+		} finally {
+			webSocket.close();
+			await close(proxyServer);
+		}
+	});
 });
 
 async function listen(server: Server): Promise<number> {

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
+import { createHash } from 'node:crypto';
+
 import type { PushMessage, PushType } from '@n8n/api-types';
 import { Logger, ModuleRegistry } from '@n8n/backend-common';
 import { SsrfProtectionService } from '@n8n/backend-network';
@@ -425,7 +427,7 @@ export async function executeAgent(
 		throw new UnexpectedError('Cannot execute agent without a workflowId in additional data');
 	}
 
-	const scopedThreadId = `workflow:project-${projectId}:${threadId}`;
+	const projectScopedThreadId = `workflow:project-${projectId}:${threadId}`;
 
 	if ('deepSeekHarnessAgentId' in source) {
 		const { DeepSeekHarnessService } = await import(
@@ -447,7 +449,7 @@ export async function executeAgent(
 			source.inlineAgent,
 			message,
 			executionId,
-			scopedThreadId,
+			projectScopedThreadId,
 			projectId,
 			telemetryUserId,
 			isManualOrChatExecution(executionMode) ? 'test' : 'production',
@@ -456,6 +458,10 @@ export async function executeAgent(
 			...streamObserverArguments,
 		);
 	}
+
+	const scopedThreadId = `workflow:agent:${createHash('sha256')
+		.update(JSON.stringify(['workflow-agent-session', projectId, source.agentId, threadId]))
+		.digest('base64url')}`;
 
 	const { hashAgentSandboxPrincipal } = await import('@/modules/agents/agent-sandbox-principal.js');
 	const useDraftVersion = isManualOrChatExecution(executionMode);

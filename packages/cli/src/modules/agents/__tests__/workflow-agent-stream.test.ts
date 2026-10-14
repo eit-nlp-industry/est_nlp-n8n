@@ -264,6 +264,66 @@ describe('WorkflowAgentStreamAdapter', () => {
 		]);
 		expect(JSON.stringify(observer.mock.calls)).not.toContain('secret');
 	});
+
+	it.each([
+		['without a phase', undefined],
+		['with a non-decision phase', 'result'],
+	] as const)('emits a read-only json-render result %s', async (_label, phase) => {
+		const observer = observerMock();
+		const adapter = new WorkflowAgentStreamAdapter(observer);
+		const payload = {
+			format: 'json-render-v1',
+			spec: { root: 'dashboard', elements: { dashboard: { type: 'Card' } } },
+		};
+
+		await adapter.observe({
+			type: 'tool-result',
+			toolCallId: 'tc-dashboard',
+			toolName: 'render_dashboard',
+			output: {
+				status: 'success',
+				data: [
+					{
+						json: {
+							format: 'json-render-v1',
+							payload,
+							...(phase === undefined ? {} : { phase }),
+						},
+					},
+				],
+			},
+		});
+
+		expect(observer).toHaveBeenCalledWith({ type: 'json-render', payload });
+	});
+
+	it('does not emit a read-only result for a decision json-render payload', async () => {
+		const observer = observerMock();
+		const adapter = new WorkflowAgentStreamAdapter(observer);
+
+		await adapter.observe({
+			type: 'tool-result',
+			toolCallId: 'tc-decision',
+			toolName: 'render_interaction',
+			output: {
+				status: 'success',
+				data: [
+					{
+						json: {
+							format: 'json-render-v1',
+							phase: 'decision',
+							payload: {
+								format: 'json-render-v1',
+								spec: { root: 'form', elements: { form: { type: 'Form' } } },
+							},
+						},
+					},
+				],
+			},
+		});
+
+		expect(observer).not.toHaveBeenCalled();
+	});
 });
 
 describe('createWorkflowAgentStreamObserver', () => {
@@ -287,6 +347,27 @@ describe('createWorkflowAgentStreamObserver', () => {
 		await observer({ type: 'response-end' });
 
 		expect(sendResponseChunk.mock.calls).toEqual([['begin'], ['item', 'hello'], ['end']]);
+	});
+
+	it('streams a read-only json-render result to the chat response', async () => {
+		const sendResponseChunk = vi.fn().mockResolvedValue(undefined);
+		const observer = createWorkflowAgentStreamObserver({
+			additionalData: mock<IWorkflowExecuteAdditionalData>(),
+			executionId: 'exec-1',
+			invocation: { ...invocation, sendResponseChunk },
+		});
+		const payload = {
+			format: 'json-render-v1',
+			spec: { root: 'dashboard', elements: { dashboard: { type: 'Card' } } },
+		};
+
+		await observer({ type: 'json-render', payload } as never);
+
+		expect(sendResponseChunk.mock.calls).toEqual([
+			['begin'],
+			['item', JSON.stringify({ type: 'json-render', payload })],
+			['end'],
+		]);
 	});
 
 	it('streams a native interaction as soon as the agent suspends', async () => {
@@ -328,6 +409,47 @@ describe('createWorkflowAgentStreamObserver', () => {
 			],
 			['end'],
 		]);
+	});
+
+	it('streams a json-render suspension as a json-render agent interaction', async () => {
+		const sendResponseChunk = vi.fn().mockResolvedValue(undefined);
+		const observer = createWorkflowAgentStreamObserver({
+			additionalData: mock<IWorkflowExecuteAdditionalData>(),
+			executionId: 'exec-1',
+			invocation: { ...invocation, sendResponseChunk },
+		});
+		const payload = {
+			type: 'json-render-interaction',
+			jsonRender: {
+				format: 'json-render-v1',
+				spec: { root: 'form', elements: { form: { type: 'form' } } },
+			},
+		};
+
+		await observer({
+			type: 'interaction',
+			suspension: {
+				runId: 'run-2',
+				toolCallId: 'tc-2',
+				toolName: 'render_refund_form',
+				suspendPayload: payload,
+			},
+		});
+
+		expect(sendResponseChunk).toHaveBeenNthCalledWith(
+			2,
+			'item',
+			JSON.stringify({
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-2',
+					toolCallId: 'tc-2',
+					interactionType: 'json_render',
+					payload,
+					blockUserInput: true,
+				},
+			}),
+		);
 	});
 
 	it('sends minimal ordered progress payloads without tool input or output', async () => {

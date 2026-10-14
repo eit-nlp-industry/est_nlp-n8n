@@ -12,6 +12,7 @@ type WorkflowAgentStreamEvent =
 	| { type: 'response-begin' }
 	| { type: 'response-delta'; delta: string }
 	| { type: 'response-end' }
+	| { type: 'json-render'; payload: Readonly<Record<string, unknown>> }
 	| { type: 'interaction'; suspension: AgentWorkflowSuspension }
 	| { type: 'capability-start'; toolCallId: string; capability: AgentNodeCapability }
 	| {
@@ -27,6 +28,28 @@ type PendingTool = {
 	toolName: string;
 	input: unknown;
 };
+
+function extractReadOnlyJsonRender(
+	output: unknown,
+): Readonly<Record<string, unknown>> | undefined {
+	if (!isRecord(output)) return undefined;
+
+	const first = Array.isArray(output.data) ? output.data[0] : undefined;
+	const json = isRecord(first) && isRecord(first.json) ? first.json : output;
+	if (json.phase === 'decision') return undefined;
+
+	if (
+		isRecord(json.payload) &&
+		json.payload.format === 'json-render-v1' &&
+		isRecord(json.payload.spec)
+	) {
+		return json.payload;
+	}
+
+	if (json.format === 'json-render-v1' && isRecord(json.spec)) return json;
+
+	return undefined;
+}
 
 function capabilityFor(toolName: string, input: unknown): AgentNodeCapability | undefined {
 	if (toolName !== SKILL_LOAD_TOOL_NAME) return { kind: 'tool', name: toolName };
@@ -62,6 +85,14 @@ export function createWorkflowAgentStreamObserver({
 			case 'response-end':
 				await invocation.sendResponseChunk?.('end');
 				return;
+			case 'json-render':
+				await invocation.sendResponseChunk?.('begin');
+				await invocation.sendResponseChunk?.(
+					'item',
+					JSON.stringify({ type: 'json-render', payload: event.payload }),
+				);
+				await invocation.sendResponseChunk?.('end');
+				return;
 			case 'interaction': {
 				const payload = event.suspension.suspendPayload;
 				if (!isRecord(payload)) return;
@@ -70,7 +101,12 @@ export function createWorkflowAgentStreamObserver({
 					interaction: {
 						runId: event.suspension.runId,
 						toolCallId: event.suspension.toolCallId,
-						interactionType: 'card' in payload ? 'chat_action' : 'approval',
+						interactionType:
+							payload.type === 'json-render-interaction'
+								? 'json_render'
+								: 'card' in payload
+									? 'chat_action'
+									: 'approval',
 						payload,
 						blockUserInput: true,
 					},
@@ -155,6 +191,11 @@ export class WorkflowAgentStreamAdapter {
 				return;
 			case 'tool-result':
 				await this.endCapability(chunk.toolCallId, chunk.isError === true ? 'failed' : 'succeeded');
+				if (chunk.isError === true) return;
+				const jsonRender = extractReadOnlyJsonRender(chunk.output);
+				if (!jsonRender) return;
+				await this.endText();
+				await this.emit({ type: 'json-render', payload: jsonRender });
 				return;
 		}
 	}

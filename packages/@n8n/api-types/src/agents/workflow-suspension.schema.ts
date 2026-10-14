@@ -24,6 +24,14 @@ export const agentWorkflowChatActionPayloadSchema = richMessageSchema.refine(
 	{ message: 'Provide a response card for a chat action interaction.' },
 );
 
+export const agentWorkflowJsonRenderPayloadSchema = z
+	.object({
+		type: z.literal('json-render-interaction'),
+		jsonRender: z.record(z.string(), z.unknown()),
+		message: z.string().optional(),
+	})
+	.strict();
+
 export const agentWorkflowInteractionSchema = z.discriminatedUnion('interactionType', [
 	agentWorkflowInteractionBaseSchema.extend({
 		interactionType: z.literal('approval'),
@@ -32,6 +40,10 @@ export const agentWorkflowInteractionSchema = z.discriminatedUnion('interactionT
 	agentWorkflowInteractionBaseSchema.extend({
 		interactionType: z.literal('chat_action'),
 		payload: agentWorkflowChatActionPayloadSchema,
+	}),
+	agentWorkflowInteractionBaseSchema.extend({
+		interactionType: z.literal('json_render'),
+		payload: agentWorkflowJsonRenderPayloadSchema,
 	}),
 ]);
 

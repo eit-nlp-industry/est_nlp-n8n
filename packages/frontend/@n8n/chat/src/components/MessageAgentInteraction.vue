@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import type { JsonRenderPayload } from '@eit/json-render-protocol';
 import { N8nButton, N8nOption, N8nSelect, N8nText } from '@n8n/design-system';
 import { ElRadio } from 'element-plus';
 import { computed, ref } from 'vue';
 
 import { useChat } from '@n8n/chat/composables';
+
+import JsonRenderInteraction from './JsonRenderInteraction.vue';
 
 interface CardButton {
 	type?: 'button';
@@ -38,9 +41,11 @@ type CardComponent =
 	  };
 
 interface InteractionPayload {
+	type?: string;
 	text?: string;
 	displayName?: string;
 	toolName?: string;
+	jsonRender?: JsonRenderPayload;
 	card?: {
 		title?: string;
 		message?: string;
@@ -52,7 +57,7 @@ interface Interaction {
 	messageId?: string;
 	runId?: string;
 	toolCallId?: string;
-	interactionType?: 'approval' | 'chat_action';
+	interactionType?: 'approval' | 'chat_action' | 'json_render';
 	payload?: InteractionPayload;
 }
 
@@ -152,7 +157,16 @@ async function submitOption(component: { id?: string }, index: number, value: st
 </script>
 
 <template>
-	<div v-if="!submitted" :class="$style.card" data-test-id="agent-interaction-card">
+	<JsonRenderInteraction
+		v-if="!submitted && interactionType === 'json_render' && payload?.jsonRender"
+		data-test-id="agent-interaction-card"
+		:payload="payload.jsonRender"
+		:instance-id="`workflow-agent-${runId ?? 'unknown'}-${toolCallId ?? 'unknown'}`"
+		:read-only="interactionDisabled"
+		@submit="submit({ approved: true, value: $event })"
+		@cancel="submit({ approved: false })"
+	/>
+	<div v-else-if="!submitted" :class="$style.card" data-test-id="agent-interaction-card">
 		<N8nText v-if="card?.title" :class="$style.title" bold>{{ card.title }}</N8nText>
 		<N8nText v-if="card?.message" :class="$style.message" color="text-base">
 			{{ card.message }}

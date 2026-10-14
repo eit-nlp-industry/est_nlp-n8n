@@ -1815,7 +1815,7 @@ export type ChatNodeMessageAgentInteraction = {
 	interaction: {
 		runId: string;
 		toolCallId: string;
-		interactionType: 'approval' | 'chat_action';
+		interactionType: 'approval' | 'chat_action' | 'json_render';
 		payload: Readonly<Record<string, unknown>>;
 		blockUserInput: true;
 	};

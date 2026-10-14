@@ -5,6 +5,7 @@ import { ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
 import MessageAgentInteraction from '../components/MessageAgentInteraction.vue';
+import JsonRenderInteraction from '../components/JsonRenderInteraction.vue';
 import { MessageComponentKey } from '../constants/messageComponents';
 import { ChatSymbol } from '../constants/symbols';
 import type { ChatMessage } from '../types';
@@ -229,5 +230,41 @@ describe('MessageAgentInteraction', () => {
 
 		expect(wrapper.text()).toContain('Order');
 		expect(wrapper.text()).toContain('A100');
+	});
+
+	it('renders json-render and submits its decision as an agent suspension response', async () => {
+		const { wrapper, ws } = mountInteraction([]);
+		await wrapper.setProps({
+			interactionType: 'json_render' as never,
+			payload: {
+				type: 'json-render-interaction',
+				jsonRender: {
+					format: 'json-render-v1',
+					spec: { root: 'form', elements: { form: { type: 'form' } } },
+				},
+			} as never,
+		});
+
+		const jsonRender = wrapper.findComponent(JsonRenderInteraction);
+		expect(jsonRender.exists()).toBe(true);
+
+		jsonRender.vm.$emit('submit', { refundReason: 'wrong_purchase' });
+		await flushPromises();
+
+		expect(ws?.send).toHaveBeenCalledWith(
+			JSON.stringify({
+				sessionId: 'session-1',
+				action: 'sendMessage',
+				chatInput: JSON.stringify({
+					type: 'agent-suspension-response',
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					resumeData: {
+						approved: true,
+						value: { refundReason: 'wrong_purchase' },
+					},
+				}),
+			}),
+		);
 	});
 });

@@ -59,6 +59,25 @@ describe('agentWorkflowInteractionSchema', () => {
 		expect(agentWorkflowInteractionSchema.parse(interaction)).toEqual(interaction);
 	});
 
+	it('parses a json-render interaction', () => {
+		const interaction = {
+			runId: 'run-3',
+			toolCallId: 'tool-call-3',
+			interactionType: 'json_render',
+			payload: {
+				type: 'json-render-interaction',
+				jsonRender: {
+					format: 'json-render-v1',
+					spec: { root: 'form', elements: { form: { type: 'form' } } },
+				},
+				message: 'Choose a refund reason',
+			},
+			blockUserInput: true,
+		};
+
+		expect(agentWorkflowInteractionSchema.parse(interaction)).toEqual(interaction);
+	});
+
 	it('rejects an unknown interaction type', () => {
 		expect(
 			agentWorkflowInteractionSchema.safeParse({

@@ -100,11 +100,14 @@ export function createStudioProxyMiddleware(
 		if (typeof projectId !== 'string' || typeof agentId !== 'string') return undefined;
 		return rewriteSetCookiePaths(setCookie, studioProxyBasePath(projectId, agentId));
 	};
-	const proxyError = (_error: Error, _req: Request, res: ServerResponse) => {
-		if (!res.headersSent) {
-			res.writeHead(502);
-			res.end('Bad Gateway');
+	const proxyError = (_error: Error, _req: Request, res: ServerResponse | Socket) => {
+		if (!('writeHead' in res)) {
+			res.destroy();
+			return;
 		}
+		if (res.headersSent) return;
+		res.writeHead(502);
+		res.end('Bad Gateway');
 	};
 
 	const streamingProxy = createProxyMiddleware<Request>({

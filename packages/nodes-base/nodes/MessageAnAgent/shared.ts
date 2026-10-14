@@ -606,7 +606,12 @@ function toAgentInteraction(
 		);
 	}
 	const interactionPayload = payload;
-	const interactionType = 'card' in interactionPayload ? 'chat_action' : 'approval';
+	const interactionType =
+		interactionPayload.type === 'json-render-interaction'
+			? 'json_render'
+			: 'card' in interactionPayload
+				? 'chat_action'
+				: 'approval';
 	return {
 		type: 'agent-interaction',
 		interaction: {
