@@ -1,4 +1,9 @@
-import type { Agent as RuntimeAgent, StreamChunk } from '@n8n/agents';
+import type {
+	Agent as RuntimeAgent,
+	CredentialProvider,
+	ResumeOptions,
+	StreamChunk,
+} from '@n8n/agents';
 import type { AgentJsonConfig } from '@n8n/api-types';
 import { mockLogger } from '@n8n/backend-test-utils';
 import type { AiConfig, AgentsConfig } from '@n8n/config';
@@ -330,6 +335,179 @@ describe('AgentWorkflowExecutionService', () => {
 				userId,
 				source: 'workflow',
 				executionId: 'execution-1',
+			}),
+		);
+	});
+
+	it('passes the n8n chat integration to resumable workflow runtime reconstruction', async () => {
+		const { service, reconstructionService } = makeService();
+		const runtime = makeRuntime();
+		reconstructionService.reconstructFromAgentEntity.mockResolvedValue(runtime);
+
+		await service.compileIsolated(
+			makeAgent(),
+			mock<CredentialProvider>(),
+			'production',
+			undefined,
+			undefined,
+			undefined,
+			{ supportsHitl: true },
+		);
+
+		expect(reconstructionService.reconstructFromAgentEntity.mock.calls[0]?.[3]).toBe('n8n_chat');
+	});
+
+	it('initializes n8n chat message context for resumable workflow agents', async () => {
+		const { service, agentRepository, reconstructionService } = makeService();
+		const runtime = makeRuntime();
+		agentRepository.findByIdAndProjectId.mockResolvedValue(makeAgent());
+		reconstructionService.reconstructFromAgentEntity.mockResolvedValue(runtime);
+
+		await service.executeForWorkflow(
+			agentId,
+			'hello',
+			'execution-1',
+			'thread-1',
+			projectId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true,
+		);
+
+		expect(runtime.agent.stream).toHaveBeenCalledWith(
+			'hello',
+			expect.objectContaining({
+				persistence: expect.objectContaining({
+					hostMetadata: {
+						n8nIntegrationMessageContext: expect.objectContaining({
+							integrationConnectionId: 'n8n_chat',
+							platform: 'n8n_chat',
+							target: { type: 'thread', threadId: 'thread-1' },
+						}),
+					},
+				}),
+			}),
+		);
+	});
+
+	it('records a workflow HITL resume without a transport user message', async () => {
+		const { service, agentRepository, reconstructionService, executionService } = makeService();
+		const runtime = makeRuntime([
+			{
+				type: 'model-turn',
+				turnIndex: 1,
+				timestamp: 100,
+				endTime: 200,
+				model: 'test-model',
+				finishReason: 'stop',
+				usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+				url: 'https://api.example.com/v1/chat',
+				method: 'POST',
+				status: 200,
+				streamed: true,
+				requestBody: { messages: [] },
+				responseBody: { choices: [] },
+			},
+			{ type: 'text-start', id: 'text-1' },
+			{ type: 'text-delta', id: 'text-1', delta: 'Continued response' },
+			{ type: 'text-end', id: 'text-1' },
+			{ type: 'finish', finishReason: 'stop' },
+		]);
+		const streamObserver = vi.fn<WorkflowAgentStreamObserver>().mockResolvedValue(undefined);
+		runtime.agent.resume.mockImplementation(
+			async (_method: 'stream', _data: unknown, options: ResumeOptions) => {
+				await options.onResumeClaimed?.();
+				return {
+					runId: options.runId,
+					stream: makeReadableStream([
+						{
+							type: 'model-turn',
+							turnIndex: 1,
+							timestamp: 100,
+							endTime: 200,
+							model: 'test-model',
+							finishReason: 'stop',
+							usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+							url: 'https://api.example.com/v1/chat',
+							method: 'POST',
+							status: 200,
+							streamed: true,
+							requestBody: { messages: [] },
+							responseBody: { choices: [] },
+						},
+						{ type: 'text-start', id: 'text-1' },
+						{ type: 'text-delta', id: 'text-1', delta: 'Continued response' },
+						{ type: 'text-end', id: 'text-1' },
+						{ type: 'finish', finishReason: 'stop' },
+					]),
+				};
+			},
+		);
+		agentRepository.findByIdAndProjectId.mockResolvedValue(makeAgent());
+		reconstructionService.reconstructFromAgentEntity.mockResolvedValue(runtime);
+
+		const result = await service.executeForWorkflow(
+			agentId,
+			'{"type":"agent-suspension-response"}',
+			'execution-1',
+			'thread-1',
+			projectId,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			streamObserver,
+			true,
+			{
+				runId: 'run-1',
+				toolCallId: 'tool-call-1',
+				resumeData: { selected: 'damaged' },
+			},
+		);
+
+		expect(runtime.agent.stream).not.toHaveBeenCalled();
+		expect(runtime.agent.resume).toHaveBeenCalledWith(
+			'stream',
+			{ selected: 'damaged' },
+			expect.objectContaining({
+				runId: 'run-1',
+				toolCallId: 'tool-call-1',
+				persistence: expect.objectContaining({
+					resourceId: 'thread-1',
+					threadId: 'thread-1',
+				}),
+				executionCounter: expect.any(Object),
+			}),
+		);
+		expect(streamObserver.mock.calls.map(([event]) => event)).toEqual([
+			{ type: 'response-begin' },
+			{ type: 'response-delta', delta: 'Continued response' },
+			{ type: 'response-end' },
+		]);
+		expect(result.modelTurns?.map(({ turnIndex }) => turnIndex)).toEqual([1]);
+
+		expect(executionService.startExecutionRecording).toHaveBeenCalledWith(
+			expect.objectContaining({ userMessage: null }),
+			expect.any(Date),
+		);
+		expect(executionService.finalizeExecution).toHaveBeenCalledWith(
+			'execution-1',
+			expect.objectContaining({
+				hitlStatus: 'resumed',
+				record: expect.objectContaining({
+					timeline: expect.arrayContaining([
+						expect.objectContaining({
+							type: 'hitl-response',
+							toolCallId: 'tool-call-1',
+							response: { selected: 'damaged' },
+						}),
+					]),
+				}),
 			}),
 		);
 	});
@@ -758,6 +936,36 @@ describe('AgentWorkflowExecutionService', () => {
 					nodeId: 'node-1',
 				}),
 			);
+		});
+
+		it('does not inject fetch_input_data when a workflow agent resumes', async () => {
+			const { service, toolFn } = setupRuntimeWithToolSpy();
+			const workflowContext: ExecuteAgentWorkflowContext = {
+				...baseContext,
+				exposeWorkflowData: false,
+			};
+
+			await service.executeForWorkflow(
+				agentId,
+				'{"type":"agent-suspension-response"}',
+				'execution-1',
+				'thread-1',
+				projectId,
+				undefined,
+				undefined,
+				undefined,
+				workflowContext,
+				undefined,
+				undefined,
+				true,
+				{
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					resumeData: { selected: 'damaged' },
+				},
+			);
+
+			expect(toolFn).not.toHaveBeenCalled();
 		});
 
 		it('also injects fetch_workflow_context when exposeWorkflowData is true', async () => {

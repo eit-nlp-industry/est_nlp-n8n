@@ -526,8 +526,26 @@ describe('ExecuteContext', () => {
 					nodeName: node.name,
 					runIndex,
 					itemIndex: 0,
+					supportsHitl: false,
 				},
 			);
+		});
+
+		it('forwards the agent HITL capability to additionalData.executeAgent', async () => {
+			const executeAgentMock = vi.fn().mockResolvedValue({ response: 'ok' });
+			agentAdditionalData.executeAgent =
+				executeAgentMock as IWorkflowExecuteAdditionalData['executeAgent'];
+
+			await agentExecuteContext.executeAgent(
+				{ agentId: 'agent-1', supportsHitl: true },
+				'hello',
+				'exec-1',
+				0,
+			);
+
+			const invocationContext = executeAgentMock.mock
+				.calls[0]?.[8] as ExecuteAgentInvocationContext;
+			expect(invocationContext.supportsHitl).toBe(true);
 		});
 
 		it('passes a response chunk callback when workflow streaming is available', async () => {

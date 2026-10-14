@@ -60,6 +60,10 @@ const {
 	cachedAgentIcon: AgentIconOrEmoji | null;
 	acceptedMimeTypes: string;
 	submitJsonRenderDecision?: (approved: boolean, value?: Record<string, unknown>) => Promise<void>;
+	submitAgentInteraction?: (
+		source: Extract<ChatMessageContentChunk, { type: 'agent-interaction' }>,
+		resumeData: unknown,
+	) => Promise<void>;
 	/**
 	 * minHeight allows scrolling agent's response to the top while it is being generated
 	 */
@@ -123,7 +127,8 @@ const messageChunks = computed(() =>
 		if (
 			chunk.type === 'with-buttons' ||
 			chunk.type === 'json-render' ||
-			chunk.type === 'json-render-interaction'
+			chunk.type === 'json-render-interaction' ||
+			chunk.type === 'agent-interaction'
 		) {
 			return [chunk];
 		}
@@ -435,6 +440,7 @@ onBeforeMount(() => {
 							:source="chunk"
 							:is-buttons-disabled="message.status !== 'waiting'"
 							:submit-json-render-decision="submitJsonRenderDecision"
+							:submit-agent-interaction="submitAgentInteraction"
 							@open-artifact="emit('openArtifact', $event)"
 						/>
 						<Teleport v-if="activeCodeBlockTeleport" :to="activeCodeBlockTeleport.target">

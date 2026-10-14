@@ -68,7 +68,7 @@ describe('WorkflowAgentStreamAdapter', () => {
 		expect(observer.mock.calls.map(([event]) => event)).toEqual([{ type: 'response-begin' }]);
 	});
 
-	it('drops reasoning, tool-input, sub-agent, step, message, warning, and suspension events', async () => {
+	it('drops reasoning, tool-input, sub-agent, step, message, and warning events', async () => {
 		const observer = observerMock();
 		const adapter = new WorkflowAgentStreamAdapter(observer);
 		const ignoredChunks = [
@@ -88,12 +88,78 @@ describe('WorkflowAgentStreamAdapter', () => {
 			{ type: 'finish-step' },
 			{ type: 'message', message: { role: 'assistant', content: 'private message' } },
 			{ type: 'warning', message: 'warning' },
-			{ type: 'tool-call-suspended', runId: 'run-1', toolCallId: 'tc-1' },
 		] as StreamChunk[];
 
 		await observeChunks(adapter, ignoredChunks);
 
 		expect(observer).not.toHaveBeenCalled();
+	});
+
+	it('emits suspended tool calls immediately after closing the current text segment', async () => {
+		const observer = observerMock();
+		const adapter = new WorkflowAgentStreamAdapter(observer);
+
+		await observeChunks(adapter, [
+			{ type: 'text-start', id: 'text-1' },
+			{
+				type: 'tool-call-suspended',
+				runId: 'run-1',
+				toolCallId: 'tc-1',
+				toolName: 'send_email',
+				suspendPayload: { type: 'approval', toolName: 'send_email', args: { to: 'a@example.com' } },
+				resumeSchema: { type: 'object' },
+			},
+			{
+				type: 'tool-call-suspended',
+				runId: 'run-2',
+				toolCallId: 'tc-2',
+				toolName: 'choose_owner',
+				suspendPayload: { type: 'integration_action', card: { title: 'Choose' } },
+			},
+		]);
+
+		expect(observer.mock.calls.map(([event]) => event)).toEqual([
+			{ type: 'response-begin' },
+			{ type: 'response-end' },
+			{
+				type: 'interaction',
+				suspension: {
+					runId: 'run-1',
+					toolCallId: 'tc-1',
+					toolName: 'send_email',
+					suspendPayload: {
+						type: 'approval',
+						toolName: 'send_email',
+						args: { to: 'a@example.com' },
+					},
+					resumeSchema: { type: 'object' },
+				},
+			},
+			{
+				type: 'interaction',
+				suspension: {
+					runId: 'run-2',
+					toolCallId: 'tc-2',
+					toolName: 'choose_owner',
+					suspendPayload: { type: 'integration_action', card: { title: 'Choose' } },
+				},
+			},
+		]);
+		expect(adapter.getSuspensions()).toEqual([
+			{
+				runId: 'run-1',
+				toolCallId: 'tc-1',
+				toolName: 'send_email',
+				suspendPayload: { type: 'approval', toolName: 'send_email', args: { to: 'a@example.com' } },
+				resumeSchema: { type: 'object' },
+			},
+			{
+				runId: 'run-2',
+				toolCallId: 'tc-2',
+				toolName: 'choose_owner',
+				suspendPayload: { type: 'integration_action', card: { title: 'Choose' } },
+			},
+		]);
 	});
 
 	it('tracks concurrent calls to the same tool by call id', async () => {
@@ -221,6 +287,47 @@ describe('createWorkflowAgentStreamObserver', () => {
 		await observer({ type: 'response-end' });
 
 		expect(sendResponseChunk.mock.calls).toEqual([['begin'], ['item', 'hello'], ['end']]);
+	});
+
+	it('streams a native interaction as soon as the agent suspends', async () => {
+		const sendResponseChunk = vi.fn().mockResolvedValue(undefined);
+		const observer = createWorkflowAgentStreamObserver({
+			additionalData: mock<IWorkflowExecuteAdditionalData>(),
+			executionId: 'exec-1',
+			invocation: { ...invocation, sendResponseChunk },
+		});
+		const payload = {
+			type: 'integration_action',
+			card: { title: 'Choose a refund reason' },
+		};
+
+		await observer({
+			type: 'interaction',
+			suspension: {
+				runId: 'run-1',
+				toolCallId: 'tc-1',
+				toolName: 'chat_action',
+				suspendPayload: payload,
+			},
+		});
+
+		expect(sendResponseChunk.mock.calls).toEqual([
+			['begin'],
+			[
+				'item',
+				JSON.stringify({
+					type: 'agent-interaction',
+					interaction: {
+						runId: 'run-1',
+						toolCallId: 'tc-1',
+						interactionType: 'chat_action',
+						payload,
+						blockUserInput: true,
+					},
+				}),
+			],
+			['end'],
+		]);
 	});
 
 	it('sends minimal ordered progress payloads without tool input or output', async () => {

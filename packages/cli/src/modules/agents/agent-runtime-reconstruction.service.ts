@@ -919,6 +919,12 @@ export class AgentRuntimeReconstructionService {
 
 		if (runtimeProfile === 'top-level') {
 			const includeN8nChat = integrationType === N8N_CHAT_INTEGRATION_TYPE;
+			this.logger.debugFile?.('[Agent runtime] integration gate', {
+				agentId,
+				runtimeProfile,
+				integrationType,
+				includeN8nChat,
+			});
 
 			if (credentialIntegrations.length > 0 || includeN8nChat) {
 				const integrationRegistry = Container.get(ChatIntegrationRegistry);
@@ -943,6 +949,10 @@ export class AgentRuntimeReconstructionService {
 					);
 
 				if (includeN8nChat) {
+					this.logger.debugFile?.('[Agent runtime] injecting n8n_chat tools', {
+						actionToolName: N8N_CHAT_ACTION_TOOL_NAME,
+						contextToolName: N8N_CHAT_CONTEXT_TOOL_NAME,
+					});
 					// Implicit in-app chat channel: credential-less, per-run, fixed
 					// tool names (exactly one n8n_chat per run — no suffixing).
 					const n8nChat = integrationRegistry.require(N8N_CHAT_INTEGRATION_TYPE);

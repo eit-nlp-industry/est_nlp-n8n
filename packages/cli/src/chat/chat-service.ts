@@ -87,6 +87,12 @@ export class ChatService {
 		}
 
 		const execution = await this.executionManager.findExecution(executionId);
+		this.logger.debugFile?.('[ChatService] websocket session request', {
+			sessionId,
+			executionId,
+			executionFound: execution !== undefined,
+			status: execution?.status,
+		});
 
 		if (!execution) {
 			ws.send('Connection rejected');
@@ -141,6 +147,11 @@ export class ChatService {
 		this.sessions.set(key, session);
 
 		ws.send(N8N_HEARTBEAT);
+		this.scheduleChatResponseCheck(key);
+	}
+
+	private scheduleChatResponseCheck(sessionKey: string) {
+		setTimeout(async () => await this.pollAndProcessChatResponses(sessionKey)(), 0);
 	}
 
 	private async processWaitingExecution(
@@ -149,6 +160,15 @@ export class ChatService {
 		sessionKey: string,
 	) {
 		let message = getMessage(execution);
+		this.logger.debugFile?.('[ChatService] waiting execution message lookup', {
+			executionId: execution.id,
+			status: execution.status,
+			lastNodeExecuted: execution.data.resultData.lastNodeExecuted,
+			messageFound: message !== undefined,
+			messageType: typeof message,
+			messagePreview: message === undefined ? undefined : JSON.stringify(message).slice(0, 500),
+			runDataNodes: Object.keys(execution.data.resultData.runData),
+		});
 		if (typeof message === 'object') {
 			message = JSON.stringify(message);
 		}
@@ -156,6 +176,11 @@ export class ChatService {
 		if (message === undefined) return;
 
 		session.connection.send(message);
+		this.logger.debugFile?.('[ChatService] sent waiting message', {
+			executionId: session.executionId,
+			sessionId: session.sessionId,
+			messagePreview: message.slice(0, 1000),
+		});
 
 		const lastNode = getLastNodeExecuted(execution);
 
@@ -287,7 +312,12 @@ export class ChatService {
 			return false;
 		}
 
-		await this.executionManager.runWorkflow(execution, message);
+		await this.executionManager.runWorkflow(execution, message, (chunk) => {
+			const activeSession = this.sessions.get(sessionKey);
+			if (activeSession?.executionId !== executionId) return;
+			activeSession.connection.send(JSON.stringify(chunk));
+		});
+		this.scheduleChatResponseCheck(sessionKey);
 		return true;
 	}
 

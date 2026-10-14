@@ -6,6 +6,7 @@ import type {
 	IBinaryKeyData,
 	INodeExecutionData,
 	IWorkflowExecutionDataProcess,
+	StructuredChunk,
 } from 'n8n-workflow';
 import {
 	Workflow,
@@ -28,6 +29,8 @@ import { NodeTypes } from '../node-types';
 import { OwnershipService } from '../services/ownership.service';
 import { stripToolSuffix } from '../utils';
 
+const MESSAGE_AN_AGENT_NODE_TYPE = 'n8n-nodes-base.messageAnAgent';
+
 @Service()
 export class ChatExecutionManager {
 	constructor(
@@ -38,7 +41,11 @@ export class ChatExecutionManager {
 		private readonly nodeTypes: NodeTypes,
 	) {}
 
-	async runWorkflow(execution: IExecutionResponse, message: ChatMessage) {
+	async runWorkflow(
+		execution: IExecutionResponse,
+		message: ChatMessage,
+		streamSink?: (chunk: StructuredChunk) => Promise<void> | void,
+	) {
 		// Sink guard shared by every chat resume caller (chat websocket, Chat Hub,
 		// the auto-resume watcher): only a node a chat mechanism drives — one that
 		// implements onMessage — may be resumed here. This makes the allowlist
@@ -53,7 +60,17 @@ export class ChatExecutionManager {
 			});
 		}
 
-		await this.workflowRunner.run(await this.getRunData(execution, message), true, true, {
+		const runData = await this.getRunData(execution, message);
+		if (streamSink) {
+			const configureAdditionalData = runData.configureAdditionalData;
+			runData.streamingEnabled = true;
+			runData.configureAdditionalData = async (additionalData) => {
+				await configureAdditionalData?.(additionalData);
+				additionalData.hooks?.addHandler('sendChunk', streamSink);
+			};
+		}
+
+		await this.workflowRunner.run(runData, true, true, {
 			executionId: execution.id,
 			expectedStatus: 'waiting',
 		});
@@ -260,6 +277,11 @@ export class ChatExecutionManager {
 		const resumingNode = runExecutionData.executionData!.nodeExecutionStack[0].node;
 		const isChatBasedHitlTool =
 			isHitlToolType(resumingNode.type) && stripToolSuffix(resumingNode.type) === CHAT_NODE_TYPE;
+		// The node sets a far-future wait while its Agent checkpoint is suspended.
+		// Clear that wait so the workflow engine can execute the node and resume the checkpoint.
+		if (resumingNode.type === MESSAGE_AN_AGENT_NODE_TYPE) {
+			runExecutionData.waitTill = undefined;
+		}
 		if (resumingNode.type === CHAT_TOOL_NODE_TYPE || isChatBasedHitlTool) {
 			runExecutionData.waitTill = undefined;
 			resumingNode.disabled = true;

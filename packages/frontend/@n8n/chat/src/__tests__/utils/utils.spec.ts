@@ -114,6 +114,25 @@ describe('utils', () => {
 				},
 			});
 		});
+
+		it('should parse a native agent interaction and block text input', () => {
+			const message = parseBotChatMessageContent(
+				JSON.stringify({
+					type: 'agent-interaction',
+					interaction: {
+						runId: 'run-1',
+						toolCallId: 'tool-1',
+						interactionType: 'approval',
+						blockUserInput: true,
+						payload: { type: 'approval', toolName: 'send_message', args: {} },
+					},
+				}),
+			);
+
+			expect(message.type).toBe('component');
+			expect(message).toMatchObject({ key: MessageComponentKey.AGENT_INTERACTION });
+			expect(shouldBlockUserInput(message)).toBe(true);
+		});
 	});
 
 	describe('shouldBlockUserInput', () => {

@@ -11,6 +11,7 @@ import type {
 	LogMetadata,
 } from 'n8n-workflow';
 import path, { basename } from 'node:path';
+import fs from 'node:fs';
 import pc from 'picocolors';
 import winston from 'winston';
 
@@ -22,6 +23,8 @@ const noOp = () => {};
 @Service()
 export class Logger implements LoggerType {
 	private internalLogger: winston.Logger;
+
+	private diagnosticLogger: winston.Logger | undefined;
 
 	private readonly level: LogLevel;
 
@@ -275,6 +278,30 @@ export class Logger implements LoggerType {
 
 	debug(message: string, metadata: LogMetadata = {}) {
 		this.log('debug', message, metadata);
+	}
+
+	debugFile(message: string, metadata: LogMetadata = {}) {
+		if (!this.diagnosticLogger) {
+			const filename = path.join(
+				this.instanceSettingsConfig.n8nFolder,
+				'logs',
+				'agent-workflow-suspension.log',
+			);
+			fs.mkdirSync(path.dirname(filename), { recursive: true });
+			this.diagnosticLogger = winston.createLogger({
+				level: 'debug',
+				format: this.jsonConsoleFormat(),
+				transports: [
+					new winston.transports.File({
+						filename,
+						maxsize: this.globalConfig.logging.file.fileSizeMax * 1_048_576,
+						maxFiles: this.globalConfig.logging.file.fileCountMax,
+					}),
+				],
+			});
+		}
+
+		this.diagnosticLogger.log('debug', message, metadata);
 	}
 
 	// #endregion

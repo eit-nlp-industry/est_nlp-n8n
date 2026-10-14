@@ -12,6 +12,7 @@ import {
 	HIGHLIGHTED_SESSION_KEY,
 	CHAT_TRIGGER_PATH_SUFFIX,
 	buildCredentialConnectionsRequiredResponse,
+	logToDebugFile,
 } from 'n8n-workflow';
 import type {
 	IDataObject,
@@ -916,6 +917,11 @@ export class ChatTrigger extends Node {
 
 	async webhook(ctx: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const res = ctx.getResponseObject();
+		logToDebugFile(ctx.logger, '[Chat Trigger] webhook entry', {
+			mode: ctx.getMode(),
+			webhookName: ctx.getWebhookName(),
+			isChatSessionTest: ctx.isChatSessionTest(),
+		});
 
 		const isPublic = isPublicChatTriggerDisabled() ? false : ctx.getNodeParameter('public', false);
 		assertParamIsBoolean('public', isPublic, ctx.getNode());
@@ -959,6 +965,12 @@ export class ChatTrigger extends Node {
 		const enableStreaming = availableInChat
 			? !options.responseMode || options.responseMode === 'streaming'
 			: options.responseMode === 'streaming';
+		logToDebugFile(ctx.logger, '[Chat Trigger] response configuration', {
+			nodeMode,
+			availableInChat,
+			configuredResponseMode: options.responseMode,
+			enableStreaming,
+		});
 
 		const req = ctx.getRequestObject();
 		const webhookName = ctx.getWebhookName();

@@ -1,6 +1,6 @@
 import type { Logger } from '@n8n/backend-common';
 import type { ErrorReporter } from 'n8n-core';
-import { CHAT_NODE_TYPE } from 'n8n-workflow';
+import { CHAT_NODE_TYPE, type StructuredChunk } from 'n8n-workflow';
 import { mock } from 'vitest-mock-extended';
 import { WebSocket } from 'ws';
 
@@ -97,6 +97,63 @@ describe('ChatService', () => {
 			expect(session?.executionId).toBe('123');
 			expect(session?.isPublic).toBe(true);
 			expect(typeof session?.intervalId).toBe('object');
+		});
+
+		it('delivers a waiting interaction immediately after the socket attaches', async () => {
+			const validToken = 'a'.repeat(64);
+			const interaction = {
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					interactionType: 'chat_action',
+					payload: { card: { title: 'Choose' } },
+					blockUserInput: true,
+				},
+			};
+			const req = {
+				ws: mockWs,
+				query: {
+					sessionId: 'abc',
+					executionId: '123',
+					isPublic: true,
+					token: validToken,
+				},
+			} as unknown as ChatRequest;
+
+			mockExecutionManager.findExecution
+				.mockResolvedValueOnce({
+					id: '123',
+					status: 'running',
+					data: { resumeToken: validToken },
+				} as any)
+				.mockResolvedValue({
+					id: '123',
+					status: 'waiting',
+					data: {
+						resultData: {
+							lastNodeExecuted: 'Message an Agent',
+							runData: {
+								'Message an Agent': [{ data: { main: [[{ sendMessage: interaction }]] } }],
+							},
+						},
+					},
+					workflowData: { nodes: [{ name: 'Message an Agent' }] },
+				} as any);
+
+			await chatService.startSession(req);
+			await vi.advanceTimersByTimeAsync(0);
+
+			expect(mockWs.close).not.toHaveBeenCalled();
+			expect(
+				mockWs.send.mock.calls.filter(([message]) => message === JSON.stringify(interaction)),
+			).toHaveLength(1);
+
+			await vi.advanceTimersByTimeAsync(3000);
+
+			expect(
+				mockWs.send.mock.calls.filter(([message]) => message === JSON.stringify(interaction)),
+			).toHaveLength(1);
 		});
 
 		it('should terminate existing session if the same key is used and clear interval', async () => {
@@ -347,6 +404,7 @@ describe('ChatService', () => {
 			const session = {
 				executionId: '123',
 				nodeWaitingForChatResponse: 'test',
+				connection: mockWs,
 			};
 			(chatService as any).sessions.set(sessionKey, session);
 
@@ -362,6 +420,90 @@ describe('ChatService', () => {
 
 			expect(mockExecutionManager.runWorkflow).toHaveBeenCalled();
 			expect(session.nodeWaitingForChatResponse).toBeUndefined();
+		});
+
+		it('delivers the next waiting interaction immediately after resume', async () => {
+			const sessionKey = 'abc|123|public';
+			const interaction = {
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-2',
+					toolCallId: 'tool-call-2',
+					interactionType: 'chat_action',
+					payload: { card: { title: 'Choose again' } },
+					blockUserInput: true,
+				},
+			};
+			const session = {
+				executionId: '123',
+				nodeWaitingForChatResponse: 'Message an Agent',
+				connection: mockWs,
+				isProcessing: false,
+				sessionId: 'abc',
+			};
+			(chatService as any).sessions.set(sessionKey, session);
+			mockExecutionManager.findExecution
+				.mockResolvedValueOnce({
+					id: '123',
+					status: 'waiting',
+					data: { resultData: { lastNodeExecuted: 'Message an Agent' } },
+				} as any)
+				.mockResolvedValue({
+					id: '123',
+					status: 'waiting',
+					data: {
+						resultData: {
+							lastNodeExecuted: 'Message an Agent',
+							runData: {
+								'Message an Agent': [
+									{ data: { main: [[{ sendMessage: interaction }]] } },
+								],
+							},
+						},
+					},
+					workflowData: { nodes: [{ name: 'Message an Agent' }] },
+				} as any);
+
+			const data = JSON.stringify({ action: 'sendMessage', chatInput: 'answer', sessionId: 'abc' });
+			await (chatService as any).incomingMessageHandler(sessionKey)(data);
+			await vi.advanceTimersByTimeAsync(0);
+
+			expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(interaction));
+		});
+
+		it('forwards resumed workflow chunks through the session WebSocket', async () => {
+			const sessionKey = 'abc|123|public';
+			const session = {
+				executionId: '123',
+				nodeWaitingForChatResponse: 'test',
+				connection: mockWs,
+			};
+			(chatService as any).sessions.set(sessionKey, session);
+			mockExecutionManager.findExecution.mockResolvedValue({
+				id: '123',
+				status: 'waiting',
+				data: { resultData: {} },
+			} as any);
+			const data = JSON.stringify({ action: 'sendMessage', chatInput: 'hello', sessionId: 'abc' });
+
+			await (chatService as any).incomingMessageHandler(sessionKey)(data);
+			const streamSink = mockExecutionManager.runWorkflow.mock.calls[0][2];
+			const chunk: StructuredChunk = {
+				type: 'item',
+				content: 'continued response',
+				metadata: {
+					nodeId: 'agent-node',
+					nodeName: 'Message an Agent',
+					timestamp: 1,
+					runIndex: 0,
+					itemIndex: 0,
+				},
+			};
+			expect(streamSink).toBeDefined();
+			if (!streamSink) throw new Error('Expected the resume stream sink to be installed');
+			await streamSink(chunk);
+
+			expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(chunk));
 		});
 
 		it('should handle errors during message processing', async () => {

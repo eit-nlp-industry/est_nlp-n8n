@@ -73,6 +73,41 @@ describe('ChatExecutionManager', () => {
 			});
 		});
 
+		it('routes resumed workflow stream chunks to the supplied sink', async () => {
+			const execution = { id: '1', workflowData: {}, data: {} } as IExecutionResponse;
+			const message = {
+				sessionId: '123',
+				action: 'sendMessage',
+				chatInput: 'input',
+			} as ChatMessage;
+			const runData = { executionMode: 'manual', executionData: {}, workflowData: {} } as any;
+			const streamSink = vi.fn();
+			const addHandler = vi.fn();
+			const chunk = {
+				type: 'item',
+				content: 'continued response',
+				metadata: {
+					nodeId: 'agent-node',
+					nodeName: 'Message an Agent',
+					timestamp: 1,
+					runIndex: 0,
+					itemIndex: 0,
+				},
+			};
+
+			vi.spyOn(chatExecutionManager as any, 'isChatDrivenExecution').mockReturnValue(true);
+			vi.spyOn(chatExecutionManager as any, 'getRunData').mockResolvedValue(runData);
+
+			await chatExecutionManager.runWorkflow(execution, message, streamSink);
+			await runData.configureAdditionalData({ hooks: { addHandler } });
+			const installedHandler = addHandler.mock.calls[0][1];
+			await installedHandler(chunk);
+
+			expect(runData.streamingEnabled).toBe(true);
+			expect(addHandler).toHaveBeenCalledWith('sendChunk', installedHandler);
+			expect(streamSink).toHaveBeenCalledWith(chunk);
+		});
+
 		it('refuses to run when the suspended node is not chat-driven', async () => {
 			const execution = { id: '1', workflowData: {}, data: {} } as IExecutionResponse;
 			const message = {
@@ -478,6 +513,51 @@ describe('ChatExecutionManager', () => {
 				expect(
 					execution.data.executionData.nodeExecutionStack[0].node.rewireOutputLogTo,
 				).toBeUndefined();
+			});
+		});
+
+		describe('when node is Message an Agent', () => {
+			const message: ChatMessage = {
+				sessionId: '123',
+				action: 'sendMessage',
+				chatInput: '{"type":"agent-suspension-response"}',
+			};
+
+			it('clears the previous wait before resuming the Agent checkpoint', async () => {
+				const execution = {
+					id: '1',
+					workflowData: { id: 'workflowId' },
+					data: {
+						resultData: {
+							pinData: {},
+							lastNodeExecuted: 'Message an Agent',
+							runData: { 'Message an Agent': [] },
+						},
+						executionData: {
+							nodeExecutionStack: [
+								{
+									node: {
+										name: 'Message an Agent',
+										type: 'n8n-nodes-base.messageAnAgent',
+										disabled: false,
+									},
+									data: { main: [[]] },
+								},
+							],
+						},
+						pushRef: 'pushRef',
+						waitTill: new Date('9999-12-31T23:59:59.999Z'),
+					},
+					mode: 'manual',
+				} as any;
+
+				vi.spyOn(chatExecutionManager as any, 'runNode').mockResolvedValue([[{ json: message }]]);
+				ownershipService.getWorkflowProjectCached.mockResolvedValue({ id: 'projectId' } as any);
+
+				await (chatExecutionManager as any).getRunData(execution, message);
+
+				expect(execution.data.waitTill).toBeUndefined();
+				expect(execution.data.executionData.nodeExecutionStack[0].node.disabled).toBe(false);
 			});
 		});
 	});

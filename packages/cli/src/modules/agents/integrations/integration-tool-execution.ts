@@ -4,6 +4,8 @@ import {
 	type ToolContext,
 } from '@n8n/agents';
 import { isRecord } from '@n8n/utils/is-record';
+import { Logger } from '@n8n/backend-common';
+import { Container } from '@n8n/di';
 import { z } from 'zod';
 
 import { isTaskRunMemoryResourceId } from '../utils/agent-memory-scope';
@@ -271,6 +273,20 @@ export async function executeActionToolOperation(params: {
 	}
 
 	if (!awaitsResponse) return actionResult;
+	const messageInput =
+		operation.action === 'respond' && isRecord(actionInput) && isRecord(actionInput.message)
+			? actionInput.message
+			: undefined;
+	Container.get(Logger).debugFile?.('[Agent integration] suspending action', {
+		action: operation.action,
+		awaitsResponse,
+		hasInterruptContext: interruptCtx !== undefined,
+		hasCard: messageInput?.card !== undefined,
+		cardPreview:
+			messageInput?.card === undefined
+				? undefined
+				: JSON.stringify(messageInput.card).slice(0, 500),
+	});
 
 	return await interruptCtx?.suspend(
 		{
@@ -278,6 +294,7 @@ export async function executeActionToolOperation(params: {
 			action: operation.action,
 			integrationConnectionId: descriptor.integrationConnectionId,
 			messageContext: actionResult.messageContext,
+			...(messageInput && messageInput.card !== undefined ? { card: messageInput.card } : {}),
 		},
 		// An approval resume leaves APPROVAL_RESUME_SCHEMA on this tool call. Name
 		// the action-tool schema here so a follow-up card is not still expecting

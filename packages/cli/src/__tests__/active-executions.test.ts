@@ -504,6 +504,23 @@ describe('ActiveExecutions', () => {
 			);
 		});
 
+		test('should send an execution control frame to the response', async () => {
+			executionData.httpResponse = mock<Response>();
+			const executionId = await activeExecutions.add(executionData);
+			const controlFrame = {
+				type: 'execution-started' as const,
+				executionId,
+				resumeToken: 'token-123',
+			};
+
+			activeExecutions.sendChunk(executionId, controlFrame);
+
+			expect(executionData.httpResponse.write).toHaveBeenCalledWith(
+				JSON.stringify(controlFrame) + '\n',
+			);
+			expect(executionData.httpResponse.flush).toHaveBeenCalledOnce();
+		});
+
 		test('should skip sending chunk to response if response is not set', async () => {
 			const executionId = await activeExecutions.add(executionData);
 			const testChunk: StructuredChunk = {

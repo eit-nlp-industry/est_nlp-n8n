@@ -4,6 +4,7 @@ import {
 	ChatHubConversationModel,
 	chatHubMessageJsonRenderInteractionSchema,
 	chatHubMessageJsonRenderSchema,
+	chatHubMessageAgentInteractionSchema,
 	chatHubMessageWithButtonsSchema,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
@@ -764,6 +765,11 @@ export class ChatHubExecutionService {
 				chatHubMessageJsonRenderInteractionSchema.safeParse(sendMessage);
 			if (jsonRenderInteraction.success) {
 				return jsonStringify(jsonRenderInteraction.data);
+			}
+
+			const agentInteraction = chatHubMessageAgentInteractionSchema.safeParse(sendMessage);
+			if (agentInteraction.success) {
+				return jsonStringify(agentInteraction.data);
 			}
 
 			const result = chatHubMessageWithButtonsSchema.safeParse(sendMessage);

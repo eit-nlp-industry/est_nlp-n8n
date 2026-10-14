@@ -413,10 +413,12 @@ export class Chat implements INodeType {
 			const responseText =
 				typeof message === 'string'
 					? message
-					: message.type === ChatNodeMessageType.JSON_RENDER ||
-							message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
-						? JSON.stringify(message.payload)
-						: message.text;
+					: message.type === ChatNodeMessageType.AGENT_INTERACTION
+						? JSON.stringify(message.interaction)
+						: message.type === ChatNodeMessageType.JSON_RENDER ||
+								message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
+							? JSON.stringify(message.payload)
+							: message.text;
 			this.customData.set(getHighlightedResponseKey(this.getNode().name), responseText);
 		}
 
@@ -429,10 +431,12 @@ export class Chat implements INodeType {
 				const text =
 					typeof message === 'string'
 						? message
-						: message.type === ChatNodeMessageType.JSON_RENDER ||
-								message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
-							? JSON.stringify(message.payload)
-							: message.text;
+						: message.type === ChatNodeMessageType.AGENT_INTERACTION
+							? JSON.stringify(message.interaction)
+							: message.type === ChatNodeMessageType.JSON_RENDER ||
+									message.type === ChatNodeMessageType.JSON_RENDER_INTERACTION
+								? JSON.stringify(message.payload)
+								: message.text;
 				await memory.chatHistory.addAIMessage(text);
 			}
 		}

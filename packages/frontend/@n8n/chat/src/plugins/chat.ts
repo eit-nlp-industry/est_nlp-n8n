@@ -15,6 +15,7 @@ import type {
 	ChatMessageText,
 	CredentialStatus,
 	SendMessageResponse,
+	StructuredChunk,
 } from '@n8n/chat/types';
 import { parseBotChatMessageContent, shouldBlockUserInput } from '@n8n/chat/utils';
 import { StreamingMessageManager, createBotMessage } from '@n8n/chat/utils/streaming';
@@ -70,7 +71,8 @@ function isStructuredChatFrame(response: SendMessageResponse): boolean {
 		type === 'json-render-interaction' ||
 		type === 'with-buttons' ||
 		type === 'message' ||
-		type === 'error'
+		type === 'error' ||
+		type === 'agent-interaction'
 	);
 }
 
@@ -170,6 +172,7 @@ interface StreamingMessageConfig {
 	receivedMessage: Ref<ChatMessageText | null>;
 	streamingManager: StreamingMessageManager;
 	blockUserInput: Ref<boolean>;
+	onHandlersReady: (handlers: api.StreamingEventHandlers) => void;
 }
 
 /**
@@ -187,9 +190,15 @@ async function handleStreamingMessage(config: StreamingMessageConfig): Promise<b
 		receivedMessage,
 		streamingManager,
 		blockUserInput,
+		onHandlersReady,
 	} = config;
+	let executionStarted = false;
 
 	const handlers: api.StreamingEventHandlers = {
+		onExecutionStarted: (executionId, resumeToken) => {
+			executionStarted = true;
+			chatEventBus.emit('setupWebsocket', { executionId, resumeToken });
+		},
 		onChunk: (chunk: string, nodeId?: string, runIndex?: number) => {
 			handleStreamingChunk(chunk, nodeId, streamingManager, receivedMessage, messages, runIndex);
 		},
@@ -210,6 +219,7 @@ async function handleStreamingMessage(config: StreamingMessageConfig): Promise<b
 			}
 		},
 	};
+	onHandlersReady(handlers);
 
 	const { hasReceivedChunks } = await api.sendMessageStreaming(
 		text,
@@ -220,7 +230,7 @@ async function handleStreamingMessage(config: StreamingMessageConfig): Promise<b
 	);
 
 	// Check if no chunks were received (empty stream)
-	if (!hasReceivedChunks) {
+	if (!hasReceivedChunks && !executionStarted) {
 		handleEmptyStreamResponse({ receivedMessage, messages });
 	}
 
@@ -246,6 +256,7 @@ async function handleNonStreamingMessage(
 	const { text, files, sessionId, options } = config;
 
 	const sendMessageResponse = await api.sendMessage(text, files, sessionId, options);
+	console.log('[n8n chat] non-stream response', sendMessageResponse);
 
 	if (sendMessageResponse?.executionStarted) {
 		return { response: sendMessageResponse };
@@ -265,7 +276,36 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 		const currentSessionId = ref<string | null>(null);
 		const waitingForResponse = ref(false);
 		const blockUserInput = ref(false);
+		const websocketReady = ref(false);
 		const credentialStatus = ref<CredentialStatus | null>(null);
+		let activeStreamingHandlers: api.StreamingEventHandlers | undefined;
+
+		async function processStreamingFrame(frame: StructuredChunk): Promise<void> {
+			if (!activeStreamingHandlers) return;
+
+			const { nodeId, runIndex } = frame.metadata;
+			switch (frame.type) {
+				case 'begin':
+					waitingForResponse.value = true;
+					activeStreamingHandlers.onBeginMessage(nodeId, runIndex);
+					return;
+				case 'item':
+					activeStreamingHandlers.onChunk(frame.content ?? '', nodeId, runIndex);
+					return;
+				case 'end':
+					await activeStreamingHandlers.onEndMessage(nodeId, runIndex);
+					waitingForResponse.value = false;
+					return;
+				case 'error':
+					activeStreamingHandlers.onChunk(
+						`Error: ${frame.content ?? 'Unknown error'}`,
+						nodeId,
+						runIndex,
+					);
+					await activeStreamingHandlers.onEndMessage(nodeId, runIndex);
+					waitingForResponse.value = false;
+			}
+		}
 
 		const initialMessages = computed<ChatMessage[]>(() =>
 			(options.initialMessages ?? []).map((text) => ({
@@ -308,6 +348,9 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 						receivedMessage,
 						streamingManager,
 						blockUserInput,
+						onHandlersReady: (handlers) => {
+							activeStreamingHandlers = handlers;
+						},
 					});
 
 					// Call afterMessageSent handler if provided
@@ -444,10 +487,12 @@ export const ChatPlugin: Plugin<ChatOptions> = {
 			currentSessionId,
 			waitingForResponse,
 			blockUserInput,
+			websocketReady,
 			credentialStatus,
 			loadPreviousSession,
 			startNewSession,
 			sendMessage,
+			processStreamingFrame,
 		};
 
 		app.provide(ChatSymbol, chatStore);

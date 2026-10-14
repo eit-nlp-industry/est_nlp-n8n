@@ -22,6 +22,7 @@ export * from './rich-card.schema';
 export * from './sub-agent.schema';
 export * from './types';
 export * from './workflow-wait';
+export * from './workflow-suspension.schema';
 export type {
 	AgentSseEvent,
 	AgentSseMessage,

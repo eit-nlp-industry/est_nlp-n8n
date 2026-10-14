@@ -19,6 +19,7 @@ import {
 } from 'n8n-core';
 import type {
 	ExecutionError,
+	ExecutionStartedChunk,
 	IExecuteResponsePromiseData,
 	INode,
 	IPinData,
@@ -27,6 +28,7 @@ import type {
 	IWorkflowExecutionDataProcess,
 } from 'n8n-workflow';
 import {
+	CHAT_TRIGGER_NODE_TYPE,
 	createRunExecutionData,
 	ExecutionCancelledError,
 	isTerminalExecutionStatus,
@@ -104,6 +106,26 @@ function flushResponse(res: { flush?: () => void }) {
 	if (typeof res.flush === 'function') {
 		res.flush();
 	}
+}
+
+function getStreamingChatExecutionStartedChunk(
+	data: IWorkflowExecutionDataProcess,
+	executionId: string,
+): ExecutionStartedChunk | undefined {
+	const resumeToken = data.executionData?.resumeToken;
+	const triggerNodeType = data.executionData?.executionData?.runtimeData?.triggerNode?.type;
+
+	if (
+		data.streamingEnabled !== true ||
+		!data.httpResponse ||
+		triggerNodeType !== CHAT_TRIGGER_NODE_TYPE ||
+		typeof resumeToken !== 'string' ||
+		resumeToken.length === 0
+	) {
+		return undefined;
+	}
+
+	return { type: 'execution-started', executionId, resumeToken };
 }
 
 @Service()
@@ -447,6 +469,11 @@ export class WorkflowRunner {
 		if (establishContextError) {
 			await this.failExecution(data, executionId, establishContextError, responsePromise);
 			return executionId;
+		}
+
+		const executionStartedChunk = getStreamingChatExecutionStartedChunk(data, executionId);
+		if (executionStartedChunk) {
+			this.activeExecutions.sendChunk(executionId, executionStartedChunk);
 		}
 
 		const { id: workflowId } = data.workflowData;

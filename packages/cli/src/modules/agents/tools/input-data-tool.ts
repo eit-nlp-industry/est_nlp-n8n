@@ -47,7 +47,8 @@ export function createInputDataTool(context: ExecuteAgentWorkflowContext): Built
 			.systemInstruction(
 				`${WORKFLOW_INVOCATION_INSTRUCTIONS} You were invoked from the n8n workflow '${workflowLabel}' by its node '${context.callingNodeName}'. ` +
 					`Call fetch_input_data to read the data passed into this step (${scopeText}); use it whenever ` +
-					`the message references the input. ${ITEM_SHAPE_HINT} ${QUERY_WHEN_TRUNCATED_HINT}`,
+					'the message references the input. Do not use this tool to read a human interaction response. ' +
+					`The suspended tool receives that response directly when execution resumes. ${ITEM_SHAPE_HINT} ${QUERY_WHEN_TRUNCATED_HINT}`,
 			)
 			// eslint-disable-next-line @typescript-eslint/require-await -- Tool.handler() expects an async callback
 			.handler(async ({ query }) => {

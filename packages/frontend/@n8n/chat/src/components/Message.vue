@@ -8,6 +8,7 @@ import type { ChatMessage, ChatMessageText } from '@n8n/chat/types';
 import ChatFile from './ChatFile.vue';
 import MarkdownRenderer from './MarkdownRenderer.vue';
 import MessageActions from './MessageActions.vue';
+import MessageAgentInteraction from './MessageAgentInteraction.vue';
 
 const props = defineProps<{
 	message: ChatMessage;
@@ -84,7 +85,12 @@ onMounted(async () => {
 			<MessageActions :message="message" />
 		</div>
 		<slot>
-			<template v-if="message.type === 'component' && messageComponents[message.key]">
+			<MessageAgentInteraction
+				v-if="message.type === 'component' && message.key === MessageComponentKey.AGENT_INTERACTION"
+				:message-id="message.id"
+				v-bind="message.arguments"
+			/>
+			<template v-else-if="message.type === 'component' && messageComponents[message.key]">
 				<component :is="messageComponents[message.key]" v-bind="message.arguments" />
 			</template>
 			<div v-else-if="message.type === 'component'" class="chat-message-component-missing">

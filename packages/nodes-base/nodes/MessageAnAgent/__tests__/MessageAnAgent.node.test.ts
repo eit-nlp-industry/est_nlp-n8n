@@ -794,6 +794,52 @@ describe('MessageAnAgent Node', () => {
 			);
 		});
 
+		it('does not enable HITL for a Chat Hub execution', async () => {
+			executeFunctions.getInputData.mockReturnValue([{ json: { sessionId: 'chat-session-3' } }]);
+			mockParams();
+			executeFunctions.getChatTrigger.mockReturnValue(chatTriggerNode);
+			executeFunctions.getExecutionContext.mockReturnValue({
+				source: 'chat',
+				triggerNode: chatTriggerNode,
+			});
+			executeFunctions.evaluateExpression.mockImplementation((expression: string) =>
+				expression === '{{ $json.sessionId }}' ? 'chat-session-3' : undefined,
+			);
+			executeFunctions.executeAgent.mockResolvedValue(mockAgentResult);
+
+			await node.execute.call(executeFunctions);
+
+			expect(executeFunctions.executeAgent).toHaveBeenCalledWith(
+				expect.not.objectContaining({ supportsHitl: true }),
+				'Hello agent',
+				'exec-123',
+				0,
+			);
+		});
+
+		it('enables HITL for a manual Chat Trigger execution', async () => {
+			executeFunctions.getInputData.mockReturnValue([{ json: { sessionId: 'manual-session' } }]);
+			mockParams();
+			executeFunctions.getChatTrigger.mockReturnValue(chatTriggerNode);
+			executeFunctions.getExecutionContext.mockReturnValue({
+				source: 'manual',
+				triggerNode: chatTriggerNode,
+			});
+			executeFunctions.evaluateExpression.mockImplementation((expression: string) =>
+				expression === '{{ $json.sessionId }}' ? 'manual-session' : undefined,
+			);
+			executeFunctions.executeAgent.mockResolvedValue(mockAgentResult);
+
+			await node.execute.call(executeFunctions);
+
+			expect(executeFunctions.executeAgent).toHaveBeenCalledWith(
+				expect.objectContaining({ supportsHitl: true }),
+				'Hello agent',
+				'exec-123',
+				0,
+			);
+		});
+
 		it('falls back to a per-execution session when nothing resolves', async () => {
 			executeFunctions.getInputData.mockReturnValue([{ json: {} }]);
 			mockParams();

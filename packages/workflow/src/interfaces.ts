@@ -1783,6 +1783,7 @@ export const ChatNodeMessageType = {
 	WITH_BUTTONS: 'with-buttons',
 	JSON_RENDER: 'json-render',
 	JSON_RENDER_INTERACTION: 'json-render-interaction',
+	AGENT_INTERACTION: 'agent-interaction',
 } as const;
 
 export type ChatNodeMessageButtonType = 'primary' | 'secondary';
@@ -1809,10 +1810,22 @@ export type ChatNodeMessageJsonRenderInteraction = {
 	blockUserInput: boolean;
 };
 
+export type ChatNodeMessageAgentInteraction = {
+	type: typeof ChatNodeMessageType.AGENT_INTERACTION;
+	interaction: {
+		runId: string;
+		toolCallId: string;
+		interactionType: 'approval' | 'chat_action';
+		payload: Readonly<Record<string, unknown>>;
+		blockUserInput: true;
+	};
+};
+
 export type ChatNodeMessage =
 	| ChatNodeMessageWithButtons
 	| ChatNodeMessageJsonRender
 	| ChatNodeMessageJsonRenderInteraction
+	| ChatNodeMessageAgentInteraction
 	| string;
 
 /**
@@ -2414,6 +2427,10 @@ export type ExecuteAgentSource =
 	| { agentId?: never; inlineAgent: InlineAgentPayload };
 
 export type ExecuteAgentInfo = ExecuteAgentSource & {
+	/** Whether this invocation may suspend for a native chat interaction. */
+	supportsHitl?: boolean;
+	/** Resume data for a previously suspended agent interaction. */
+	resume?: ExecuteAgentResume;
 	/**
 	 * Optional caller-supplied session id. When set, this becomes the agent
 	 * thread id, letting workflows continue the same conversation (and reuse
@@ -2485,7 +2502,37 @@ export interface ExecuteAgentInvocationContext {
 	nodeName: string;
 	runIndex: number;
 	itemIndex: number;
+	supportsHitl?: boolean;
+	resume?: ExecuteAgentResume;
 	sendResponseChunk?: (type: ChunkType, content?: string) => Promise<void>;
+}
+
+export interface AgentWorkflowSuspension {
+	runId: string;
+	toolCallId: string;
+	toolName: string;
+	suspendPayload: unknown;
+	resumeSchema?: JSONSchema7;
+}
+
+export interface AgentWorkflowSuspensionData {
+	agentId: string;
+	threadId: string;
+	suspensions: AgentWorkflowSuspension[];
+}
+
+export interface ExecuteAgentResume {
+	runId: string;
+	toolCallId: string;
+	resumeData: unknown;
+}
+
+export interface AgentWorkflowWaitMetadata {
+	agentId: string;
+	threadId: string;
+	itemIndex: number;
+	suspensions: AgentWorkflowSuspension[];
+	resumeCommand?: ExecuteAgentResume;
 }
 
 export interface ExecuteAgentOptions {
@@ -2556,6 +2603,8 @@ export interface ExecuteAgentData {
 		/** The internally scoped thread id the session was persisted under (deep-link key). */
 		threadId: string;
 	} | null;
+	/** Suspension metadata for a workflow that waits for an agent interaction. */
+	suspension?: AgentWorkflowSuspensionData;
 }
 
 export type WebhookSetupMethodNames = 'checkExists' | 'create' | 'delete';
@@ -3528,6 +3577,7 @@ type SubNodeExecutionDataAction = {
 };
 
 export interface ITaskMetadata {
+	agentWorkflowSuspension?: AgentWorkflowWaitMetadata;
 	subRun?: ITaskSubRunMetadata[];
 	parentExecution?: RelatedExecution;
 	subExecution?: RelatedExecution;
@@ -4126,6 +4176,11 @@ export type Logger = Record<
 	Exclude<LogLevel, 'silent'>,
 	(message: string, metadata?: LogMetadata) => void
 >;
+
+export function logToDebugFile(logger: Logger, message: string, metadata: LogMetadata = {}) {
+	const debugFile = Reflect.get(logger, 'debugFile');
+	if (typeof debugFile === 'function') debugFile.call(logger, message, metadata);
+}
 export type LogLocationMetadata = Pick<LogMetadata, 'file' | 'function'>;
 
 export interface IStatusCodeMessages {
@@ -4591,5 +4646,17 @@ export interface StructuredChunk {
 		timestamp: number;
 	};
 }
+
+export interface ExecutionStartedChunk {
+	type: 'execution-started';
+	executionId: string;
+	resumeToken: string;
+}
+
+export interface StreamingKeepaliveChunk {
+	type: 'keepalive';
+}
+
+export type StreamingChunk = StructuredChunk | ExecutionStartedChunk | StreamingKeepaliveChunk;
 
 export type ApiKeyAudience = 'public-api' | 'mcp-server-api';

@@ -3,7 +3,7 @@ import type {
 	ChatOptions,
 	LoadPreviousSessionResponse,
 	SendMessageResponse,
-	StructuredChunk,
+	StreamingChunk,
 } from '@n8n/chat/types';
 
 export async function loadPreviousSession(sessionId: string, options: ChatOptions) {
@@ -70,7 +70,7 @@ function isProxyErrorHtml(line: string): boolean {
 }
 
 // Create a transform stream that parses newline-delimited JSON
-function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
+function createLineParser(): TransformStream<Uint8Array, StreamingChunk> {
 	let buffer = '';
 	// Once an HTML error page is detected (e.g. Cloudflare 524), all subsequent
 	// non-JSON lines are suppressed and a single user-facing error is emitted.
@@ -89,7 +89,7 @@ function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
 			for (const line of lines) {
 				if (line.trim()) {
 					try {
-						const parsed = JSON.parse(line) as StructuredChunk;
+						const parsed = JSON.parse(line) as StreamingChunk;
 						insideHtmlError = false;
 						controller.enqueue(parsed);
 					} catch (error) {
@@ -102,7 +102,7 @@ function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
 								controller.enqueue({
 									type: 'error',
 									content: PROXY_TIMEOUT_ERROR_MESSAGE,
-								} as StructuredChunk);
+								} as StreamingChunk);
 							}
 							continue;
 						}
@@ -110,7 +110,7 @@ function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
 						controller.enqueue({
 							type: 'item',
 							content: line,
-						} as StructuredChunk);
+						} as StreamingChunk);
 					}
 				}
 			}
@@ -120,7 +120,7 @@ function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
 			// Process any remaining buffer content
 			if (buffer.trim() && !insideHtmlError) {
 				try {
-					const parsed = JSON.parse(buffer) as StructuredChunk;
+					const parsed = JSON.parse(buffer) as StreamingChunk;
 					controller.enqueue(parsed);
 				} catch (error) {
 					if (isProxyErrorHtml(buffer)) {
@@ -128,14 +128,14 @@ function createLineParser(): TransformStream<Uint8Array, StructuredChunk> {
 							controller.enqueue({
 								type: 'error',
 								content: PROXY_TIMEOUT_ERROR_MESSAGE,
-							} as StructuredChunk);
+							} as StreamingChunk);
 						}
 						return;
 					}
 					controller.enqueue({
 						type: 'item',
 						content: buffer,
-					} as StructuredChunk);
+					} as StreamingChunk);
 				}
 			}
 		},
@@ -146,6 +146,7 @@ export interface StreamingEventHandlers {
 	onBeginMessage: (nodeId: string, runIndex?: number) => void;
 	onChunk: (chunk: string, nodeId?: string, runIndex?: number) => void;
 	onEndMessage: (nodeId: string, runIndex?: number) => void | Promise<void>;
+	onExecutionStarted?: (executionId: string, resumeToken: string) => void;
 }
 
 export async function sendMessageStreaming(
@@ -178,25 +179,42 @@ export async function sendMessageStreaming(
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-
-			const nodeId = value.metadata?.nodeId || 'unknown';
-			const runIndex = value.metadata?.runIndex;
+			console.log('[n8n chat] streaming frame', value);
 
 			switch (value.type) {
+				case 'execution-started':
+					handlers.onExecutionStarted?.(value.executionId, value.resumeToken);
+					break;
+				case 'keepalive':
+					break;
 				case 'begin':
-					handlers.onBeginMessage(nodeId, runIndex);
+					handlers.onBeginMessage(value.metadata?.nodeId ?? 'unknown', value.metadata?.runIndex);
 					break;
 				case 'item':
 					hasReceivedChunks = true;
-					handlers.onChunk(value.content ?? '', nodeId, runIndex);
+					handlers.onChunk(
+						value.content ?? '',
+						value.metadata?.nodeId ?? 'unknown',
+						value.metadata?.runIndex,
+					);
 					break;
 				case 'end':
-					await handlers.onEndMessage(nodeId, runIndex);
+					await handlers.onEndMessage(
+						value.metadata?.nodeId ?? 'unknown',
+						value.metadata?.runIndex,
+					);
 					break;
 				case 'error':
 					hasReceivedChunks = true;
-					handlers.onChunk(`Error: ${value.content ?? 'Unknown error'}`, nodeId, runIndex);
-					await handlers.onEndMessage(nodeId, runIndex);
+					handlers.onChunk(
+						`Error: ${value.content ?? 'Unknown error'}`,
+						value.metadata?.nodeId ?? 'unknown',
+						value.metadata?.runIndex,
+					);
+					await handlers.onEndMessage(
+						value.metadata?.nodeId ?? 'unknown',
+						value.metadata?.runIndex,
+					);
 					break;
 			}
 		}

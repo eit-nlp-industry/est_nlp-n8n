@@ -24,6 +24,103 @@ describe('sendMessageStreaming', () => {
 		vi.restoreAllMocks();
 	});
 
+	it('dispatches an execution-started frame without rendering content', async () => {
+		const encoder = new TextEncoder();
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(
+					encoder.encode(
+						JSON.stringify({
+							type: 'execution-started',
+							executionId: 'exec-123',
+							resumeToken: 'token-123',
+						}) + '\n',
+					),
+				);
+				controller.close();
+			},
+		});
+		vi.spyOn(global, 'fetch').mockResolvedValue(new Response(stream, { status: 200 }));
+		const handlers = {
+			onChunk: vi.fn(),
+			onBeginMessage: vi.fn(),
+			onEndMessage: vi.fn(),
+			onExecutionStarted: vi.fn(),
+		};
+
+		const result = await sendMessageStreaming(
+			'Test message',
+			[],
+			'test-session-id',
+			mockOptions,
+			handlers,
+		);
+
+		expect(handlers.onExecutionStarted).toHaveBeenCalledOnce();
+		expect(handlers.onExecutionStarted).toHaveBeenCalledWith('exec-123', 'token-123');
+		expect(handlers.onBeginMessage).not.toHaveBeenCalled();
+		expect(handlers.onChunk).not.toHaveBeenCalled();
+		expect(handlers.onEndMessage).not.toHaveBeenCalled();
+		expect(result).toEqual({ hasReceivedChunks: false });
+	});
+
+	it('parses an execution-started frame split across byte chunks once', async () => {
+		const encoder = new TextEncoder();
+		const frame = JSON.stringify({
+			type: 'execution-started',
+			executionId: 'exec-123',
+			resumeToken: 'token-123',
+		});
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(encoder.encode(frame.slice(0, 23)));
+				controller.enqueue(encoder.encode(frame.slice(23) + '\n'));
+				controller.close();
+			},
+		});
+		vi.spyOn(global, 'fetch').mockResolvedValue(new Response(stream, { status: 200 }));
+		const onExecutionStarted = vi.fn();
+
+		await sendMessageStreaming('Test message', [], 'test-session-id', mockOptions, {
+			onChunk: vi.fn(),
+			onBeginMessage: vi.fn(),
+			onEndMessage: vi.fn(),
+			onExecutionStarted,
+		});
+
+		expect(onExecutionStarted).toHaveBeenCalledOnce();
+		expect(onExecutionStarted).toHaveBeenCalledWith('exec-123', 'token-123');
+	});
+
+	it('ignores a keepalive frame without calling onExecutionStarted', async () => {
+		const encoder = new TextEncoder();
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(encoder.encode('{"type":"keepalive"}\n'));
+				controller.close();
+			},
+		});
+		vi.spyOn(global, 'fetch').mockResolvedValue(new Response(stream, { status: 200 }));
+		const handlers = {
+			onChunk: vi.fn(),
+			onBeginMessage: vi.fn(),
+			onEndMessage: vi.fn(),
+			onExecutionStarted: vi.fn(),
+		};
+
+		const result = await sendMessageStreaming(
+			'Test message',
+			[],
+			'test-session-id',
+			mockOptions,
+			handlers,
+		);
+
+		expect(handlers.onExecutionStarted).not.toHaveBeenCalled();
+		expect(handlers.onChunk).not.toHaveBeenCalled();
+		expect(result).toEqual({ hasReceivedChunks: false });
+	});
+
 	it('should call the webhook URL with correct parameters', async () => {
 		const chunks = [
 			{

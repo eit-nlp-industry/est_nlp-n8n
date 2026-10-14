@@ -1,14 +1,22 @@
 import type { JSONSchema7 } from 'json-schema';
 import type {
 	ExecuteAgentSource,
+	AgentWorkflowWaitMetadata,
 	IDataObject,
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
 	INodeTypeDescription,
 	InlineAgentPayload,
+	ChatNodeMessageAgentInteraction,
 } from 'n8n-workflow';
-import { jsonParse, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import {
+	CHAT_TRIGGER_NODE_TYPE,
+	jsonParse,
+	logToDebugFile,
+	NodeConnectionTypes,
+	NodeOperationError,
+} from 'n8n-workflow';
 import crypto from 'node:crypto';
 
 import { generateSchemaFromExample } from './generateSchemaFromExample';
@@ -567,6 +575,54 @@ function resolveSessionId(ctx: IExecuteFunctions, itemIndex: number): string | u
 	return getChatSessionId(ctx, itemIndex);
 }
 
+function supportsWorkflowAgentInteraction(
+	ctx: IExecuteFunctions,
+	source: ExecuteAgentSource,
+	sessionId: string | undefined,
+): boolean {
+	if (!('agentId' in source) || !source.agentId || !sessionId) return false;
+	const executionContext = ctx.getExecutionContext();
+	const chatTrigger = ctx.getChatTrigger();
+	return (
+		chatTrigger?.type === CHAT_TRIGGER_NODE_TYPE &&
+		executionContext?.source !== undefined &&
+		['manual', 'webhook'].includes(executionContext.source) &&
+		executionContext.triggerNode?.name === chatTrigger.name &&
+		executionContext.triggerNode.type === chatTrigger.type
+	);
+}
+
+function toAgentInteraction(
+	ctx: IExecuteFunctions,
+	suspension: NonNullable<
+		Awaited<ReturnType<IExecuteFunctions['executeAgent']>>['suspension']
+	>['suspensions'][number],
+): ChatNodeMessageAgentInteraction {
+	const payload = suspension.suspendPayload;
+	if (!isRecord(payload)) {
+		throw new NodeOperationError(
+			ctx.getNode(),
+			`Agent suspension for tool ${suspension.toolName} has no supported interaction payload`,
+		);
+	}
+	const interactionPayload = payload;
+	const interactionType = 'card' in interactionPayload ? 'chat_action' : 'approval';
+	return {
+		type: 'agent-interaction',
+		interaction: {
+			runId: suspension.runId,
+			toolCallId: suspension.toolCallId,
+			interactionType,
+			payload: interactionPayload,
+			blockUserInput: true,
+		},
+	};
+}
+
+function isRecord(value: unknown): value is { readonly [key: string]: Readonly<unknown> } {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Shared execution for every version. */
 export async function execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 	const items = this.getInputData();
@@ -583,6 +639,7 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 			: (this.getNodeParameter('advanced.invokeMode', 0, 'allItems') as string);
 	const runOnceForAll = invokeMode === 'allItems';
 	const loopCount = runOnceForAll ? Math.min(1, items.length) : items.length;
+	const waiting = this.getExecuteData()?.metadata?.agentWorkflowSuspension;
 
 	for (let i = 0; i < loopCount; i++) {
 		try {
@@ -613,6 +670,25 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 			}
 
 			const outputSchema = getStructuredOutputSchema(this, i);
+			const supportsHitl = supportsWorkflowAgentInteraction(this, source, sessionId);
+			const executionContext = this.getExecutionContext();
+			const chatTrigger = this.getChatTrigger();
+			logToDebugFile(this.logger, '[Message an Agent] interaction gate', {
+				executionId,
+				agentId: 'agentId' in source ? source.agentId : undefined,
+				source: executionContext?.source,
+				sessionIdPresent: Boolean(sessionId),
+				chatTrigger: chatTrigger
+					? { name: chatTrigger.name, type: chatTrigger.type, disabled: chatTrigger.disabled }
+					: null,
+				triggerNode: executionContext?.triggerNode
+					? {
+							name: executionContext.triggerNode.name,
+							type: executionContext.triggerNode.type,
+						}
+					: null,
+				supportsHitl,
+			});
 
 			const result = await this.executeAgent(
 				{
@@ -622,11 +698,46 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 					...(advanced.enableStreaming === false ? { enableStreaming: false } : {}),
 					inputDataScope: runOnceForAll ? 'all' : 'item',
 					exposeWorkflowData: allowOtherNodesData,
+					...(supportsHitl ? { supportsHitl: true } : {}),
+					...(waiting?.resumeCommand ? { resume: waiting.resumeCommand } : {}),
 				},
 				prompt,
 				executionId,
 				i,
 			);
+			logToDebugFile(this.logger, '[Message an Agent] executeAgent returned', {
+				executionId,
+				resultKeys: Object.keys(result),
+				hasSuspension: result.suspension !== undefined,
+				suspensionCount: result.suspension?.suspensions.length,
+				responsePreview:
+					typeof result.response === 'string' ? result.response.slice(0, 300) : undefined,
+			});
+
+			if (result.suspension) {
+				logToDebugFile(this.logger, '[Message an Agent] handling suspension', {
+					executionId,
+					suspensionCount: result.suspension.suspensions.length,
+				});
+				const interaction = toAgentInteraction(this, result.suspension.suspensions[0]);
+				const metadata: AgentWorkflowWaitMetadata = {
+					agentId: result.suspension.agentId,
+					threadId: result.suspension.threadId,
+					itemIndex: i,
+					suspensions: result.suspension.suspensions,
+				};
+				this.setMetadata({ agentWorkflowSuspension: metadata });
+				logToDebugFile(this.logger, '[Message an Agent] returning interaction message', {
+					executionId,
+					interactionType: interaction.type,
+					interactionPreview: JSON.stringify(interaction).slice(0, 1000),
+					runDataItemKeys: ['json', 'sendMessage', 'pairedItem'],
+				});
+				returnData.push({ json: {}, sendMessage: interaction, pairedItem: { item: i } });
+				await this.putExecutionToWait(new Date('9999-12-31T23:59:59.999Z'));
+				return [returnData];
+			}
+			if (waiting) this.setMetadata({ agentWorkflowSuspension: undefined });
 
 			returnData.push({
 				json: {
@@ -643,6 +754,10 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 				pairedItem: { item: i },
 			});
 		} catch (error) {
+			console.error('[Message an Agent] execution failed', {
+				executionId,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			if (this.continueOnFail()) {
 				returnData.push({
 					json: {
@@ -657,4 +772,49 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 	}
 
 	return [returnData];
+}
+
+export async function onMessage(
+	this: IExecuteFunctions,
+	data: INodeExecutionData,
+): Promise<INodeExecutionData[][]> {
+	const waiting = this.getExecuteData().metadata?.agentWorkflowSuspension;
+	if (!waiting) return [[data]];
+
+	const input = data.json?.chatInput;
+	const envelope =
+		typeof input === 'string'
+			? jsonParse<unknown>(input, { errorMessage: 'Invalid Agent suspension response' })
+			: input;
+	if (
+		typeof envelope !== 'object' ||
+		envelope === null ||
+		(envelope as { type?: unknown }).type !== 'agent-suspension-response'
+	) {
+		throw new NodeOperationError(this.getNode(), 'Expected an Agent suspension response.');
+	}
+	const response = envelope as {
+		type: 'agent-suspension-response';
+		runId?: unknown;
+		toolCallId?: unknown;
+		resumeData?: unknown;
+	};
+	const current = waiting.suspensions.find(
+		(suspension) =>
+			suspension.runId === response.runId && suspension.toolCallId === response.toolCallId,
+	);
+	if (!current) {
+		throw new NodeOperationError(this.getNode(), 'This Agent interaction is no longer active.');
+	}
+	this.setMetadata({
+		agentWorkflowSuspension: {
+			...waiting,
+			resumeCommand: {
+				runId: current.runId,
+				toolCallId: current.toolCallId,
+				resumeData: response.resumeData,
+			},
+		},
+	});
+	return [[data]];
 }

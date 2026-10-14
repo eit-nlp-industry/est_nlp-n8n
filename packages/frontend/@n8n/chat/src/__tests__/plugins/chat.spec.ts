@@ -273,6 +273,119 @@ describe('ChatPlugin', () => {
 			);
 		});
 
+		it('renders streamed text and a following native interaction as separate messages', async () => {
+			const interaction = {
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					interactionType: 'chat_action',
+					payload: { card: { title: 'Choose a refund reason' } },
+					blockUserInput: true,
+				},
+			};
+			vi.mocked(api.sendMessageStreaming).mockImplementationOnce(
+				async (_text, _files, _sessionId, _options, handlers) => {
+					handlers.onBeginMessage?.('agent-node', 0);
+					handlers.onChunk?.('Thanks for the order number.', 'agent-node', 0);
+					await handlers.onEndMessage?.('agent-node', 0);
+					handlers.onBeginMessage?.('agent-node', 0);
+					handlers.onChunk?.(JSON.stringify(interaction), 'agent-node', 0);
+					await handlers.onEndMessage?.('agent-node', 0);
+					return { hasReceivedChunks: true };
+				},
+			);
+
+			await chatStore.sendMessage('A100');
+
+			expect(chatStore.messages.value).toHaveLength(3);
+			expect(chatStore.messages.value[1]).toMatchObject({
+				sender: 'bot',
+				text: 'Thanks for the order number.',
+			});
+			expect(chatStore.messages.value[2]).toMatchObject({
+				sender: 'bot',
+				type: 'component',
+				arguments: interaction.interaction,
+			});
+			expect(chatStore.blockUserInput.value).toBe(true);
+		});
+
+		it('requests WebSocket setup for an execution-started frame', async () => {
+			vi.mocked(api.sendMessageStreaming).mockImplementationOnce(
+				async (_text, _files, _sessionId, _options, handlers) => {
+					handlers.onExecutionStarted?.('exec-123', 'token-123');
+					return { hasReceivedChunks: true };
+				},
+			);
+
+			await chatStore.sendMessage('Stream this!');
+
+			expect(chatEventBus.emit).toHaveBeenCalledWith('setupWebsocket', {
+				executionId: 'exec-123',
+				resumeToken: 'token-123',
+			});
+		});
+
+		it('does not add the execution-started frame to the transcript', async () => {
+			vi.mocked(api.sendMessageStreaming).mockImplementationOnce(
+				async (_text, _files, _sessionId, _options, handlers) => {
+					handlers.onExecutionStarted?.('exec-123', 'token-123');
+					return { hasReceivedChunks: true };
+				},
+			);
+
+			await chatStore.sendMessage('Stream this!');
+
+			expect(chatStore.messages.value).toHaveLength(1);
+			expect(chatStore.messages.value[0]).toMatchObject({ sender: 'user', text: 'Stream this!' });
+		});
+
+		it('does not show an empty-stream error when an execution starts and waits', async () => {
+			vi.mocked(api.sendMessageStreaming).mockImplementationOnce(
+				async (_text, _files, _sessionId, _options, handlers) => {
+					handlers.onExecutionStarted?.('exec-123', 'token-123');
+					return { hasReceivedChunks: false };
+				},
+			);
+
+			await chatStore.sendMessage('Stream this!');
+
+			expect(chatStore.messages.value).toHaveLength(1);
+			expect(chatStore.messages.value[0]).toMatchObject({ sender: 'user', text: 'Stream this!' });
+		});
+
+		it('renders resumed structured stream frames received over WebSocket', async () => {
+			vi.mocked(api.sendMessageStreaming).mockImplementationOnce(
+				async (_text, _files, _sessionId, _options, handlers) => {
+					handlers.onExecutionStarted?.('exec-123', 'token-123');
+					return { hasReceivedChunks: false };
+				},
+			);
+			await chatStore.sendMessage('Stream this!');
+			const metadata = {
+				nodeId: 'agent-node',
+				nodeName: 'Message an Agent',
+				timestamp: 1,
+				runIndex: 0,
+				itemIndex: 0,
+			};
+
+			await chatStore.processStreamingFrame({ type: 'begin', metadata });
+			await chatStore.processStreamingFrame({
+				type: 'item',
+				content: 'continued response',
+				metadata,
+			});
+			await chatStore.processStreamingFrame({ type: 'end', metadata });
+
+			expect(chatStore.messages.value).toHaveLength(2);
+			expect(chatStore.messages.value[1]).toMatchObject({
+				sender: 'bot',
+				text: 'continued response',
+			});
+		});
+
 		it('should handle empty streaming response', async () => {
 			const mockStreamingResponse = { hasReceivedChunks: false };
 			vi.mocked(api.sendMessageStreaming).mockResolvedValueOnce(mockStreamingResponse);

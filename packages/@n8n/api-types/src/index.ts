@@ -91,6 +91,8 @@ export {
 	type ChatHubMessageJsonRender,
 	chatHubMessageJsonRenderInteractionSchema,
 	type ChatHubMessageJsonRenderInteraction,
+	chatHubMessageAgentInteractionSchema,
+	type ChatHubMessageAgentInteraction,
 	type ChatHubToolDto,
 	ChatHubCreateToolRequest,
 	ChatHubUpdateToolRequest,

@@ -6,6 +6,7 @@ import type { ChatMessageContentChunk } from '@n8n/api-types';
 import ChatButtons from './ChatButtons.vue';
 import ChatJsonRenderInteractionChunk from './ChatJsonRenderInteractionChunk.vue';
 import ChatJsonRenderChunk from './ChatJsonRenderChunk.vue';
+import ChatAgentInteractionChunk from './ChatAgentInteractionChunk.vue';
 
 const {
 	source,
@@ -18,6 +19,10 @@ const {
 	isButtonsDisabled?: boolean;
 	footnoteStyle?: 'pill' | 'normal';
 	submitJsonRenderDecision?: (approved: boolean, value?: Record<string, unknown>) => Promise<void>;
+	submitAgentInteraction?: (
+		source: Extract<ChatMessageContentChunk, { type: 'agent-interaction' }>,
+		resumeData: unknown,
+	) => Promise<void>;
 }>();
 
 const emit = defineEmits<{ openArtifact: [title: string] }>();
@@ -86,6 +91,12 @@ defineExpose({
 		:source="source"
 		:disabled="isButtonsDisabled"
 		:submit-decision="submitJsonRenderDecision"
+	/>
+	<ChatAgentInteractionChunk
+		v-else-if="source.type === 'agent-interaction'"
+		:source="source"
+		:disabled="isButtonsDisabled"
+		@submit="submitAgentInteraction?.(source, $event)"
 	/>
 	<div v-else-if="source.type === 'hidden'" />
 	<button

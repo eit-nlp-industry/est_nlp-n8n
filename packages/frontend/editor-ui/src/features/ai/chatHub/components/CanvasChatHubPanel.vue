@@ -11,6 +11,7 @@ import type {
 	ChatMessageId,
 	ChatModelDto,
 	ChatSessionId,
+	ChatMessageContentChunk,
 } from '@n8n/api-types';
 import { CHAT_TRIGGER_NODE_TYPE } from '@/app/constants';
 import { useTelemetry } from '@n8n/composables/useTelemetry';
@@ -219,6 +220,28 @@ async function submitJsonRenderDecision(
 	}
 }
 
+async function submitAgentInteraction(
+	source: Extract<ChatMessageContentChunk, { type: 'agent-interaction' }>,
+	resumeData: unknown,
+): Promise<void> {
+	if (isResponding.value || !workflowAgent.value) {
+		throw new Error('Chat Hub cannot submit the interaction now');
+	}
+	await chatStore.sendMessage(
+		sessionId.value,
+		JSON.stringify({
+			type: 'agent-suspension-response',
+			runId: source.interaction.runId,
+			toolCallId: source.interaction.toolCallId,
+			resumeData,
+		}),
+		workflowAgent.value,
+		{} as ChatHubSendMessageRequest['credentials'],
+		[],
+		workflowDocumentStore.value.workflowId,
+	);
+}
+
 async function onStop() {
 	await chatStore.stopStreamingMessage(sessionId.value);
 }
@@ -406,6 +429,7 @@ defineExpose({
 						:cached-agent-icon="workflowAgent?.icon ?? null"
 						:accepted-mime-types="workflowAgent?.metadata.allowedFilesMimeTypes ?? ''"
 						:submit-json-render-decision="submitJsonRenderDecision"
+						:submit-agent-interaction="submitAgentInteraction"
 						@start-edit="handleStartEditMessage(message.id)"
 						@cancel-edit="handleCancelEditMessage"
 						@update="handleEditMessage"

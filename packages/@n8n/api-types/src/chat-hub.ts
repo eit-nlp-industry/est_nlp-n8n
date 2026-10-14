@@ -9,6 +9,7 @@ import {
 } from 'n8n-workflow';
 import { z } from 'zod';
 
+import { agentWorkflowInteractionSchema } from './agents/workflow-suspension.schema';
 import { TimeZoneSchema } from './schemas/timezone.schema';
 import { Z } from './zod-class';
 
@@ -475,6 +476,17 @@ export type ChatMessageContentChunk =
 			payload: Record<string, unknown>;
 			blockUserInput: boolean;
 			content?: undefined;
+	  }
+	| {
+			type: 'agent-interaction';
+			interaction: {
+				runId: string;
+				toolCallId: string;
+				interactionType: 'approval' | 'chat_action';
+				payload: unknown;
+				blockUserInput: true;
+			};
+			content?: undefined;
 	  };
 
 export interface ChatHubMessageDto {
@@ -726,6 +738,13 @@ export const chatHubMessageJsonRenderInteractionSchema = z.object({
 export type ChatHubMessageJsonRenderInteraction = z.infer<
 	typeof chatHubMessageJsonRenderInteractionSchema
 >;
+
+export const chatHubMessageAgentInteractionSchema = z.object({
+	type: z.literal('agent-interaction'),
+	interaction: agentWorkflowInteractionSchema,
+});
+
+export type ChatHubMessageAgentInteraction = z.infer<typeof chatHubMessageAgentInteractionSchema>;
 
 /**
  * DTO for a configured chat hub tool

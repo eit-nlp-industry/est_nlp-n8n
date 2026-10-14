@@ -11,7 +11,7 @@ import type {
 	IRun,
 	ExecutionStatus,
 	IWorkflowExecutionDataProcess,
-	StructuredChunk,
+	StreamingChunk,
 	WebhookResponseMode,
 } from 'n8n-workflow';
 import {
@@ -213,7 +213,7 @@ export class ActiveExecutions {
 	}
 
 	/** Used for sending a chunk to a streaming response */
-	sendChunk(executionId: string, chunkText: StructuredChunk): void {
+	sendChunk(executionId: string, chunkText: StreamingChunk): void {
 		const execution = this.activeExecutions[executionId];
 		if (execution?.httpResponse) {
 			execution?.httpResponse.write(JSON.stringify(chunkText) + '\n');

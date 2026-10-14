@@ -6,6 +6,7 @@ import IconSend from 'virtual:icons/mdi/send';
 import { computed, onMounted, onUnmounted, ref, unref } from 'vue';
 
 import { useI18n, useChat, useOptions } from '@n8n/chat/composables';
+import { MessageComponentKey } from '@n8n/chat/constants';
 import { chatEventBus } from '@n8n/chat/event-buses';
 import {
 	constructChatWebsocketUrl,
@@ -14,7 +15,7 @@ import {
 } from '@n8n/chat/utils';
 
 import ChatFile from './ChatFile.vue';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, ChunkType, StructuredChunk } from '../types';
 
 export interface ChatInputProps {
 	placeholder?: string;
@@ -34,6 +35,65 @@ const emit = defineEmits<{
 	arrowKeyDown: [value: ArrowKeyDownPayload];
 }>();
 
+function isChunkType(value: unknown): value is ChunkType {
+	return value === 'begin' || value === 'item' || value === 'end' || value === 'error';
+}
+
+function parseStructuredChunk(value: unknown): StructuredChunk | undefined {
+	if (value === null || typeof value !== 'object' || !('type' in value) || !isChunkType(value.type))
+		return undefined;
+	if (!('metadata' in value) || value.metadata === null || typeof value.metadata !== 'object')
+		return undefined;
+	const metadata = value.metadata;
+	if (
+		!('nodeId' in metadata) ||
+		typeof metadata.nodeId !== 'string' ||
+		!('nodeName' in metadata) ||
+		typeof metadata.nodeName !== 'string' ||
+		!('timestamp' in metadata) ||
+		typeof metadata.timestamp !== 'number' ||
+		!('runIndex' in metadata) ||
+		typeof metadata.runIndex !== 'number' ||
+		!('itemIndex' in metadata) ||
+		typeof metadata.itemIndex !== 'number'
+	)
+		return undefined;
+	const content =
+		'content' in value && typeof value.content === 'string' ? value.content : undefined;
+
+	return {
+		type: value.type,
+		...(content !== undefined ? { content } : {}),
+		metadata: {
+			nodeId: metadata.nodeId,
+			nodeName: metadata.nodeName,
+			timestamp: metadata.timestamp,
+			runIndex: metadata.runIndex,
+			itemIndex: metadata.itemIndex,
+		},
+	};
+}
+
+function isDuplicateAgentInteraction(candidate: ChatMessage, messages: ChatMessage[]): boolean {
+	if (candidate.type !== 'component' || candidate.key !== MessageComponentKey.AGENT_INTERACTION) {
+		return false;
+	}
+	const { runId, toolCallId } = candidate.arguments;
+	if (typeof runId !== 'string' || typeof toolCallId !== 'string') return false;
+
+	return messages.some(
+		(message) =>
+			message.type === 'component' &&
+			message.key === MessageComponentKey.AGENT_INTERACTION &&
+			message.arguments.runId === runId &&
+			message.arguments.toolCallId === toolCallId,
+	);
+}
+
+function isEmptyTextMessage(message: ChatMessage): boolean {
+	return message.type !== 'component' && message.text.length === 0;
+}
+
 const { options } = useOptions();
 const chatStore = useChat();
 const { waitingForResponse, credentialStatus } = chatStore;
@@ -44,6 +104,7 @@ const input = ref('');
 const isSubmitting = ref(false);
 const resizeObserver = ref<ResizeObserver | null>(null);
 const waitingForChatResponse = ref(false);
+const websocketExecutionId = ref<string | null>(null);
 
 const isCredentialGateActive = computed(() => {
 	const status = credentialStatus.value;
@@ -98,8 +159,8 @@ onChange((newFiles) => {
 	files.value = newFilesDT.files;
 });
 
-function handleSetupWebsocket(executionId: string, resumeToken?: string) {
-	setupWebsocketConnection(executionId, resumeToken);
+function handleSetupWebsocket(payload: { executionId: string; resumeToken?: string }) {
+	setupWebsocketConnection(payload.executionId, payload.resumeToken);
 }
 
 onMounted(() => {
@@ -167,6 +228,16 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 	// do not setup websocket as it would be handled by the integrated chat
 	if (options.webhookUrl && chatStore.currentSessionId.value) {
 		try {
+			if (
+				chatStore.ws &&
+				websocketExecutionId.value === executionId &&
+				chatStore.ws.readyState !== WebSocket.CLOSED
+			) {
+				return;
+			}
+
+			chatStore.ws?.close();
+			chatStore.websocketReady.value = false;
 			const wsUrl = constructChatWebsocketUrl(
 				options.webhookUrl,
 				executionId,
@@ -174,7 +245,14 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 				true,
 				resumeToken,
 			);
-			chatStore.ws = new WebSocket(wsUrl);
+			const ws = new WebSocket(wsUrl);
+			chatStore.ws = ws;
+			websocketExecutionId.value = executionId;
+			ws.onopen = () => {
+				if (chatStore.ws === ws && websocketExecutionId.value === executionId) {
+					chatStore.websocketReady.value = true;
+				}
+			};
 			// Keep the typing indicator up while the execution runs: the initial
 			// sendMessage cleared it on `executionStarted`, and the first bot frame
 			// (or socket close) below will clear it again.
@@ -183,25 +261,43 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 			// `n8n|heartbeat`, a v3 server sends `{type:'heartbeat'}`. Once legacy mode is
 			// locked, JSON that merely looks like a control frame is a chat message.
 			let jsonProtocol: boolean | undefined;
-			chatStore.ws.onmessage = (e) => {
+			ws.onmessage = (e) => {
 				const data = e.data as string;
+				console.log('[n8n chat] websocket frame', data.slice(0, 2000));
+				if (data.length === 0) return;
 
 				// Backward compatible with both protocols: legacy string sentinels
 				// (n8n < v3) and JSON frames (n8n v3+). Normalize to a frame type,
 				// remembering the legacy case so heartbeats are acked in kind.
 				const isLegacy = data === 'n8n|heartbeat' || data === 'n8n|continue';
 				let frameType: string | undefined;
+				let parsedFrame: unknown;
 				if (isLegacy) {
 					frameType = data === 'n8n|heartbeat' ? 'heartbeat' : 'continue';
 				} else {
 					try {
-						frameType = (JSON.parse(data) as { type?: string }).type;
+						parsedFrame = JSON.parse(data);
+						if (
+							parsedFrame !== null &&
+							typeof parsedFrame === 'object' &&
+							'type' in parsedFrame &&
+							typeof parsedFrame.type === 'string'
+						) {
+							frameType = parsedFrame.type;
+						}
 					} catch {
 						frameType = undefined;
 					}
 				}
 
+				const structuredChunk = parseStructuredChunk(parsedFrame);
+				if (structuredChunk) {
+					void chatStore.processStreamingFrame(structuredChunk);
+					return;
+				}
+
 				const isChatContentFrame =
+					frameType === 'agent-interaction' ||
 					frameType === 'json-render' ||
 					frameType === 'json-render-interaction' ||
 					frameType === 'with-buttons' ||
@@ -210,6 +306,8 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 
 				if (isChatContentFrame) {
 					const newMessage = parseBotChatMessageContent(data);
+					if (isEmptyTextMessage(newMessage)) return;
+					if (isDuplicateAgentInteraction(newMessage, chatStore.messages.value)) return;
 					chatStore.messages.value.push(newMessage);
 					waitingForChatResponse.value = true;
 					chatStore.waitingForResponse.value = false;
@@ -237,14 +335,24 @@ function setupWebsocketConnection(executionId: string, resumeToken?: string) {
 				}
 
 				const newMessage = parseBotChatMessageContent(data);
+				if (isEmptyTextMessage(newMessage)) return;
 				chatStore.messages.value.push(newMessage);
 				waitingForChatResponse.value = true;
 				chatStore.waitingForResponse.value = false;
 				chatStore.blockUserInput.value = shouldBlockUserInput(newMessage);
 			};
 
-			chatStore.ws.onclose = () => {
+			ws.onerror = () => {
+				if (chatStore.ws !== ws) return;
+				chatStore.websocketReady.value = false;
+				websocketExecutionId.value = null;
+			};
+
+			ws.onclose = () => {
+				if (chatStore.ws !== ws) return;
 				chatStore.ws = null;
+				chatStore.websocketReady.value = false;
+				websocketExecutionId.value = null;
 				waitingForChatResponse.value = false;
 				chatStore.waitingForResponse.value = false;
 				chatStore.blockUserInput.value = false;

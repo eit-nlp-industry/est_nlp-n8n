@@ -487,7 +487,9 @@ export async function executeAgent(
 		outputSchema,
 		workflowContext,
 		sandboxScope,
-		...streamObserverArguments,
+		streamObserver,
+		invocationContext?.supportsHitl === true,
+		invocationContext?.resume,
 	);
 
 	// Callers see the session id they supplied (or the derived per-call id), so

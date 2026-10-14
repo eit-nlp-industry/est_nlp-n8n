@@ -34,6 +34,7 @@ import {
 	Workflow,
 	ExecutionError,
 	TimeoutExecutionCancelledError,
+	CHAT_TRIGGER_NODE_TYPE,
 	createRunExecutionData,
 } from 'n8n-workflow';
 import PCancelable from 'p-cancelable';
@@ -1674,6 +1675,96 @@ describe('pre-persist context establishment', () => {
 });
 
 describe('streaming functionality', () => {
+	function buildStreamingExecutionData(
+		triggerNodeType: string,
+		resumeToken?: string,
+	): IWorkflowExecutionDataProcess {
+		const executionData = createRunExecutionData({
+			resumeToken,
+			executionData: {
+				contextData: {},
+				runtimeData: {
+					version: 1,
+					establishedAt: Date.now(),
+					source: 'webhook',
+					triggerNode: { name: 'Trigger', type: triggerNodeType },
+				},
+				nodeExecutionStack: [],
+				metadata: {},
+				waitingExecution: {},
+				waitingExecutionSource: null,
+			},
+		});
+		if (resumeToken === undefined) executionData.resumeToken = undefined;
+
+		return {
+			workflowData: {
+				id: 'workflow-1',
+				name: 'Workflow',
+				active: false,
+				isArchived: false,
+				createdAt: new Date(0),
+				updatedAt: new Date(0),
+				activeVersionId: null,
+				nodes: [],
+				connections: {},
+			},
+			executionData,
+			executionMode: 'webhook',
+			streamingEnabled: true,
+			httpResponse: mock<Response>({ writableEnded: false }),
+		};
+	}
+
+	function mockStreamingExecutionStart(callOrder: string[]) {
+		const activeExecutions = Container.get(ActiveExecutions);
+		vi.spyOn(activeExecutions, 'add').mockResolvedValue('exec-123');
+		vi.spyOn(activeExecutions, 'sendChunk').mockImplementation(() => callOrder.push('sendChunk'));
+		vi.spyOn(activeExecutions, 'getPostExecutePromise').mockReturnValue(new Promise(() => {}));
+		vi.spyOn(Container.get(CredentialsPermissionChecker), 'check').mockResolvedValueOnce();
+		// @ts-expect-error Private method
+		vi.spyOn(runner, 'runMainProcess').mockImplementation(async () => {
+			callOrder.push('runMainProcess');
+		});
+	}
+
+	it('sends execution-started before starting a streaming Chat Trigger execution', async () => {
+		const callOrder: string[] = [];
+		mockStreamingExecutionStart(callOrder);
+		const activeExecutions = Container.get(ActiveExecutions);
+
+		await runner.run(buildStreamingExecutionData(CHAT_TRIGGER_NODE_TYPE, 'token-123'));
+
+		expect(activeExecutions.sendChunk).toHaveBeenCalledWith('exec-123', {
+			type: 'execution-started',
+			executionId: 'exec-123',
+			resumeToken: 'token-123',
+		});
+		expect(callOrder).toEqual(['sendChunk', 'runMainProcess']);
+	});
+
+	it('does not send execution-started for a generic streaming Webhook', async () => {
+		const callOrder: string[] = [];
+		mockStreamingExecutionStart(callOrder);
+		const activeExecutions = Container.get(ActiveExecutions);
+
+		await runner.run(buildStreamingExecutionData('n8n-nodes-base.webhook', 'token-123'));
+
+		expect(activeExecutions.sendChunk).not.toHaveBeenCalled();
+		expect(callOrder).toEqual(['runMainProcess']);
+	});
+
+	it('does not send execution-started when the Chat execution has no resume token', async () => {
+		const callOrder: string[] = [];
+		mockStreamingExecutionStart(callOrder);
+		const activeExecutions = Container.get(ActiveExecutions);
+
+		await runner.run(buildStreamingExecutionData(CHAT_TRIGGER_NODE_TYPE, undefined));
+
+		expect(activeExecutions.sendChunk).not.toHaveBeenCalled();
+		expect(callOrder).toEqual(['runMainProcess']);
+	});
+
 	it('should setup heartbeat interval and sendChunk handler when streaming is enabled', async () => {
 		// ARRANGE
 		const activeExecutions = Container.get(ActiveExecutions);

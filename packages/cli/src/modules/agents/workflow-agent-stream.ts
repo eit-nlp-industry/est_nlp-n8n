@@ -1,12 +1,18 @@
 import { SKILL_LOAD_TOOL_NAME, type StreamChunk } from '@n8n/agents';
 import type { AgentNodeCapability, PushPayload } from '@n8n/api-types';
 import { isRecord } from '@n8n/utils/is-record';
-import type { ExecuteAgentInvocationContext, IWorkflowExecuteAdditionalData } from 'n8n-workflow';
+import type {
+	AgentWorkflowSuspension,
+	ChatNodeMessageAgentInteraction,
+	ExecuteAgentInvocationContext,
+	IWorkflowExecuteAdditionalData,
+} from 'n8n-workflow';
 
 type WorkflowAgentStreamEvent =
 	| { type: 'response-begin' }
 	| { type: 'response-delta'; delta: string }
 	| { type: 'response-end' }
+	| { type: 'interaction'; suspension: AgentWorkflowSuspension }
 	| { type: 'capability-start'; toolCallId: string; capability: AgentNodeCapability }
 	| {
 			type: 'capability-end';
@@ -56,6 +62,24 @@ export function createWorkflowAgentStreamObserver({
 			case 'response-end':
 				await invocation.sendResponseChunk?.('end');
 				return;
+			case 'interaction': {
+				const payload = event.suspension.suspendPayload;
+				if (!isRecord(payload)) return;
+				const message: ChatNodeMessageAgentInteraction = {
+					type: 'agent-interaction',
+					interaction: {
+						runId: event.suspension.runId,
+						toolCallId: event.suspension.toolCallId,
+						interactionType: 'card' in payload ? 'chat_action' : 'approval',
+						payload,
+						blockUserInput: true,
+					},
+				};
+				await invocation.sendResponseChunk?.('begin');
+				await invocation.sendResponseChunk?.('item', JSON.stringify(message));
+				await invocation.sendResponseChunk?.('end');
+				return;
+			}
 		}
 
 		if (!additionalData.sendDataToUI) return;
@@ -82,6 +106,8 @@ export class WorkflowAgentStreamAdapter {
 
 	private readonly runningCapabilities = new Map<string, AgentNodeCapability>();
 
+	private readonly suspensions = new Map<string, AgentWorkflowSuspension>();
+
 	constructor(private readonly observer?: WorkflowAgentStreamObserver) {}
 
 	async observe(chunk: StreamChunk): Promise<void> {
@@ -103,6 +129,18 @@ export class WorkflowAgentStreamAdapter {
 			case 'error':
 				this.fail();
 				return;
+			case 'tool-call-suspended':
+				await this.endText();
+				const suspension = {
+					runId: chunk.runId,
+					toolCallId: chunk.toolCallId,
+					toolName: chunk.toolName,
+					suspendPayload: chunk.suspendPayload,
+					...(chunk.resumeSchema ? { resumeSchema: chunk.resumeSchema } : {}),
+				};
+				this.suspensions.set(chunk.toolCallId, suspension);
+				await this.emit({ type: 'interaction', suspension });
+				return;
 			case 'tool-call':
 				this.pendingTools.set(chunk.toolCallId, {
 					toolName: chunk.toolName,
@@ -119,6 +157,10 @@ export class WorkflowAgentStreamAdapter {
 				await this.endCapability(chunk.toolCallId, chunk.isError === true ? 'failed' : 'succeeded');
 				return;
 		}
+	}
+
+	getSuspensions(): AgentWorkflowSuspension[] {
+		return [...this.suspensions.values()];
 	}
 
 	fail(): void {

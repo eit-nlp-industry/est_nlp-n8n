@@ -35,10 +35,12 @@ vi.mock('@n8n/chat/composables', () => ({
 	useChat: () => ({
 		waitingForResponse: ref(false),
 		blockUserInput: { value: false },
+		websocketReady: ref(false),
 		credentialStatus: mockCredentialStatus,
 		currentSessionId: { value: 'session-123' },
 		messages: { value: [] },
 		sendMessage: vi.fn(),
+		processStreamingFrame: vi.fn(),
 		ws: null,
 	}),
 	useOptions: () => ({
@@ -131,6 +133,93 @@ describe('ChatInput', () => {
 
 		expect(global.WebSocket).toHaveBeenCalledWith(expect.stringContaining('sessionId=session-123'));
 		expect(global.WebSocket).toHaveBeenCalledWith(expect.stringContaining('executionId=exec-123'));
+	});
+
+	it('does not replace an active WebSocket for the same execution', () => {
+		const socket = {
+			readyState: 0,
+			send: vi.fn(),
+			close: vi.fn(),
+			onopen: null,
+			onmessage: null,
+			onclose: null,
+			onerror: null,
+		};
+		let constructionCount = 0;
+		class FakeWebSocket {
+			static readonly CLOSED = 3;
+
+			constructor() {
+				constructionCount++;
+				return socket;
+			}
+		}
+		// @ts-expect-error - mock WebSocket
+		global.WebSocket = FakeWebSocket;
+
+		wrapper.vm.setupWebsocketConnection('exec-123', 'token-123');
+		wrapper.vm.setupWebsocketConnection('exec-123', 'token-123');
+
+		expect(constructionCount).toBe(1);
+		expect(socket.close).not.toHaveBeenCalled();
+	});
+
+	it('closes the previous WebSocket before connecting a different execution', () => {
+		const events: string[] = [];
+		const sockets = ['first', 'second'].map((name) => ({
+			readyState: 0 as number,
+			send: vi.fn(),
+			close: vi.fn(() => events.push(`close-${name}`)),
+			onopen: null,
+			onmessage: null,
+			onclose: null,
+			onerror: null,
+		}));
+		let socketIndex = 0;
+		class FakeWebSocket {
+			constructor() {
+				events.push(`create-${socketIndex + 1}`);
+				return sockets[socketIndex++];
+			}
+		}
+		// @ts-expect-error - mock WebSocket
+		global.WebSocket = FakeWebSocket;
+
+		wrapper.vm.setupWebsocketConnection('exec-1', 'token-1');
+		wrapper.vm.setupWebsocketConnection('exec-2', 'token-2');
+
+		expect(events).toEqual(['create-1', 'close-first', 'create-2']);
+		expect(wrapper.vm.chatStore.ws).toBe(sockets[1]);
+	});
+
+	it('sets websocketReady only after open and clears it after close', () => {
+		const socket = {
+			readyState: 0 as number,
+			send: vi.fn(),
+			close: vi.fn(),
+			onopen: null as (() => void) | null,
+			onmessage: null,
+			onclose: null as (() => void) | null,
+			onerror: null,
+		};
+		class FakeWebSocket {
+			constructor() {
+				return socket;
+			}
+		}
+		// @ts-expect-error - mock WebSocket
+		global.WebSocket = FakeWebSocket;
+
+		wrapper.vm.setupWebsocketConnection('exec-123', 'token-123');
+		expect(wrapper.vm.chatStore.websocketReady.value).toBe(false);
+
+		socket.readyState = 1;
+		socket.onopen?.();
+		expect(wrapper.vm.chatStore.websocketReady.value).toBe(true);
+
+		socket.onclose?.();
+		expect(wrapper.vm.chatStore.websocketReady.value).toBe(false);
+		expect(wrapper.vm.chatStore.ws).toBeNull();
 	});
 
 	it('keeps waitingForResponse true after setting up the WebSocket connection', () => {
@@ -262,6 +351,25 @@ describe('ChatInput', () => {
 			expect(wrapper.vm.chatStore.waitingForResponse.value).toBe(true);
 		});
 
+		it('forwards resumed structured stream frames to the chat stream handler', () => {
+			const frame = {
+				type: 'item',
+				content: 'continued response',
+				metadata: {
+					nodeId: 'agent-node',
+					nodeName: 'Message an Agent',
+					timestamp: 1,
+					runIndex: 0,
+					itemIndex: 0,
+				},
+			};
+
+			emit(JSON.stringify(frame));
+
+			expect(wrapper.vm.chatStore.processStreamingFrame).toHaveBeenCalledWith(frame);
+			expect(wrapper.vm.chatStore.messages.value).toHaveLength(0);
+		});
+
 		it('renders JSON that looks like a control frame as a message when the server is legacy', () => {
 			emit('n8n|heartbeat'); // locks legacy mode (single legacy ack)
 			emit(JSON.stringify({ type: 'continue' }));
@@ -307,6 +415,55 @@ describe('ChatInput', () => {
 				text: 'Hello',
 			});
 		});
+
+		it('renders an interaction received from the waiting execution fallback', () => {
+			const interaction = {
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					interactionType: 'chat_action',
+					payload: { card: { title: 'Choose a refund reason' } },
+					blockUserInput: true,
+				},
+			};
+
+			emit(JSON.stringify(interaction));
+
+			expect(wrapper.vm.chatStore.messages.value).toHaveLength(1);
+			expect(wrapper.vm.chatStore.messages.value[0]).toMatchObject({
+				sender: 'bot',
+				type: 'component',
+				arguments: interaction.interaction,
+			});
+		});
+
+		it('does not add a waiting execution fallback for an interaction already in the transcript', () => {
+			const interaction = {
+				type: 'agent-interaction',
+				interaction: {
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					interactionType: 'chat_action',
+					payload: { card: { title: 'Choose a refund reason' } },
+					blockUserInput: true,
+				},
+			};
+
+			emit(JSON.stringify(interaction));
+			emit(JSON.stringify(interaction));
+
+			expect(wrapper.vm.chatStore.messages.value).toHaveLength(1);
+		});
+
+		it.each(['', JSON.stringify({ type: 'message', text: '' })])(
+			'does not render an empty WebSocket message',
+			(data) => {
+				emit(data);
+
+				expect(wrapper.vm.chatStore.messages.value).toHaveLength(0);
+			},
+		);
 
 		it('renders a legacy raw-string message as bot text', () => {
 			emit('Just some text');

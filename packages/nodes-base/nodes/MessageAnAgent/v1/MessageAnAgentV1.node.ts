@@ -7,7 +7,13 @@ import type {
 	INodeTypeDescription,
 } from 'n8n-workflow';
 
-import { commonProperties, execute, messageProperty, sharedVersionDescription } from '../shared';
+import {
+	commonProperties,
+	execute,
+	messageProperty,
+	onMessage,
+	sharedVersionDescription,
+} from '../shared';
 
 export class MessageAnAgentV1 implements INodeType {
 	description: INodeTypeDescription;
@@ -90,5 +96,9 @@ export class MessageAnAgentV1 implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		return await execute.call(this);
+	}
+
+	async onMessage(this: IExecuteFunctions, context: IExecuteFunctions, data: INodeExecutionData) {
+		return await onMessage.call(context, data);
 	}
 }

@@ -28,6 +28,7 @@ import {
 	type ChatHubConversationModel,
 	type ChatHubSendMessageRequest,
 	type ChatModelDto,
+	type ChatMessageContentChunk,
 	chatHubConversationModelSchema,
 } from '@n8n/api-types';
 import { N8nIconButton, N8nResizeWrapper, N8nScrollArea, N8nText } from '@n8n/design-system';
@@ -539,6 +540,26 @@ async function submitJsonRenderDecision(
 	}
 }
 
+async function submitAgentInteraction(
+	source: Extract<ChatMessageContentChunk, { type: 'agent-interaction' }>,
+	resumeData: unknown,
+): Promise<void> {
+	if (!selectedModel.value || !credentialsForSelectedProvider.value) {
+		throw new Error('Chat Hub cannot submit the interaction now');
+	}
+	await chatStore.sendMessage(
+		sessionId.value,
+		JSON.stringify({
+			type: 'agent-suspension-response',
+			runId: source.interaction.runId,
+			toolCallId: source.interaction.toolCallId,
+			resumeData,
+		}),
+		selectedModel.value,
+		credentialsForSelectedProvider.value,
+	);
+}
+
 async function onStop() {
 	await chatStore.stopStreamingMessage(sessionId.value);
 }
@@ -785,6 +806,7 @@ function onFilesDropped(files: File[]) {
 								:cached-agent-icon="selectedModel?.icon ?? null"
 								:accepted-mime-types="selectedModel?.metadata.allowedFilesMimeTypes ?? ''"
 								:submit-json-render-decision="submitJsonRenderDecision"
+								:submit-agent-interaction="submitAgentInteraction"
 								:min-height="
 									didSubmitInCurrentSession &&
 									message.type === 'ai' &&

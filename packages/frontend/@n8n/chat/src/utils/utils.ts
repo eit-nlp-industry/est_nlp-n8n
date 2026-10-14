@@ -8,6 +8,7 @@ const CHAT_NODE_MESSAGE_WITH_BUTTONS_TYPE = 'with-buttons';
 const CHAT_NODE_MESSAGE_JSON_RENDER_TYPE = 'json-render';
 const CHAT_NODE_MESSAGE_JSON_RENDER_INTERACTION_TYPE = 'json-render-interaction';
 const CHAT_NODE_ERROR_TYPE = 'error';
+const CHAT_NODE_AGENT_INTERACTION_TYPE = 'agent-interaction';
 
 interface ChatNodeMessageWithButtons {
 	type: typeof CHAT_NODE_MESSAGE_WITH_BUTTONS_TYPE;
@@ -41,12 +42,18 @@ interface ChatNodeError {
 	message: string;
 }
 
+interface ChatNodeAgentInteraction {
+	type: typeof CHAT_NODE_AGENT_INTERACTION_TYPE;
+	interaction: Record<string, unknown>;
+}
+
 type ChatNodeFrame =
 	| ChatNodeMessageWithButtons
 	| ChatNodeMessageRegular
 	| ChatNodeMessageJsonRender
 	| ChatNodeMessageJsonRenderInteraction
-	| ChatNodeError;
+	| ChatNodeError
+	| ChatNodeAgentInteraction;
 
 export function constructChatWebsocketUrl(
 	url: string,
@@ -110,6 +117,14 @@ export function parseBotChatMessageContent(message: string): ChatMessage {
 			chatMessage = { id, sender: 'bot', text: parsed.text };
 		} else if (parsed.type === CHAT_NODE_ERROR_TYPE) {
 			chatMessage = { id, sender: 'bot', text: parsed.message };
+		} else if (parsed.type === CHAT_NODE_AGENT_INTERACTION_TYPE) {
+			chatMessage = {
+				id,
+				sender: 'bot',
+				type: 'component',
+				key: MessageComponentKey.AGENT_INTERACTION,
+				arguments: parsed.interaction,
+			};
 		}
 	} catch {
 		// ignore error as the message might be just a string
@@ -131,6 +146,8 @@ export function shouldBlockUserInput(message: ChatMessage): boolean {
 	if (message.key === MessageComponentKey.JSON_RENDER_INTERACTION) {
 		return message.arguments?.blockUserInput !== false;
 	}
+
+	if (message.key === MessageComponentKey.AGENT_INTERACTION) return true;
 
 	return false;
 }

@@ -31,6 +31,7 @@ import type {
 	StructuredChunk,
 } from 'n8n-workflow';
 import {
+	logToDebugFile,
 	UnexpectedError,
 	OperationalError,
 	NodeHelpers,
@@ -277,6 +278,8 @@ export class BaseExecuteContext extends NodeExecutionContext {
 				nodeName: this.node.name,
 				runIndex: this.runIndex,
 				itemIndex,
+				supportsHitl: agentInfo.supportsHitl === true,
+				...(agentInfo.resume ? { resume: agentInfo.resume } : {}),
 				...(sendResponseChunk ? { sendResponseChunk } : {}),
 			},
 		);
@@ -311,6 +314,11 @@ export class BaseExecuteContext extends NodeExecutionContext {
 			content: parsedContent,
 			metadata,
 		};
+		logToDebugFile(this.logger, '[Workflow execution] send stream chunk', {
+			type,
+			nodeId: this.node.id,
+			contentPreview: parsedContent?.slice(0, 500),
+		});
 
 		await this.additionalData.hooks?.runHook('sendChunk', [message]);
 	}

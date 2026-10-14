@@ -1,5 +1,7 @@
 import { TOOL_EXECUTOR_NODE_NAME } from '@n8n/constants';
+import { Logger } from '@n8n/backend-common';
 import type { IExecutionResponse } from '@n8n/db';
+import { Container } from '@n8n/di';
 import type { ChatNodeMessage, IExecuteData, INode, Workflow } from 'n8n-workflow';
 import {
 	CHAT_WAIT_USER_REPLY,
@@ -144,9 +146,22 @@ export function getMessage(execution: IExecutionResponse) {
 		return getToolExecutorSendMessage(execution.data);
 	}
 
-	const runIndex = execution.data.resultData.runData[lastNodeExecuted].length - 1;
+	const nodeRuns = execution.data.resultData.runData[lastNodeExecuted];
+	if (!nodeRuns) return undefined;
+	const runIndex = nodeRuns.length - 1;
 	const data = execution.data.resultData.runData[lastNodeExecuted][runIndex]?.data;
 	const outputs = data?.main ?? data?.[AI_TOOL];
+	Container.get(Logger).debugFile?.('[ChatService] getMessage node output', {
+		lastNodeExecuted,
+		runIndex,
+		dataKeys: data ? Object.keys(data) : [],
+		mainBranches: Array.isArray(data?.main) ? data.main.length : undefined,
+		aiToolBranches: Array.isArray(data?.[AI_TOOL]) ? data[AI_TOOL].length : undefined,
+		firstItemKeys:
+			Array.isArray(outputs) && Array.isArray(outputs[0]) && outputs[0][0]
+				? Object.keys(outputs[0][0])
+				: [],
+	});
 
 	// Check all main output branches for a message
 	if (outputs && Array.isArray(outputs)) {

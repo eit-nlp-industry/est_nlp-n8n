@@ -236,7 +236,16 @@ export function handleHostedChatResponse(
 	executionId: string,
 	resumeToken?: string,
 ): boolean {
+	Container.get(Logger).debugFile?.('[Webhook] hosted chat response decision', {
+		responseMode,
+		didSendResponse,
+		executionId,
+		resumeTokenPresent: resumeToken !== undefined,
+	});
 	if (responseMode === 'hostedChat' && !didSendResponse) {
+		Container.get(Logger).debugFile?.('[Webhook] sending executionStarted response', {
+			executionId,
+		});
 		res.send({ executionStarted: true, executionId, resumeToken });
 		process.nextTick(() => res.end());
 		return true;

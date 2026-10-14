@@ -1352,6 +1352,7 @@ describe('integration tools', () => {
 				type: 'integration_action',
 				action: 'respond',
 				integrationConnectionId: 'slack:cred-a',
+				card: expect.any(Object),
 				messageContext: expect.objectContaining({
 					integrationConnectionId: 'slack:cred-a',
 					platform: 'slack',

@@ -3,6 +3,7 @@ import type { AgentJsonConfig, AgentSkill } from '@n8n/api-types';
 import {
 	AGENT_WORKFLOW_TRIGGER_TYPE,
 	formatAgentConfigZodError,
+	N8N_CHAT_INTEGRATION_TYPE,
 	RunnableInlineAgentConfigSchema,
 	sanitizeAgentJsonConfig,
 	sanitizeAgentSkillBodies,
@@ -41,6 +42,7 @@ import type { Agent } from './entities/agent.entity';
 import type { ExecutionRecorder, MessageRecord, TimelineEvent } from './execution-recorder';
 import { encodeIntegrationMessageContext } from './integrations/integration-message-context';
 import { IntegrationMessageContextService } from './integrations/integration-message-context.service';
+import { N8NCheckpointStorage } from './integrations/n8n-checkpoint-storage';
 import { NodeToolAiGatewayService } from './json-config/node-tool-ai-gateway.service';
 import { modelStreamStallOptions } from './model-stream-stall-options';
 import { AgentRepository } from './repositories/agent.repository';
@@ -79,7 +81,9 @@ interface WorkflowAgentStreamParams {
 	};
 	recordingParams?: StartExecutionParams;
 	streamObserver?: WorkflowAgentStreamObserver;
+	supportsHitl?: boolean;
 	sandboxScope?: { projectId: string; principalHash: AgentSandboxPrincipalHash };
+	resume?: { runId: string; toolCallId: string; resumeData: unknown };
 }
 
 interface WorkflowAgentStreamConsumption {
@@ -135,6 +139,7 @@ export class AgentWorkflowExecutionService {
 		private readonly aiConfig: AiConfig,
 		private readonly agentsConfig: AgentsConfig,
 		private readonly integrationMessageContextService: IntegrationMessageContextService,
+		private readonly n8nCheckpointStorage?: N8NCheckpointStorage,
 	) {}
 
 	private normalizeWorkflowStreamError(error: unknown, outputSchema?: JSONSchema7): Error {
@@ -201,12 +206,21 @@ export class AgentWorkflowExecutionService {
 		outputSchema?: JSONSchema7,
 		extraTools?: BuiltTool[],
 		sandboxPrincipalHash?: AgentSandboxPrincipalHash,
+		options?: { supportsHitl?: boolean; integrationType?: string },
 	): Promise<{ ok: boolean; agent?: BuiltAgent; error?: string }> {
 		if (!agentEntity.schema) {
 			return { ok: false, error: 'Agent has no JSON config. Create a config first.' };
 		}
 
 		try {
+			const integrationType =
+				options?.integrationType ??
+				(options?.supportsHitl === true ? N8N_CHAT_INTEGRATION_TYPE : undefined);
+			this.logger.debugFile?.('[Agent workflow] compile isolated', {
+				agentId: agentEntity.id,
+				supportsHitl: options?.supportsHitl ?? false,
+				integrationType,
+			});
 			// No `user`: this path runs an agent invoked from inside a workflow
 			// execution (AI Agent node, or a "Message an Agent" tool call from
 			// another workflow) — there is no interactive n8n user, only a bare
@@ -219,14 +233,13 @@ export class AgentWorkflowExecutionService {
 					agentEntity,
 					credentialProvider,
 					runType,
-					undefined,
+					integrationType,
 					undefined,
 					undefined,
 					'manual',
 					sandboxPrincipalHash,
-					// A workflow execution cannot resume a suspended run — it throws
-					// instead (see `recorder.suspended` below).
-					{ supportsHitl: false },
+					// Workflow callers opt into suspension through this capability.
+					{ supportsHitl: options?.supportsHitl ?? false },
 				);
 			return this.applyPerCallAgentExtras(reconstructed, outputSchema, extraTools);
 		} catch (e) {
@@ -280,10 +293,13 @@ export class AgentWorkflowExecutionService {
 	/** Per-call workflow-data tools exposed to a workflow-invoked agent. */
 	private buildWorkflowExtraTools(
 		workflowContext?: ExecuteAgentWorkflowContext,
+		includeInputDataTool = true,
 	): BuiltTool[] | undefined {
 		if (!workflowContext) return undefined;
 
-		const extraTools: BuiltTool[] = [createInputDataTool(workflowContext)];
+		const extraTools: BuiltTool[] = includeInputDataTool
+			? [createInputDataTool(workflowContext)]
+			: [];
 		if (workflowContext.exposeWorkflowData) {
 			extraTools.push(createWorkflowContextTool(workflowContext));
 		}
@@ -306,6 +322,7 @@ export class AgentWorkflowExecutionService {
 			tracing,
 			recordingParams,
 			sandboxScope,
+			resume,
 		} = params;
 		let structuredOutput: unknown = null;
 		const toolCalls: ExecuteAgentData['toolCalls'] = [];
@@ -341,9 +358,18 @@ export class AgentWorkflowExecutionService {
 				});
 
 				// Only stored agents have integration tools.
-				const messageContext = recordingParams
+				const storedMessageContext = recordingParams
 					? await this.integrationMessageContextService.getLatest(threadId)
 					: null;
+				const messageContext =
+					params.supportsHitl && !storedMessageContext
+						? {
+								integrationConnectionId: N8N_CHAT_INTEGRATION_TYPE,
+								platform: N8N_CHAT_INTEGRATION_TYPE,
+								target: { type: 'thread' as const, threadId },
+								updatedAt: new Date().toISOString(),
+							}
+						: storedMessageContext;
 				const options = {
 					// The memory store scopes message reads by `resourceId` (the
 					// "per-user scope"; chat integrations pass the chat user id there).
@@ -369,10 +395,30 @@ export class AgentWorkflowExecutionService {
 					...debugModelIoOption(this.agentsConfig.debugModelIo),
 					...(telemetry ? { telemetry } : {}),
 				};
-				executionStarted = true;
-				const resultStream = await agentInstance.stream(message, options);
+				let resultStream;
+				if (resume) {
+					resultStream = await agentInstance.resume('stream', resume.resumeData, {
+						...options,
+						runId: resume.runId,
+						toolCallId: resume.toolCallId,
+						onResumeClaimed: () => {
+							executionStarted = true;
+							recorder.recordHitlResponse(resume.toolCallId, resume.resumeData);
+						},
+					});
+				} else {
+					executionStarted = true;
+					resultStream = await agentInstance.stream(message, options);
+				}
 
 				for await (const value of streamAgentChunks(resultStream.stream)) {
+					this.logger.debugFile?.('[Agent workflow] stream event', {
+						type: value.type,
+						toolName: 'toolName' in value ? value.toolName : undefined,
+						toolCallId: 'toolCallId' in value ? value.toolCallId : undefined,
+						runId: 'runId' in value ? value.runId : undefined,
+						delta: value.type === 'text-delta' ? value.delta.slice(0, 200) : undefined,
+					});
 					if (value.type === 'error') {
 						executionError = value.error;
 						if (outputSchema)
@@ -440,11 +486,16 @@ export class AgentWorkflowExecutionService {
 
 		const messageRecord = recorder.getMessageRecord();
 		if (recordingParams && agentExecutionId) {
+			const hitlStatus = recorder.suspended
+				? 'suspended'
+				: params.resume && executionStarted
+					? 'resumed'
+					: undefined;
 			await this.turnExecutionService.finalizeExecution({
 				executionId: agentExecutionId,
 				executionStarted,
 				executionError,
-				params: { ...recordingParams, record: messageRecord },
+				params: { ...recordingParams, record: messageRecord, hitlStatus },
 			});
 		}
 
@@ -457,6 +508,7 @@ export class AgentWorkflowExecutionService {
 			structuredOutput,
 			toolCalls,
 			streamError,
+			suspensions: streamAdapter.getSuspensions(),
 		};
 	}
 
@@ -468,15 +520,25 @@ export class AgentWorkflowExecutionService {
 		run: WorkflowAgentRunOutcome;
 		session: ExecuteAgentData['session'];
 		outputSchema?: JSONSchema7;
+		supportsHitl?: boolean;
 	}): ExecuteAgentData {
 		const { run, session, outputSchema } = params;
-		const { recorder, messageRecord, structuredOutput, toolCalls, streamError } = run;
+		const { recorder, messageRecord, structuredOutput, toolCalls, streamError, suspensions } = run;
+		this.logger.debugFile?.('[Agent workflow] build result state', {
+			supportsHitl: params.supportsHitl,
+			recorderSuspended: recorder.suspended,
+			suspensionCount: suspensions.length,
+			lastNode: messageRecord.timeline.at(-1)?.type,
+			finishReason: messageRecord.finishReason,
+			assistantResponsePreview: messageRecord.assistantResponse?.slice(0, 500),
+			streamError: streamError?.message,
+		});
 
 		if (streamError !== undefined) {
 			throw streamError;
 		}
 
-		if (recorder.suspended) {
+		if (recorder.suspended && (!params.supportsHitl || suspensions.length === 0)) {
 			throw createWorkflowAgentExecutionError(
 				'Agent execution suspended waiting for tool approval. ' +
 					'Suspend/resume is not supported in workflow execution context.',
@@ -517,8 +579,57 @@ export class AgentWorkflowExecutionService {
 			toolCalls,
 			finishReason: messageRecord.finishReason,
 			session,
+			...(recorder.suspended && session
+				? {
+						suspension: {
+							agentId: session.agentId,
+							threadId: session.threadId,
+							suspensions,
+						},
+					}
+				: {}),
 			...(modelTurns.length > 0 ? { modelTurns } : {}),
 		};
+	}
+
+	async resumeForWorkflow(
+		agentId: string,
+		resume: { runId: string; toolCallId: string; resumeData: unknown },
+		executionId: string,
+		threadId: string,
+		projectId: string,
+		telemetryUserId?: string,
+		useDraftVersion = true,
+		outputSchema?: JSONSchema7,
+		workflowContext?: ExecuteAgentWorkflowContext,
+		sandboxScope?: WorkflowSandboxScope,
+		streamObserver?: WorkflowAgentStreamObserver,
+	): Promise<ExecuteAgentData> {
+		const checkpoint = await this.n8nCheckpointStorage?.getStatus(resume.runId, agentId);
+		if (!checkpoint || checkpoint.status !== 'active' || !checkpoint.checkpoint) {
+			throw new UserError(`Checkpoint ${resume.runId} is no longer available`);
+		}
+		if (
+			checkpoint.checkpoint.persistence?.threadId !== threadId ||
+			checkpoint.checkpoint.persistence?.resourceId !== threadId
+		) {
+			throw new UserError(`Checkpoint ${resume.runId} does not belong to this chat`);
+		}
+		return await this.executeForWorkflowInternal(
+			agentId,
+			'',
+			executionId,
+			threadId,
+			projectId,
+			telemetryUserId,
+			useDraftVersion,
+			outputSchema,
+			workflowContext,
+			sandboxScope,
+			streamObserver,
+			true,
+			resume,
+		);
 	}
 
 	async executeForWorkflow(
@@ -533,6 +644,8 @@ export class AgentWorkflowExecutionService {
 		workflowContext?: ExecuteAgentWorkflowContext,
 		sandboxScope?: WorkflowSandboxScope,
 		streamObserver?: WorkflowAgentStreamObserver,
+		supportsHitl = false,
+		resume?: { runId: string; toolCallId: string; resumeData: unknown },
 	): Promise<ExecuteAgentData> {
 		return await this.executeForWorkflowInternal(
 			agentId,
@@ -546,6 +659,8 @@ export class AgentWorkflowExecutionService {
 			workflowContext,
 			sandboxScope,
 			streamObserver,
+			supportsHitl,
+			resume,
 		);
 	}
 
@@ -561,6 +676,8 @@ export class AgentWorkflowExecutionService {
 		workflowContext?: ExecuteAgentWorkflowContext,
 		sandboxScope?: WorkflowSandboxScope,
 		streamObserver?: WorkflowAgentStreamObserver,
+		supportsHitl = false,
+		resume?: { runId: string; toolCallId: string; resumeData: unknown },
 	): Promise<ExecuteAgentData> {
 		// Keep the original intent if deletion happens during preparation.
 		const sessionMode = await this.turnExecutionService.getSessionMode(threadId);
@@ -590,13 +707,13 @@ export class AgentWorkflowExecutionService {
 			agentId,
 			agentName: agentData.schema?.name ?? agentData.name,
 			projectId,
-			userMessage: message,
+			userMessage: resume ? null : message,
 			sessionMode,
 			source: AGENT_WORKFLOW_TRIGGER_TYPE,
 			telemetry: { userId: telemetryUserId, runType, configuration: telemetryConfiguration },
 		};
 
-		const extraTools = this.buildWorkflowExtraTools(workflowContext);
+		const extraTools = this.buildWorkflowExtraTools(workflowContext, resume === undefined);
 		const compiled = await this.compileIsolated(
 			agentData,
 			credentialProvider,
@@ -604,7 +721,14 @@ export class AgentWorkflowExecutionService {
 			outputSchema,
 			extraTools?.length ? extraTools : undefined,
 			sandboxScope?.principalHash,
+			{ supportsHitl },
 		);
+		this.logger.debugFile?.('[Agent workflow] execution compiled', {
+			executionId,
+			agentId,
+			supportsHitl,
+			compiled: compiled.ok,
+		});
 		if (!compiled.ok || !compiled.agent) {
 			const error = new OperationalError(
 				`Failed to compile agent: ${compiled.error ?? 'unknown error'}`,
@@ -631,6 +755,8 @@ export class AgentWorkflowExecutionService {
 			},
 			recordingParams: { ...recordingParams, agentName: agentInstance.name },
 			streamObserver,
+			supportsHitl,
+			resume,
 			...(sandboxScope
 				? {
 						sandboxScope: {
@@ -640,6 +766,11 @@ export class AgentWorkflowExecutionService {
 					}
 				: {}),
 		});
+		this.logger.debugFile?.('[Agent workflow] stream collected', {
+			executionId,
+			suspensionCount: run.suspensions.length,
+			streamError: run.streamError?.message,
+		});
 
 		return this.buildWorkflowResult({
 			run,
@@ -647,6 +778,7 @@ export class AgentWorkflowExecutionService {
 			// to the caller-facing id; this method never sees the unscoped one.
 			session: { agentId, projectId, sessionId: threadId, threadId },
 			outputSchema,
+			supportsHitl,
 		});
 	}
 
@@ -823,6 +955,7 @@ interface WorkflowAgentRunOutcome {
 	structuredOutput: unknown;
 	toolCalls: ExecuteAgentData['toolCalls'];
 	streamError?: Error;
+	suspensions: NonNullable<ExecuteAgentData['suspension']>['suspensions'];
 }
 
 function isModelTurnEvent(
