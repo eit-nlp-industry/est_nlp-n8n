@@ -7,6 +7,7 @@ import { computed, ref } from 'vue';
 import { useChat } from '@n8n/chat/composables';
 
 import JsonRenderInteraction from './JsonRenderInteraction.vue';
+import HarnessQuestionInteraction from './HarnessQuestionInteraction.vue';
 
 interface CardButton {
 	type?: 'button';
@@ -46,6 +47,14 @@ interface InteractionPayload {
 	displayName?: string;
 	toolName?: string;
 	jsonRender?: JsonRenderPayload;
+	questions?: Array<{
+		id: string;
+		question: string;
+		detail?: string;
+		header?: string;
+		options?: Array<{ label: string; description?: string }>;
+		multiSelect?: boolean;
+	}>;
 	card?: {
 		title?: string;
 		message?: string;
@@ -57,7 +66,7 @@ interface Interaction {
 	messageId?: string;
 	runId?: string;
 	toolCallId?: string;
-	interactionType?: 'approval' | 'chat_action' | 'json_render';
+	interactionType?: 'approval' | 'chat_action' | 'json_render' | 'harness_question';
 	payload?: InteractionPayload;
 }
 
@@ -157,8 +166,14 @@ async function submitOption(component: { id?: string }, index: number, value: st
 </script>
 
 <template>
+	<HarnessQuestionInteraction
+		v-if="!submitted && interactionType === 'harness_question' && payload?.questions"
+		:payload="{ type: 'harness-question', questions: payload.questions }"
+		:disabled="interactionDisabled"
+		@submit="submit($event)"
+	/>
 	<JsonRenderInteraction
-		v-if="!submitted && interactionType === 'json_render' && payload?.jsonRender"
+		v-else-if="!submitted && interactionType === 'json_render' && payload?.jsonRender"
 		data-test-id="agent-interaction-card"
 		:payload="payload.jsonRender"
 		:instance-id="`workflow-agent-${runId ?? 'unknown'}-${toolCallId ?? 'unknown'}`"

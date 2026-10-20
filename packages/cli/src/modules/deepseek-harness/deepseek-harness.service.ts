@@ -2,7 +2,7 @@ import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
 import { isUniqueConstraintError } from '@n8n/db';
 import { Container, Service } from '@n8n/di';
 import { generateNanoId } from '@n8n/utils/generate-nano-id';
-import type { ChunkType } from 'n8n-workflow';
+import type { ChunkType, ExecuteAgentResume } from 'n8n-workflow';
 
 import { ConflictError } from '@/errors/response-errors/conflict.error';
 
@@ -113,6 +113,8 @@ export class DeepSeekHarnessService {
 		sendResponseChunk?: (type: ChunkType, content?: string) => Promise<void>,
 		workspaceId?: string,
 		reuseSession = false,
+		supportsHitl = false,
+		resume?: ExecuteAgentResume,
 	) {
 		return await this.withAgentExecution(
 			agentId,
@@ -123,7 +125,7 @@ export class DeepSeekHarnessService {
 					projectId,
 					message,
 					sessionId,
-					{ allowUnpublished, sendResponseChunk, workspaceId, reuseSession },
+					{ allowUnpublished, sendResponseChunk, workspaceId, reuseSession, supportsHitl, resume },
 				),
 		);
 	}

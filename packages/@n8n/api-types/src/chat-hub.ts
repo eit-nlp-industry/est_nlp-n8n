@@ -482,7 +482,7 @@ export type ChatMessageContentChunk =
 			interaction: {
 				runId: string;
 				toolCallId: string;
-				interactionType: 'approval' | 'chat_action' | 'json_render';
+				interactionType: 'approval' | 'chat_action' | 'json_render' | 'harness_question';
 				payload: unknown;
 				blockUserInput: true;
 			};

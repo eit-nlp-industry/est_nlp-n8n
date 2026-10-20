@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { AgentWorkflowInteraction, ChatMessageContentChunk } from '@n8n/api-types';
+import type {
+	AgentWorkflowInteraction,
+	ChatMessageContentChunk,
+	HarnessQuestionInteractionPayload,
+} from '@n8n/api-types';
+import HarnessQuestionInteraction from '@n8n/chat/components/HarnessQuestionInteraction.vue';
 import type { ApprovalInput } from '@/features/ai/shared/agentsChat/types';
 import type {
 	N8nChatInteractionInput,
@@ -20,6 +25,7 @@ const emit = defineEmits<{ submit: [resumeData: unknown] }>();
 const interaction = props.source.interaction as AgentWorkflowInteraction;
 const approvalInput = interaction.payload as unknown as ApprovalInput;
 const actionInput = interaction.payload as unknown as N8nChatInteractionInput;
+const harnessQuestionInput = interaction.payload as HarnessQuestionInteractionPayload;
 const approvalResolved = props.resolvedValue as ApprovalResume | undefined;
 const actionResolved = props.resolvedValue as N8nChatResumeValue | undefined;
 </script>
@@ -30,6 +36,12 @@ const actionResolved = props.resolvedValue as N8nChatResumeValue | undefined;
 		:input="approvalInput"
 		:disabled="disabled"
 		:resolved-value="approvalResolved"
+		@submit="emit('submit', $event)"
+	/>
+	<HarnessQuestionInteraction
+		v-else-if="interaction.interactionType === 'harness_question'"
+		:payload="harnessQuestionInput"
+		:disabled="disabled"
 		@submit="emit('submit', $event)"
 	/>
 	<N8nChatActionCard

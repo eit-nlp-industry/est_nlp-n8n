@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import MessageAgentInteraction from '../components/MessageAgentInteraction.vue';
 import JsonRenderInteraction from '../components/JsonRenderInteraction.vue';
+import HarnessQuestionInteraction from '../components/HarnessQuestionInteraction.vue';
 import { MessageComponentKey } from '../constants/messageComponents';
 import { ChatSymbol } from '../constants/symbols';
 import type { ChatMessage } from '../types';
@@ -266,5 +267,35 @@ describe('MessageAgentInteraction', () => {
 				}),
 			}),
 		);
+	});
+
+	it('submits a Harness answer batch and removes the question card', async () => {
+		const { wrapper, ws } = mountInteraction([]);
+		await wrapper.setProps({
+			interactionType: 'harness_question' as never,
+			payload: {
+				type: 'harness-question',
+				questions: [{ id: 'environment', question: 'Choose one.' }],
+			} as never,
+		});
+
+		wrapper.findComponent(HarnessQuestionInteraction).vm.$emit('submit', {
+			answers: [{ id: 'environment', selected: ['Staging'] }],
+		});
+		await flushPromises();
+
+		expect(ws?.send).toHaveBeenCalledWith(
+			JSON.stringify({
+				sessionId: 'session-1',
+				action: 'sendMessage',
+				chatInput: JSON.stringify({
+					type: 'agent-suspension-response',
+					runId: 'run-1',
+					toolCallId: 'tool-call-1',
+					resumeData: { answers: [{ id: 'environment', selected: ['Staging'] }] },
+				}),
+			}),
+		);
+		expect(wrapper.findComponent(HarnessQuestionInteraction).exists()).toBe(false);
 	});
 });

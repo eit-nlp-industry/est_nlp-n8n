@@ -32,6 +32,38 @@ export const agentWorkflowJsonRenderPayloadSchema = z
 	})
 	.strict();
 
+export const harnessQuestionSchema = z
+	.object({
+		id: z.string().min(1),
+		question: z.string().min(1),
+		detail: z.string().optional(),
+		header: z.string().optional(),
+		options: z
+			.array(
+				z
+					.object({
+						label: z.string().min(1),
+						description: z.string().optional(),
+					})
+					.strict(),
+			)
+			.optional(),
+		multiSelect: z.boolean().optional(),
+	})
+	.strict();
+
+export const harnessQuestionInteractionPayloadSchema = z
+	.object({
+		type: z.literal('harness-question'),
+		questions: z.array(harnessQuestionSchema).min(1),
+	})
+	.strict();
+
+export type HarnessQuestion = z.infer<typeof harnessQuestionSchema>;
+export type HarnessQuestionInteractionPayload = z.infer<
+	typeof harnessQuestionInteractionPayloadSchema
+>;
+
 export const agentWorkflowInteractionSchema = z.discriminatedUnion('interactionType', [
 	agentWorkflowInteractionBaseSchema.extend({
 		interactionType: z.literal('approval'),
@@ -44,6 +76,10 @@ export const agentWorkflowInteractionSchema = z.discriminatedUnion('interactionT
 	agentWorkflowInteractionBaseSchema.extend({
 		interactionType: z.literal('json_render'),
 		payload: agentWorkflowJsonRenderPayloadSchema,
+	}),
+	agentWorkflowInteractionBaseSchema.extend({
+		interactionType: z.literal('harness_question'),
+		payload: harnessQuestionInteractionPayloadSchema,
 	}),
 ]);
 

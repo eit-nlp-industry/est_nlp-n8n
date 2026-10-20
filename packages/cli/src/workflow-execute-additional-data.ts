@@ -441,6 +441,9 @@ export async function executeAgent(
 			isManualOrChatExecution(executionMode),
 			invocationContext?.sendResponseChunk,
 			source.workspaceId,
+			invocationContext?.resume !== undefined,
+			invocationContext?.supportsHitl,
+			invocationContext?.resume,
 		);
 	}
 

@@ -78,6 +78,54 @@ describe('agentWorkflowInteractionSchema', () => {
 		expect(agentWorkflowInteractionSchema.parse(interaction)).toEqual(interaction);
 	});
 
+	it('parses a Harness question interaction with every input mode', () => {
+		const interaction = {
+			runId: 'event-1',
+			toolCallId: 'call-1',
+			interactionType: 'harness_question',
+			payload: {
+				type: 'harness-question',
+				questions: [
+					{
+						id: 'environment',
+						header: 'Environment',
+						question: 'Which environment should receive the change?',
+						detail: 'Production changes require an approval.',
+						options: [
+							{ label: 'Staging', description: 'Deploy to the staging environment.' },
+							{ label: 'Production' },
+						],
+					},
+					{
+						id: 'checks',
+						question: 'Which checks should run?',
+						options: [{ label: 'Unit tests' }, { label: 'Type checks' }],
+						multiSelect: true,
+					},
+					{
+						id: 'notes',
+						question: 'Add release notes.',
+					},
+				],
+			},
+			blockUserInput: true,
+		};
+
+		expect(agentWorkflowInteractionSchema.parse(interaction)).toEqual(interaction);
+	});
+
+	it('rejects a Harness interaction without questions', () => {
+		expect(
+			agentWorkflowInteractionSchema.safeParse({
+				runId: 'event-1',
+				toolCallId: 'call-1',
+				interactionType: 'harness_question',
+				payload: { type: 'harness-question', questions: [] },
+				blockUserInput: true,
+			}).success,
+		).toBe(false);
+	});
+
 	it('rejects an unknown interaction type', () => {
 		expect(
 			agentWorkflowInteractionSchema.safeParse({
@@ -110,6 +158,23 @@ describe('agentWorkflowResumeMessageSchema', () => {
 			runId: 'run-1',
 			toolCallId: 'tool-call-1',
 			resumeData: { nested: { answer: ['one', 2, true] } },
+		};
+
+		expect(agentWorkflowResumeMessageSchema.parse(message)).toEqual(message);
+	});
+
+	it('preserves a Harness answer batch', () => {
+		const message = {
+			type: 'agent-suspension-response',
+			runId: 'event-1',
+			toolCallId: 'call-1',
+			resumeData: {
+				answers: [
+					{ id: 'environment', selected: ['Staging'] },
+					{ id: 'checks', selected: ['Unit tests', 'Type checks'] },
+					{ id: 'notes', selected: [], custom: 'Ship after validation.' },
+				],
+			},
 		};
 
 		expect(agentWorkflowResumeMessageSchema.parse(message)).toEqual(message);

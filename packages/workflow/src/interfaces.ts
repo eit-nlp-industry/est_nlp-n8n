@@ -1815,7 +1815,7 @@ export type ChatNodeMessageAgentInteraction = {
 	interaction: {
 		runId: string;
 		toolCallId: string;
-		interactionType: 'approval' | 'chat_action' | 'json_render';
+		interactionType: 'approval' | 'chat_action' | 'json_render' | 'harness_question';
 		payload: Readonly<Record<string, unknown>>;
 		blockUserInput: true;
 	};
@@ -2532,6 +2532,15 @@ export interface AgentWorkflowWaitMetadata {
 	threadId: string;
 	itemIndex: number;
 	suspensions: AgentWorkflowSuspension[];
+	resumeCommand?: ExecuteAgentResume;
+}
+
+export interface DeepSeekHarnessWorkflowWaitMetadata {
+	agentId: string;
+	sessionId: string;
+	itemIndex: number;
+	completedItems: INodeExecutionData[];
+	suspension: AgentWorkflowSuspension;
 	resumeCommand?: ExecuteAgentResume;
 }
 
@@ -3578,6 +3587,7 @@ type SubNodeExecutionDataAction = {
 
 export interface ITaskMetadata {
 	agentWorkflowSuspension?: AgentWorkflowWaitMetadata;
+	deepSeekHarnessWorkflowSuspension?: DeepSeekHarnessWorkflowWaitMetadata;
 	subRun?: ITaskSubRunMetadata[];
 	parentExecution?: RelatedExecution;
 	subExecution?: RelatedExecution;

@@ -1,4 +1,6 @@
 import type {
+	ChatNodeMessageAgentInteraction,
+	DeepSeekHarnessWorkflowWaitMetadata,
 	IDataObject,
 	IExecuteFunctions,
 	ILoadOptionsFunctions,
@@ -6,7 +8,7 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { CHAT_TRIGGER_NODE_TYPE, jsonParse, NodeOperationError } from 'n8n-workflow';
 import crypto from 'node:crypto';
 
 const SESSION_ID_MAX_LENGTH = 74;
@@ -53,6 +55,47 @@ function resolveSessionId(ctx: IExecuteFunctions, itemIndex: number): string | u
 	return trimmed.length > SESSION_ID_MAX_LENGTH
 		? crypto.createHash('sha256').update(trimmed).digest('hex')
 		: trimmed;
+}
+
+function supportsWorkflowInteraction(
+	ctx: IExecuteFunctions,
+	sessionId: string | undefined,
+): boolean {
+	if (!sessionId) return false;
+	const executionContext = ctx.getExecutionContext();
+	const chatTrigger = ctx.getChatTrigger();
+	return (
+		chatTrigger?.type === CHAT_TRIGGER_NODE_TYPE &&
+		executionContext?.source !== undefined &&
+		['manual', 'webhook'].includes(executionContext.source) &&
+		executionContext.triggerNode?.name === chatTrigger.name &&
+		executionContext.triggerNode.type === chatTrigger.type
+	);
+}
+
+function toHarnessInteraction(
+	ctx: IExecuteFunctions,
+	suspension: DeepSeekHarnessWorkflowWaitMetadata['suspension'],
+): ChatNodeMessageAgentInteraction {
+	const payload = suspension.suspendPayload;
+	if (
+		typeof payload !== 'object' ||
+		payload === null ||
+		!('type' in payload) ||
+		payload.type !== 'harness-question'
+	) {
+		throw new NodeOperationError(ctx.getNode(), 'Harness returned an unsupported interaction.');
+	}
+	return {
+		type: 'agent-interaction',
+		interaction: {
+			runId: suspension.runId,
+			toolCallId: suspension.toolCallId,
+			interactionType: 'harness_question',
+			payload,
+			blockUserInput: true,
+		},
+	};
 }
 
 export class DeepSeekHarness implements INodeType {
@@ -245,10 +288,11 @@ export class DeepSeekHarness implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const input = this.getInputData();
-		const output: INodeExecutionData[] = [];
+		let waiting = this.getExecuteData?.()?.metadata?.deepSeekHarnessWorkflowSuspension;
+		const output: INodeExecutionData[] = waiting ? [...waiting.completedItems] : [];
 		const executionId = this.getExecutionId() ?? crypto.randomUUID();
 
-		for (let index = 0; index < input.length; index++) {
+		for (let index = waiting?.itemIndex ?? 0; index < input.length; index++) {
 			const agent = this.getNodeParameter('agentId', index) as { value?: string } | string;
 			const agentId = (typeof agent === 'string' ? agent : agent.value)?.trim();
 			const message = String(this.getNodeParameter('message', index, '')).trim();
@@ -262,7 +306,8 @@ export class DeepSeekHarness implements INodeType {
 			const advanced = this.getNodeParameter('advanced', index, {}) as {
 				enableStreaming?: boolean;
 			};
-			const sessionId = resolveSessionId(this, index);
+			const sessionId = waiting?.sessionId ?? resolveSessionId(this, index);
+			const supportsHitl = supportsWorkflowInteraction(this, sessionId);
 			if (!agentId)
 				throw new NodeOperationError(this.getNode(), 'A DeepSeek Harness agent is required');
 			if (!message) throw new NodeOperationError(this.getNode(), 'Message cannot be empty');
@@ -273,11 +318,36 @@ export class DeepSeekHarness implements INodeType {
 					...(workspaceId ? { workspaceId } : {}),
 					...(sessionId ? { sessionId } : {}),
 					...(advanced.enableStreaming === false ? { enableStreaming: false } : {}),
+					...(supportsHitl ? { supportsHitl: true } : {}),
+					...(waiting?.resumeCommand ? { resume: waiting.resumeCommand } : {}),
 				},
 				message,
 				executionId,
 				index,
 			);
+
+			if (result.suspension) {
+				const suspension = result.suspension.suspensions[0];
+				if (!suspension) {
+					throw new NodeOperationError(this.getNode(), 'Harness returned an empty suspension.');
+				}
+				const interaction = toHarnessInteraction(this, suspension);
+				const metadata: DeepSeekHarnessWorkflowWaitMetadata = {
+					agentId: result.suspension.agentId,
+					sessionId: result.suspension.threadId,
+					itemIndex: index,
+					completedItems: [...output],
+					suspension,
+				};
+				this.setMetadata({ deepSeekHarnessWorkflowSuspension: metadata });
+				output.push({ json: {}, sendMessage: interaction, pairedItem: { item: index } });
+				await this.putExecutionToWait(new Date('9999-12-31T23:59:59.999Z'));
+				return [output];
+			}
+			if (waiting) {
+				this.setMetadata({ deepSeekHarnessWorkflowSuspension: undefined });
+				waiting = undefined;
+			}
 
 			output.push({
 				json: {
@@ -289,5 +359,43 @@ export class DeepSeekHarness implements INodeType {
 		}
 
 		return [output];
+	}
+
+	async onMessage(this: IExecuteFunctions, context: IExecuteFunctions, data: INodeExecutionData) {
+		const waiting = context.getExecuteData().metadata?.deepSeekHarnessWorkflowSuspension;
+		if (!waiting) return [[data]];
+
+		const input = data.json?.chatInput;
+		const envelope =
+			typeof input === 'string'
+				? jsonParse<unknown>(input, { errorMessage: 'Invalid Harness suspension response' })
+				: input;
+		if (
+			typeof envelope !== 'object' ||
+			envelope === null ||
+			!('type' in envelope) ||
+			envelope.type !== 'agent-suspension-response' ||
+			!('runId' in envelope) ||
+			!('toolCallId' in envelope) ||
+			envelope.runId !== waiting.suspension.runId ||
+			envelope.toolCallId !== waiting.suspension.toolCallId
+		) {
+			throw new NodeOperationError(
+				context.getNode(),
+				'This Harness interaction is no longer active.',
+			);
+		}
+
+		context.setMetadata({
+			deepSeekHarnessWorkflowSuspension: {
+				...waiting,
+				resumeCommand: {
+					runId: waiting.suspension.runId,
+					toolCallId: waiting.suspension.toolCallId,
+					resumeData: 'resumeData' in envelope ? envelope.resumeData : undefined,
+				},
+			},
+		});
+		return [[data]];
 	}
 }
