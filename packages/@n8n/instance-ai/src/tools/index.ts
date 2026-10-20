@@ -4,6 +4,7 @@ import type { BuiltTool } from '@n8n/agents';
 import { isParseableAttachment } from '../parsers/structured-file-parser';
 import { createToolRegistry } from '../tool-registry';
 import type { InstanceAiContext, InstanceAiToolRegistry, OrchestrationContext } from '../types';
+import { resolveAgentBuilderTarget } from './orchestration/agent-target-binding';
 import { DOMAIN_TOOL_IDS, ORCHESTRATION_TOOL_IDS } from './tool-ids';
 
 const lazyMod = <T>(loader: () => T): (() => T) => {
@@ -42,10 +43,15 @@ const loadMcpServersTool = lazyMod(
 const loadActivityTool = lazyMod(
 	() => require('./activity.tool') as typeof import('./activity.tool'),
 );
+const loadSaveUserPreferenceTool = lazyMod(
+	() => require('./save-user-preference.tool') as typeof import('./save-user-preference.tool'),
+);
 const loadN8nDocsTool = lazyMod(
 	() => require('./n8n-docs.tool') as typeof import('./n8n-docs.tool'),
 );
-const loadAgentsTool = lazyMod(() => require('./agents.tool') as typeof import('./agents.tool'));
+const loadAgentContextTool = lazyMod(
+	() => require('./agent-context.tool') as typeof import('./agent-context.tool'),
+);
 const loadBuildAgentTool = lazyMod(
 	() =>
 		require('./orchestration/build-agent.tool') as typeof import('./orchestration/build-agent.tool'),
@@ -53,10 +59,6 @@ const loadBuildAgentTool = lazyMod(
 const loadBuildHarnessTool = lazyMod(
 	() =>
 		require('./orchestration/build-harness.tool') as typeof import('./orchestration/build-harness.tool'),
-);
-const loadListAgentCapabilitiesTool = lazyMod(
-	() =>
-		require('./orchestration/list-agent-capabilities.tool') as typeof import('./orchestration/list-agent-capabilities.tool'),
 );
 const loadGetSessionTool = lazyMod(
 	() =>
@@ -82,6 +84,10 @@ const loadResearchTool = lazyMod(
 );
 const loadAskUserTool = lazyMod(
 	() => require('./shared/ask-user.tool') as typeof import('./shared/ask-user.tool'),
+);
+const loadLeaveOnboardingTool = lazyMod(
+	() =>
+		require('./shared/leave-onboarding.tool') as typeof import('./shared/leave-onboarding.tool'),
 );
 const loadTaskControlTool = lazyMod(
 	() => require('./task-control.tool') as typeof import('./task-control.tool'),
@@ -123,19 +129,21 @@ function getOrchestratorDomainToolFactories(
 		],
 	];
 
+	// Onboarding threads only: the tool ends the flow the host seeded, and the frontend restores
+	// the chat chrome when it sees the call.
+	if (context.onboardingThread) {
+		tools.push([
+			DOMAIN_TOOL_IDS.LEAVE_ONBOARDING,
+			() => loadLeaveOnboardingTool().createLeaveOnboardingTool(),
+		]);
+	}
+
 	// eval-config is flag-gated: the adapter only wires evaluationConfigService
 	// when `088_config_evaluations` is on, so presence = expose the tool.
 	if (context.evaluationConfigService) {
 		tools.push([
 			DOMAIN_TOOL_IDS.EVAL_CONFIG,
 			() => loadEvalConfigTool().createEvalConfigTool(context),
-		]);
-	}
-
-	if (context.deepSeekHarnessService) {
-		tools.push([
-			DOMAIN_TOOL_IDS.DEEPSEEK_HARNESS,
-			() => loadDeepSeekHarnessTool().createDeepSeekHarnessTool(context),
 		]);
 	}
 
@@ -146,6 +154,13 @@ function getOrchestratorDomainToolFactories(
 		tools.push([
 			DOMAIN_TOOL_IDS.MCP_SERVERS,
 			() => loadMcpServersTool().createMcpServersTool(context),
+		]);
+	}
+
+	if (context.deepSeekHarnessService) {
+		tools.push([
+			DOMAIN_TOOL_IDS.DEEPSEEK_HARNESS,
+			() => loadDeepSeekHarnessTool().createDeepSeekHarnessTool(context),
 		]);
 	}
 
@@ -164,6 +179,27 @@ function getOrchestratorDomainToolFactories(
 	// block that hands the agent ids to expand rides the orchestrator's turn.
 	if (context.activityService) {
 		tools.push([DOMAIN_TOOL_IDS.ACTIVITY, () => loadActivityTool().createActivityTool(context)]);
+	}
+
+	if (context.agentContextService) {
+		tools.push([
+			DOMAIN_TOOL_IDS.AGENT_CONTEXT,
+			() =>
+				loadAgentContextTool().createAgentContextTool({
+					reader: context.agentContextService!,
+					resolveDefaultAgentId: async () => (await resolveAgentBuilderTarget(context))?.agentId,
+					logger: context.logger,
+				}),
+		]);
+	}
+
+	// Presence is the gate, as with activity: the adapter wires `aiPreferenceService`
+	// only when saved preferences are enabled for this user.
+	if (context.aiPreferenceService) {
+		tools.push([
+			DOMAIN_TOOL_IDS.SAVE_USER_PREFERENCE,
+			() => loadSaveUserPreferenceTool().createSaveUserPreferenceTool(context),
+		]);
 	}
 
 	if (context.currentUserAttachments?.some(isParseableAttachment)) {
@@ -228,11 +264,6 @@ export function createOrchestrationTools(context: OrchestrationContext): Instanc
 			ORCHESTRATION_TOOL_IDS.BUILD_AGENT,
 			loadBuildAgentTool().createBuildAgentTool(context),
 		]);
-		tools.push([
-			ORCHESTRATION_TOOL_IDS.LIST_AGENT_CAPABILITIES,
-			loadListAgentCapabilitiesTool().createListAgentCapabilitiesTool(context),
-		]);
-		tools.push([DOMAIN_TOOL_IDS.AGENTS, loadAgentsTool().createAgentsTool(context)]);
 	}
 
 	if (context.domainContext?.deepSeekHarnessService) {

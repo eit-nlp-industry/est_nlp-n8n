@@ -1,7 +1,12 @@
 import type { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
+import type { NodeTypes } from '@/node-types';
 
-import { CREDENTIAL_TYPES_KIND } from './constants';
-import { nodeTypePackageResolver, type PackageResolver } from './policy-evaluator';
+import { CREDENTIAL_TYPES_KIND, NODE_TYPES_KIND } from './constants';
+import {
+	nodeTypePackageResolver,
+	type PackageResolver,
+	type PolicedType,
+} from './policy-evaluator';
 
 /**
  * A credential type name (e.g. `slackApi`) carries no package prefix, unlike a node type
@@ -44,6 +49,56 @@ export function packageResolverFor(
 	return kind === CREDENTIAL_TYPES_KIND
 		? credentialTypePackageResolver(loadNodesAndCredentials)
 		: nodeTypePackageResolver;
+}
+
+/**
+ * Every type `typeName` is built on, walking `extends` breadth-first. The visited set keeps a
+ * community package that declares a cycle from looping forever.
+ */
+function credentialTypeAncestors(
+	loadNodesAndCredentials: LoadNodesAndCredentials,
+	typeName: string,
+): string[] {
+	const { knownCredentials } = loadNodesAndCredentials;
+	const parentsOf = (name: string) =>
+		Object.hasOwn(knownCredentials, name) ? (knownCredentials[name].extends ?? []) : [];
+
+	const seen = new Set<string>([typeName]);
+	const queue = [...parentsOf(typeName)];
+
+	for (let index = 0; index < queue.length; index++) {
+		const parent = queue[index];
+		if (seen.has(parent)) continue;
+		seen.add(parent);
+		queue.push(...parentsOf(parent));
+	}
+
+	seen.delete(typeName);
+	return [...seen];
+}
+
+export function policedTypeFor(
+	kind: string,
+	nodeTypes: NodeTypes,
+	loadNodesAndCredentials: LoadNodesAndCredentials,
+): (name: string) => PolicedType {
+	if (kind === NODE_TYPES_KIND) {
+		return (name) => ({ name, baseName: nodeTypes.resolveBaseName(name).baseName });
+	}
+
+	return (name) => ({
+		name,
+		baseName: name,
+		ancestors: credentialTypeAncestors(loadNodesAndCredentials, name),
+	});
+}
+
+/** Whether a credential type is known, checked at write time for an `extends` rule's value. */
+export function isCredentialTypeKnown(
+	loadNodesAndCredentials: LoadNodesAndCredentials,
+	typeName: string,
+): boolean {
+	return Object.hasOwn(loadNodesAndCredentials.knownCredentials, typeName);
 }
 
 /**

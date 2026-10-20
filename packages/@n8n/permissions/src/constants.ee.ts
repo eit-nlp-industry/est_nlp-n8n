@@ -1,7 +1,7 @@
 export const DEFAULT_OPERATIONS = ['create', 'read', 'update', 'delete', 'list'] as const;
 
 export const RESOURCES = {
-	agent: [...DEFAULT_OPERATIONS, 'execute', 'publish', 'unpublish', 'manage'] as const,
+	agent: [...DEFAULT_OPERATIONS, 'execute', 'publish', 'unpublish', 'manage', 'export'] as const,
 	aiAssistant: ['manage'] as const,
 	// AI prompt preferences. `aiPreference`: instance-wide rows and other users' rows.
 	// `projectAiPreference`: rows of a project. A user's own rows need no scope.
@@ -77,6 +77,7 @@ export const RESOURCES = {
 	insights: ['list', 'read'] as const,
 	oidc: ['manage'] as const,
 	provisioning: ['manage'] as const,
+	scim: ['manage'] as const,
 	dataTable: [
 		...DEFAULT_OPERATIONS,
 		'readRow',
@@ -103,6 +104,7 @@ export const RESOURCES = {
 } as const;
 
 export const API_KEY_RESOURCES = {
+	agent: ['export'] as const,
 	tag: [...DEFAULT_OPERATIONS] as const,
 	workflow: [...DEFAULT_OPERATIONS, 'move', 'activate', 'deactivate', 'export', 'import'] as const,
 	variable: ['create', 'update', 'delete', 'list'] as const,
@@ -131,7 +133,7 @@ export const API_KEY_RESOURCES = {
 	role: ['manage', 'manageProject', 'list', 'read'] as const,
 	roleMappingRule: ['create', 'delete', 'list', 'update'] as const,
 	nodeTypePolicy: ['manage'] as const,
-	// TODO: add credentialTypePolicy:manage once a Public API endpoint consumes it.
+	credentialTypePolicy: ['manage'] as const,
 } as const;
 
 export const GLOBAL_OWNER_ROLE_SLUG = 'global:owner';

@@ -23,7 +23,11 @@ import {
 	type CredentialDependencyType,
 } from './credential-dependency-entity';
 import { CredentialsEntity, type CredentialUsageScope } from './credentials-entity';
-import { DeploymentKey, OAUTH_JWE_PRIVATE_KEY_TYPE } from './deployment-key';
+import {
+	DeploymentKey,
+	OAUTH_JWE_PRIVATE_KEY_TYPE,
+	OAUTH_SIGNING_KEY_TYPE,
+} from './deployment-key';
 import { EvaluationCollection } from './evaluation-collection.ee';
 import { EvaluationConfig } from './evaluation-config.ee';
 import { ExecutionAnnotation } from './execution-annotation.ee';
@@ -33,6 +37,11 @@ import type { ExecutionDataStorageLocation } from './execution-entity';
 import { ExecutionMetadata } from './execution-metadata';
 import { Folder } from './folder';
 import { FolderTagMapping } from './folder-tag-mapping';
+import {
+	IdempotencyKey,
+	idempotencyKeyStatuses,
+	type IdempotencyKeyStatus,
+} from './idempotency-key';
 import { InstanceCredentialAssignment } from './instance-credential-assignment';
 import { InvalidAuthToken } from './invalid-auth-token';
 import { PollerState } from './poller-state';
@@ -83,6 +92,7 @@ import {
 	WorkflowPublicationOutboxStatus,
 	WorkflowPublicationReason,
 } from './workflow-publication-outbox';
+import { WorkflowPublicationRetryState } from './workflow-publication-retry-state';
 import {
 	WorkflowPublicationTriggerStatus,
 	type WorkflowPublicationTriggerStatusType,
@@ -119,6 +129,9 @@ export {
 	type AgentEvalResultStatus,
 	AgentEvalRating,
 	type AgentEvalVote,
+	IdempotencyKey,
+	idempotencyKeyStatuses,
+	type IdempotencyKeyStatus,
 	InvalidAuthToken,
 	InstanceCredentialAssignment,
 	AiBuilderTemporaryWorkflow,
@@ -141,6 +154,7 @@ export {
 	type CredentialDependencyType,
 	DeploymentKey,
 	OAUTH_JWE_PRIVATE_KEY_TYPE,
+	OAUTH_SIGNING_KEY_TYPE,
 	EvaluationCollection,
 	EvaluationConfig,
 	Folder,
@@ -177,6 +191,7 @@ export {
 	WorkflowPublicationOutboxStatus,
 	WorkflowPublicationReason,
 	UNPUBLISH_VERSION_SENTINEL,
+	WorkflowPublicationRetryState,
 	WorkflowPublicationTriggerStatus,
 	type WorkflowPublicationTriggerStatusType,
 	type WorkflowPublicationTriggerKind,
@@ -212,6 +227,7 @@ export const entities = {
 	AgentEvalRun,
 	AgentEvalResult,
 	AgentEvalRating,
+	IdempotencyKey,
 	InvalidAuthToken,
 	InstanceCredentialAssignment,
 	AiBuilderTemporaryWorkflow,
@@ -246,6 +262,7 @@ export const entities = {
 	AuthProviderSyncHistory,
 	WorkflowHistory,
 	WorkflowPublicationOutbox,
+	WorkflowPublicationRetryState,
 	WorkflowPublicationTriggerStatus,
 	WorkflowPublishedVersion,
 	WorkflowPublishHistory,

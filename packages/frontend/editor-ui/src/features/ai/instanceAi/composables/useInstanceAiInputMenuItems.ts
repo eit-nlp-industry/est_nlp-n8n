@@ -1,7 +1,10 @@
 import { computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import type { DropdownMenuItemProps, IconName } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
+import { VIEWS } from '@/app/constants';
 import { useUIStore } from '@/app/stores/ui.store';
+import { isContextPreferencesEnabled } from '@/features/settings/context/context.utils';
 import type { ToolConnectionStatus, ToolIconSource } from '@/features/shared/toolsConnection/types';
 import {
 	INSTANCE_AI_COMPUTER_USE_SETUP_MODAL_KEY,
@@ -26,6 +29,7 @@ export type InputMenuItem = DropdownMenuItemProps<string, InputMenuItemData>;
 export function useInstanceAiInputMenuItems(attachFiles: () => void) {
 	const i18n = useI18n();
 	const uiStore = useUIStore();
+	const router = useRouter();
 	const settingsStore = useInstanceAiSettingsStore();
 	const mcpStore = useInstanceAiMcpStore();
 	const { ignorePendingConnectResult } = useMcpServerConnect();
@@ -57,6 +61,11 @@ export function useInstanceAiInputMenuItems(attachFiles: () => void) {
 	function openToolsModal() {
 		mcpTelemetry.trackToolsListOpened('input_menu');
 		uiStore.openModal(INSTANCE_AI_TOOLS_CONNECTION_MODAL_KEY);
+	}
+
+	function openPreferenceSettings() {
+		// A new tab keeps the chat and its unsent draft.
+		window.open(router.resolve({ name: VIEWS.SETTINGS_CONTEXT_PREFERENCES }).href, '_blank');
 	}
 
 	function createConnectionItem({
@@ -270,6 +279,16 @@ export function useInstanceAiInputMenuItems(attachFiles: () => void) {
 					disconnect: settingsStore.disconnectBrowserUse,
 				}),
 			);
+		}
+
+		if (isContextPreferencesEnabled()) {
+			items.push({
+				id: 'preferences',
+				label: i18n.baseText('instanceAi.inputMenu.preferences.label'),
+				icon: { type: 'icon', value: 'brain' },
+				divided: true,
+				data: { action: openPreferenceSettings },
+			});
 		}
 
 		return items;
