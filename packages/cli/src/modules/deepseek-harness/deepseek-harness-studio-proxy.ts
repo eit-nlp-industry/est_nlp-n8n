@@ -100,10 +100,23 @@ export function createStudioProxyMiddleware(
 		if (typeof projectId !== 'string' || typeof agentId !== 'string') return undefined;
 		return rewriteSetCookiePaths(setCookie, studioProxyBasePath(projectId, agentId));
 	};
-	const proxyError = (_error: Error, _req: Request, res: ServerResponse) => {
-		if (!res.headersSent) {
-			res.writeHead(502);
-			res.end('Bad Gateway');
+	const proxyError = (_error: Error, _req: Request, res: ServerResponse | Socket) => {
+		if ('writeHead' in res) {
+			if (!res.headersSent) {
+				res.writeHead(502);
+				res.end('Bad Gateway');
+			}
+			return;
+		}
+
+		if (!res.destroyed) {
+			res.end(
+				'HTTP/1.1 502 Bad Gateway\r\n' +
+					'Connection: close\r\n' +
+					'Content-Type: text/plain; charset=utf-8\r\n' +
+					'Content-Length: 11\r\n\r\n' +
+					'Bad Gateway',
+			);
 		}
 	};
 

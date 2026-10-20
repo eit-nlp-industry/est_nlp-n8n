@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer, request as httpRequest, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { createConnection, type AddressInfo } from 'node:net';
 import WebSocket, { WebSocketServer } from 'ws';
 
 import {
@@ -45,6 +45,34 @@ describe('deepseek-harness-studio-proxy', () => {
 		);
 		expect(html.indexOf('ownsHost:true')).toBeLessThan(html.indexOf('</head>'));
 		expect(injectStudioHostOwnership('not html')).toBe('not html');
+	});
+
+	it('returns a 502 response when a WebSocket upstream is unavailable', async () => {
+		const unavailableBackend = createServer();
+		const unavailablePort = await listen(unavailableBackend);
+		await close(unavailableBackend);
+
+		const webService = {
+			getRunningOrigin: () => `http://127.0.0.1:${unavailablePort}`,
+		};
+		const app = express();
+		const proxy = createStudioProxyMiddleware(webService as never);
+		app.use('/deepseek-harness-studio/:projectId/:agentId', proxy);
+		const proxyServer = createServer(app);
+		attachStudioProxyUpgrade(proxyServer, webService as never, proxy);
+		const proxyPort = await listen(proxyServer);
+
+		try {
+			const response = await requestUpgrade(
+				proxyPort,
+				'/deepseek-harness-studio/project-1/agent-1/api/remote.mux',
+			);
+
+			expect(response).toContain('HTTP/1.1 502 Bad Gateway');
+			expect(response).toContain('\r\n\r\nBad Gateway');
+		} finally {
+			await close(proxyServer);
+		}
 	});
 
 	it('preserves public trust headers across HTTP and WebSocket proxying', async () => {
@@ -184,6 +212,33 @@ async function listen(server: Server): Promise<number> {
 async function close(server: Server): Promise<void> {
 	await new Promise<void>((resolve, reject) => {
 		server.close((error) => (error ? reject(error) : resolve()));
+	});
+}
+
+async function requestUpgrade(port: number, path: string): Promise<string> {
+	return await new Promise((resolve, reject) => {
+		const socket = createConnection({ host: '127.0.0.1', port });
+		let response = '';
+		socket.setEncoding('utf8');
+		socket.setTimeout(2_000, () => {
+			socket.destroy();
+			reject(new Error('Timed out while waiting for the WebSocket upgrade response'));
+		});
+		socket.once('connect', () => {
+			socket.write(
+				`GET ${path} HTTP/1.1\r\n` +
+					'Host: public.localhost\r\n' +
+					'Connection: Upgrade\r\n' +
+					'Upgrade: websocket\r\n' +
+					'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n' +
+					'Sec-WebSocket-Version: 13\r\n\r\n',
+			);
+		});
+		socket.on('data', (chunk: string) => {
+			response += chunk;
+		});
+		socket.once('end', () => resolve(response));
+		socket.once('error', reject);
 	});
 }
 

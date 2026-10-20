@@ -1,13 +1,12 @@
 import { DeepSeekHarnessConfig, GlobalConfig } from '@n8n/config';
 import { Service } from '@n8n/di';
 import { OnShutdown } from '@n8n/decorators';
+import { NotFoundError } from '@n8n/errors';
 import { isRecord } from '@n8n/utils/is-record';
 import { sanitizeErrorDetail } from '@n8n/utils/redaction/sanitize-error-detail';
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import { join } from 'node:path';
-
-import { NotFoundError } from '@/errors/response-errors/not-found.error';
 
 import {
 	DEFAULT_WORKSPACE_NAME,
@@ -97,9 +96,7 @@ export function getHarnessConfigurationStatus(
 	settings: HarnessSettingsDescription,
 	credentials: HarnessCredentialsDescription,
 ): DeepSeekHarnessConfigurationStatus {
-	const modelNamespace = settings.namespaces?.find(
-		({ ns }) => ns === MODEL_SETTINGS_NAMESPACE,
-	);
+	const modelNamespace = settings.namespaces?.find(({ ns }) => ns === MODEL_SETTINGS_NAMESPACE);
 	const modelValue = isRecord(modelNamespace?.value) ? modelNamespace.value : undefined;
 	const provider = typeof modelValue?.provider === 'string' ? modelValue.provider.trim() : null;
 	const model = typeof modelValue?.model === 'string' ? modelValue.model.trim() : null;

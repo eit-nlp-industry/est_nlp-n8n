@@ -1,10 +1,9 @@
 import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
 import { isUniqueConstraintError } from '@n8n/db';
 import { Container, Service } from '@n8n/di';
+import { ConflictError } from '@n8n/errors';
 import { generateNanoId } from '@n8n/utils/generate-nano-id';
 import type { ChunkType } from 'n8n-workflow';
-
-import { ConflictError } from '@/errors/response-errors/conflict.error';
 
 import { DeepSeekHarnessHomeService } from './deepseek-harness-home.service';
 import { DeepSeekHarnessCliService } from './deepseek-harness-cli.service';
