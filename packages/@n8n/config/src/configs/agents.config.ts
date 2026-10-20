@@ -67,12 +67,20 @@ export class AgentsConfig {
 	tracingRecordOutputs: boolean = true;
 
 	/**
-	 * When true, each LLM turn is recorded on the agent session timeline with the
-	 * raw request/response snapshot (for debug). Off by default — payloads can be
-	 * large and may contain sensitive data.
+	 * Whether agent session timelines record each model HTTP request and response.
+	 * The recorded data can be large and can contain sensitive values.
 	 */
 	@Env('N8N_AGENTS_DEBUG_MODEL_IO')
 	debugModelIo: boolean = false;
+
+	/**
+	 * Whether agents keep their skills in the skills hub instead of inline on the agent.
+	 * Read once when the agents module starts; a change needs a restart. Set the same value
+	 * on every main and worker. With it on, each main copies inline skills into the hub at
+	 * startup, once per agent.
+	 */
+	@Env('N8N_AGENTS_SKILLS_HUB_ENABLED')
+	skillsHubEnabled: boolean = false;
 
 	/**
 	 * Comma-separated list of agent sub-feature modules to enable. Each entry
@@ -121,4 +129,12 @@ export class AgentsConfig {
 	 */
 	@Env('N8N_AGENTS_CHANNEL_RECONCILE_INTERVAL')
 	channelReconcileIntervalSeconds: number = 60;
+
+	/**
+	 * For testing only. Lets the WhatsApp setup accept a short-lived access token,
+	 * like the one on the API Setup page in Meta. A channel that uses one stops
+	 * working when the token expires, about a day later.
+	 */
+	@Env('N8N_AGENTS_WHATSAPP_ALLOW_TEMPORARY_TOKEN')
+	whatsAppAllowTemporaryToken: boolean = false;
 }

@@ -39,6 +39,7 @@ import {
 	packSandboxLinkedWorkspacePackages,
 	type WorkspacePackageTarball,
 } from './pack-workspace-sdk';
+import type { VerifiedWorkspaceBundles } from './prebaked-workspace-bundle';
 import {
 	runInSandbox,
 	readFileViaSandbox,
@@ -488,11 +489,13 @@ async function materializeKnowledgeBaseStep(
 	workspace: SandboxWorkspace,
 	root: string,
 	context: InstanceAiContext,
+	verifiedBundles: VerifiedWorkspaceBundles | undefined,
 ): Promise<void> {
 	await setupStep('materialize-knowledge-base', async () => {
 		const templatesBundle = (await context.templatesService?.getBundle()) ?? null;
 		await materializeKnowledgeBaseIntoWorkspace({
 			workspace,
+			verifiedBundles,
 			root,
 			logger: context.logger,
 			templatesArchive: templatesBundle?.archive ?? null,
@@ -511,6 +514,7 @@ async function materializeKnowledgeBaseStep(
 export async function setupSandboxWorkspace(
 	workspace: SandboxWorkspace,
 	context: InstanceAiContext,
+	options: { verifiedBundles?: VerifiedWorkspaceBundles } = {},
 ): Promise<boolean> {
 	return await traceSandboxOperation(
 		'initialize-workspace',
@@ -528,7 +532,7 @@ export async function setupSandboxWorkspace(
 				async () => await readWorkspaceFile(workspace, markerFile),
 			);
 			if (marker !== null) {
-				await materializeKnowledgeBaseStep(workspace, root, context);
+				await materializeKnowledgeBaseStep(workspace, root, context, options.verifiedBundles);
 				return false;
 			}
 
@@ -555,7 +559,7 @@ export async function setupSandboxWorkspace(
 				'write-workspace-files',
 				async () => await writeWorkspaceFiles(workspace, root, files),
 			);
-			await materializeKnowledgeBaseStep(workspace, root, context);
+			await materializeKnowledgeBaseStep(workspace, root, context, options.verifiedBundles);
 
 			// npm install (must run after package.json is in place)
 			await setupStep('install-dependencies', async () => {

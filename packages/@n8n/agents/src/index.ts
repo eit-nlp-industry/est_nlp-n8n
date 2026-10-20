@@ -87,6 +87,7 @@ export type {
 	AgentInputBoundary,
 	SmoothStreamOptions,
 	TokenUsage,
+	PromptSizeUsage,
 	AgentExecutionCounter,
 	SideCallTask,
 	SideCallUsageReport,
@@ -94,6 +95,7 @@ export type {
 	AnthropicPromptCachingConfig,
 	OpenAIPromptCachingConfig,
 	PromptCachingConfig,
+	NativeToolDeferralConfig,
 	BuiltTelemetry,
 	AttributeValue,
 	ObservationCursor,
@@ -203,6 +205,10 @@ export { deriveSubAgentTelemetry } from './runtime/telemetry/sub-agent-telemetry
 export { LangSmithTelemetry } from './integrations/langsmith';
 export type { LangSmithTelemetryConfig } from './integrations/langsmith';
 export { Agent } from './sdk/agent';
+export {
+	PROMPT_SIZE_BUCKET_THRESHOLDS,
+	withPromptSizeBreakdown,
+} from './runtime/loop/prompt-size-usage';
 export type {
 	VolatileInstructionsContext,
 	VolatileInstructionsProvider,
@@ -214,6 +220,7 @@ export {
 	createRuntimeSkillSource,
 	createRuntimeSkillTools,
 	createSkillLoadTool,
+	extendRuntimeSkillSource,
 	filterRuntimeSkillSource,
 	formatSkillValidationErrors,
 	InvalidRuntimeSkillError,
