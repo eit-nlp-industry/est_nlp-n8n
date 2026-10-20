@@ -257,6 +257,7 @@ provider notifications or polling.
 | `N8N_INSTANCE_AI_SANDBOX_IMAGE`                 | `daytonaio/sandbox:0.5.0` | Daytona base image                                                            |
 | `N8N_INSTANCE_AI_SANDBOX_SNAPSHOT`              | empty                     | Daytona proxy snapshot override                                               |
 | `N8N_INSTANCE_AI_SANDBOX_TIMEOUT`               | `300000`                  | Default command timeout in milliseconds                                       |
+| `N8N_INSTANCE_AI_SANDBOX_NPM_REGISTRY`          | empty                     | Optional npm registry URL for workspace dependency installation               |
 | `N8N_INSTANCE_AI_BUILDER_SANDBOX_TTL_MS`        | `900000`                  | In-process idle cache TTL; `0` disables eviction                              |
 | `N8N_INSTANCE_AI_SANDBOX_NAME_PREFIX`           | empty                     | Prefix and label for Daytona names                                            |
 | `N8N_INSTANCE_AI_SANDBOX_EPHEMERAL`             | `false`                   | Delete the sandbox once idle instead of stopping it                           |

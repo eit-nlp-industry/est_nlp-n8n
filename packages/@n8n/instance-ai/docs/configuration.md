@@ -98,6 +98,7 @@ without search results. `research(action="fetch-url")` still works.
 | `N8N_INSTANCE_AI_SANDBOX_IMAGE` | string | `daytonaio/sandbox:0.5.0` | Docker image for the Daytona sandbox. |
 | `N8N_INSTANCE_AI_SANDBOX_SNAPSHOT` | string | `''` | Overrides the full Daytona snapshot name (e.g. `n8n/instance-ai:2.27.3`) used to create sandboxes. Defaults to the versioned snapshot derived from the running n8n version. It applies only in proxy mode. A missing or unusable snapshot fails sandbox creation because proxy mode cannot upload an image-build context. |
 | `N8N_INSTANCE_AI_SANDBOX_TIMEOUT` | number | `300000` | Default command timeout in the sandbox (milliseconds). |
+| `N8N_INSTANCE_AI_SANDBOX_NPM_REGISTRY` | string | `''` | Optional HTTP or HTTPS npm registry URL used to install sandbox workspace dependencies. Empty uses the npm default registry. |
 | `N8N_INSTANCE_AI_SANDBOX_CREATE_TIMEOUT_SECONDS` | number | `900` | Eval-harness-only Daytona cold-provisioning timeout in seconds. It must be a positive integer. |
 | `N8N_INSTANCE_AI_SANDBOX_NAME_PREFIX` | string | `''` | Prefix prepended to every Daytona sandbox name (e.g. `eval-baseline-daily`). Also surfaced as a `name_prefix` label. Empty in production. |
 | `N8N_INSTANCE_AI_SANDBOX_EPHEMERAL` | boolean | `false` | When true, sandboxes are created ephemeral: the provider deletes them once idle instead of leaving them stopped. Applies to both `n8n-sandbox` and `daytona`. Intended for throwaway eval instances so sandboxes don't accumulate. |

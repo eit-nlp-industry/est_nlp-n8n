@@ -30,7 +30,7 @@ export class DeepSeekHarnessController {
 		_res: unknown,
 		@Body _dto: CreateDeepSeekHarnessAgentDto,
 	): Promise<DeepSeekHarnessAgentDto> {
-		return await this.service.createForProject(req.user.email, req.params.projectId);
+		return await this.service.createProfileForProject(req.user.email, req.params.projectId);
 	}
 
 	@Get('/')

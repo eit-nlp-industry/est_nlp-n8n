@@ -5,7 +5,12 @@ import { execFile } from 'node:child_process';
 
 import { vi } from 'vitest';
 
-import { DeepSeekHarnessCliService, getPnpmCommand } from '../deepseek-harness-cli.service';
+import {
+	DeepSeekHarnessCliService,
+	getHarnessEnv,
+	getInitializeProfileInvocation,
+	getPnpmCommand,
+} from '../deepseek-harness-cli.service';
 
 vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
 
@@ -50,6 +55,7 @@ describe('DeepSeekHarnessCliService', () => {
 			const options = args[2] as { env: NodeJS.ProcessEnv };
 			const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
 			expect(options.env.DSH_HOME).toBe(home);
+			expect(options.env).toEqual(getHarnessEnv(harnessPath, home));
 			void mkdir(profilePath, { recursive: true }).then(async () => {
 				await writeFile(path.join(profilePath, 'package.json'), '{}');
 				await writeFile(path.join(profilePath, 'cordis.patch.yml'), '[]\n');
@@ -63,6 +69,7 @@ describe('DeepSeekHarnessCliService', () => {
 		const patch = await readFile(path.join(profilePath, 'cordis.patch.yml'), 'utf8');
 		expect(patch).toContain('documentsDirectory:');
 		expect(patch).toContain(JSON.stringify(home));
+		expect(patch).not.toMatch(/(?:^|\n)\[\]\s*(?:\n|$)/);
 
 		expect(execFile).toHaveBeenCalledWith(
 			process.platform === 'win32' ? process.env.ComSpec : getPnpmCommand(process.platform),
@@ -97,7 +104,10 @@ describe('DeepSeekHarnessCliService', () => {
 		);
 		const renamedProfilePath = path.join(home, 'renamed', 'profiles', 'n8n-web');
 		await mkdir(renamedProfilePath, { recursive: true });
-		await writeFile(path.join(renamedProfilePath, 'cordis.patch.yml'), await readFile(path.join(profilePath, 'cordis.patch.yml')));
+		await writeFile(
+			path.join(renamedProfilePath, 'cordis.patch.yml'),
+			await readFile(path.join(profilePath, 'cordis.patch.yml')),
+		);
 		const service = new DeepSeekHarnessCliService({ path: home, profile: 'n8n-web' } as never);
 
 		await service.ensureWorkspaceDirectory(home, 'n8n-web');
@@ -109,6 +119,20 @@ describe('DeepSeekHarnessCliService', () => {
 		expect(patch).not.toContain('old-home');
 	});
 
+	it('replaces a commented empty array without leaving invalid YAML', async () => {
+		const profilePath = path.join(home, 'profiles', 'n8n-web');
+		await mkdir(profilePath, { recursive: true });
+		await writeFile(path.join(profilePath, 'cordis.patch.yml'), '# header comment\n[]\n');
+		const service = new DeepSeekHarnessCliService({ path: home, profile: 'n8n-web' } as never);
+
+		await service.ensureWorkspaceDirectory(home, 'n8n-web');
+
+		const patch = await readFile(path.join(profilePath, 'cordis.patch.yml'), 'utf8');
+		expect(patch).toContain('# header comment');
+		expect(patch).toContain('id: workspace-controller');
+		expect(patch).not.toMatch(/(?:^|\n)\[\]\s*(?:\n|$)/);
+	});
+
 	it('rejects when the CLI exits without creating the profile files', async () => {
 		const service = new DeepSeekHarnessCliService({
 			path: home,
@@ -118,6 +142,125 @@ describe('DeepSeekHarnessCliService', () => {
 		await expect(service.initializeProfile(home)).rejects.toThrow(
 			'DeepSeek Harness profile initialization did not create the expected files',
 		);
+	});
+
+	it('redacts secrets from CLI errors', async () => {
+		const service = new DeepSeekHarnessCliService({
+			path: home,
+			profile: 'n8n-web',
+		} as never);
+		vi.mocked(execFile).mockImplementation((...args: unknown[]) => {
+			const callback = args.at(-1) as (error: Error, stdout: string, stderr: string) => void;
+			callback(new Error('Command failed'), '', 'token=secret\nProfile initialization failed');
+			return undefined as never;
+		});
+
+		await expect(service.initializeProfile(home)).rejects.toThrow(
+			'Command failed: [REDACTED] Profile initialization failed',
+		);
+	});
+
+	it('initializes via a configured Node binary instead of pnpm', async () => {
+		const harnessPath = path.join(home, 'harness');
+		const profilePath = path.join(home, 'profiles', 'n8n-web');
+		const nodePath = '/opt/glibc-node/bin/node-glibc';
+		const service = new DeepSeekHarnessCliService({
+			path: harnessPath,
+			profile: 'n8n-web',
+			nodePath,
+		} as never);
+
+		vi.mocked(execFile).mockImplementation((...args: unknown[]) => {
+			const callback = args.at(-1) as (error: null, stdout: string, stderr: string) => void;
+			void mkdir(profilePath, { recursive: true }).then(async () => {
+				await writeFile(path.join(profilePath, 'package.json'), '{}');
+				await writeFile(path.join(profilePath, 'cordis.patch.yml'), '[]\n');
+				callback(null, '', '');
+			});
+			return undefined as never;
+		});
+
+		await service.initializeProfile(home);
+
+		expect(execFile).toHaveBeenCalledWith(
+			nodePath,
+			[
+				path.join(harnessPath, 'apps', 'cli', 'lib', 'bin.js'),
+				'--profile',
+				'n8n-web',
+				'--from-default-profile',
+				'web',
+				'--dump-config',
+			],
+			expect.objectContaining({ cwd: harnessPath }),
+			expect.any(Function),
+		);
+	});
+});
+
+describe('getInitializeProfileInvocation', () => {
+	it('uses bin.js under a configured Node binary', () => {
+		expect(
+			getInitializeProfileInvocation(
+				'/opt/deepseek-harness',
+				'n8n-web',
+				'/opt/glibc-node/bin/node-glibc',
+				'linux',
+			),
+		).toEqual({
+			command: '/opt/glibc-node/bin/node-glibc',
+			args: [
+				path.join('/opt/deepseek-harness', 'apps', 'cli', 'lib', 'bin.js'),
+				'--profile',
+				'n8n-web',
+				'--from-default-profile',
+				'web',
+				'--dump-config',
+			],
+		});
+	});
+
+	it('falls back to pnpm when no Node binary is configured', () => {
+		expect(getInitializeProfileInvocation('/opt/dsh', 'n8n-web', '', 'linux')).toEqual({
+			command: 'pnpm',
+			args: ['dsh', '--profile', 'n8n-web', '--from-default-profile', 'web', '--dump-config'],
+		});
+	});
+});
+
+describe('getHarnessEnv', () => {
+	const binDir = path.join('/opt/dsh', 'node_modules', '.bin');
+
+	it('puts the Harness bin directory first on PATH', () => {
+		const env = getHarnessEnv('/opt/dsh', '/data/home', { PATH: '/usr/bin', FOO: 'bar' });
+
+		expect(env).toEqual({
+			PATH: `${binDir}${path.delimiter}/usr/bin`,
+			FOO: 'bar',
+			DSH_HOME: '/data/home',
+		});
+	});
+
+	it('keeps the existing PATH key casing', () => {
+		const env = getHarnessEnv('/opt/dsh', '/data/home', { Path: 'C:\\Windows' });
+
+		expect(env.Path).toBe(`${binDir}${path.delimiter}C:\\Windows`);
+		expect(env).not.toHaveProperty('PATH');
+	});
+
+	it('sets PATH to the Harness bin directory when PATH is missing', () => {
+		expect(getHarnessEnv('/opt/dsh', '/data/home', {})).toEqual({
+			PATH: binDir,
+			DSH_HOME: '/data/home',
+		});
+	});
+
+	it('does not mutate the source environment', () => {
+		const source = { PATH: '/usr/bin' };
+
+		getHarnessEnv('/opt/dsh', '/data/home', source);
+
+		expect(source).toEqual({ PATH: '/usr/bin' });
 	});
 });
 

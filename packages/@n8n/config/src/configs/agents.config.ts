@@ -64,6 +64,14 @@ export class AgentsConfig {
 	tracingRecordOutputs: boolean = true;
 
 	/**
+	 * When true, each LLM turn is recorded on the agent session timeline with the
+	 * raw request/response snapshot (for debug). Off by default — payloads can be
+	 * large and may contain sensitive data.
+	 */
+	@Env('N8N_AGENTS_DEBUG_MODEL_IO')
+	debugModelIo: boolean = false;
+
+	/**
 	 * Comma-separated list of agent sub-feature modules to enable. Each entry
 	 * gates a specific frontend/runtime capability inside the agents module.
 	 * Add supported module tokens to `AGENTS_MODULE_NAMES`.

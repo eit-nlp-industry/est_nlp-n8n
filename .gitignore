@@ -87,6 +87,14 @@ packages/cli/src/commands/export/outputs
 .superset
 .conductor
 .n8n
+*.log
+
+# Local demo harness — keep on developer machines only (not for GitHub)
+demo/
+
+# Superpowers SDD execution ledgers (local only; plans/specs live in .agents/specs)
+.superpowers/
+
 lefthook-local.yml
 IMPROVEMENTS.md
 .playwright-mcp

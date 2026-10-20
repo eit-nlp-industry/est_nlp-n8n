@@ -305,6 +305,19 @@ export function timelineItemSearchText(
 		searchableValueText(item.hitlRequest),
 		searchableValueText(item.hitlResponse),
 	);
+	if (item.kind === 'model-turn') {
+		parts.push(
+			item.modelName,
+			item.finishReason,
+			item.turnIndex !== undefined ? String(item.turnIndex + 1) : undefined,
+			item.modelUrl,
+			item.modelMethod,
+			item.modelStatus !== undefined ? String(item.modelStatus) : undefined,
+			searchableValueText(item.modelRequestBody),
+			searchableValueText(item.modelResponseBody),
+			item.modelError,
+		);
+	}
 	if (item.toolName) parts.push(formatToolNameForDisplay(item.toolName));
 
 	const toolKey = builtinToolLabelKey(item.toolName, item.toolOutput);
@@ -358,6 +371,7 @@ const COLOR_MAP: Record<EventKind, string> = {
 	user: 'var(--color--blue-400)',
 	agent: 'var(--color--secondary)',
 	skill: 'var(--color--orange-400)',
+	'model-turn': 'var(--color--orange-400)',
 	tool: 'var(--color--success)',
 	node: 'var(--color--text)',
 	workflow: 'var(--color--primary)',
@@ -375,6 +389,7 @@ const CHART_BLOCK_COLOR_MAP: Record<EventKind, string> = {
 	user: 'var(--color--blue-600)',
 	agent: 'var(--color--purple-600)',
 	skill: 'var(--color--orange-600)',
+	'model-turn': 'var(--color--orange-600)',
 	tool: 'var(--color--green-600)',
 	node: 'var(--color--neutral-600)',
 	workflow: 'var(--color--pink-600)',
@@ -434,6 +449,28 @@ interface RawTextEvent {
 	endTime?: number;
 }
 
+interface RawModelTurnEvent {
+	type: 'model-turn';
+	turnIndex: number;
+	timestamp: number;
+	endTime: number;
+	model?: string;
+	finishReason?: string;
+	usage?: {
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+	};
+	url: string;
+	method?: string;
+	status?: number;
+	streamed?: boolean;
+	requestBody?: unknown;
+	responseBody?: unknown;
+	error?: string;
+	emptyRetries?: number;
+}
+
 interface RawSuspensionEvent {
 	type: 'suspension';
 	toolName: string;
@@ -459,6 +496,7 @@ interface RawBackgroundJobSignalEvent {
 type RawEvent =
 	| RawToolCallEvent
 	| RawTextEvent
+	| RawModelTurnEvent
 	| RawSuspensionEvent
 	| RawHitlResponseEvent
 	| RawBackgroundJobSignalEvent;
@@ -688,6 +726,27 @@ export function flattenExecutionsToTimelineItems(executions: AgentExecution[]): 
 					// `endTime` skip this so the popover doesn't show a misleading 0.
 					endTimestamp: event.endTime && event.endTime > startTs ? event.endTime : undefined,
 					resumed: showResumed,
+				});
+			} else if (event.type === 'model-turn') {
+				items.push({
+					kind: 'model-turn',
+					executionId: exec.id,
+					turnIndex: event.turnIndex,
+					// Point event on the chart (avoid overlapping the agent text bar);
+					// keep endTimestamp for popover duration.
+					timestamp: event.timestamp,
+					endTimestamp: event.endTime,
+					modelName: event.model,
+					finishReason: event.finishReason,
+					modelUsage: event.usage,
+					modelUrl: event.url,
+					modelMethod: event.method,
+					modelStatus: event.status,
+					modelStreamed: event.streamed,
+					modelRequestBody: event.requestBody,
+					modelResponseBody: event.responseBody,
+					modelError: event.error,
+					emptyRetries: event.emptyRetries,
 				});
 			} else if (event.type === 'tool-call') {
 				const hitlContext = hitlContexts.get(event.toolCallId);

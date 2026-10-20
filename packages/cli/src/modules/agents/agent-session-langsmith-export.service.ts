@@ -353,6 +353,33 @@ function buildEventRun(event: TimelineEvent, execution: AgentExecution, path: st
 				metadata: {},
 				children: [],
 			};
+		case 'model-turn':
+			return {
+				path,
+				name: 'Model turn',
+				runType: 'llm',
+				startTime: event.timestamp,
+				endTime: event.endTime,
+				inputs: {
+					url: event.url,
+					...(event.method !== undefined && { method: event.method }),
+					...(event.requestBody !== undefined && { requestBody: event.requestBody }),
+				},
+				outputs: {
+					...(event.status !== undefined && { status: event.status }),
+					...(event.streamed === true && { streamed: true }),
+					...(event.responseBody !== undefined && { responseBody: event.responseBody }),
+					...(event.error !== undefined && { error: event.error }),
+				},
+				metadata: {
+					turnIndex: event.turnIndex,
+					model: event.model,
+					finishReason: event.finishReason,
+					usage: event.usage,
+					emptyRetries: event.emptyRetries,
+				},
+				children: [],
+			};
 		case 'suspension':
 			return {
 				path,

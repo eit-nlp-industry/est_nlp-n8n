@@ -64,6 +64,15 @@ const infoText = computed((): string => {
 			return truncate(it.content ?? '', 500);
 		case 'skill':
 			return it.skillName ?? resolveToolNameForDisplay(it.toolName, i18n, it.toolOutput);
+		case 'model-turn': {
+			const index = (it.turnIndex ?? 0) + 1;
+			const model = it.modelName ? ` · ${it.modelName}` : '';
+			return (
+				i18n.baseText('agentSessions.timeline.modelTurnIndex', {
+					interpolate: { index: String(index) },
+				}) + model
+			);
+		}
 		case 'tool': {
 			if (isSubAgent.value) return delegateLabel(i18n, it.subAgentName ?? '');
 			return resolveToolNameForDisplay(it.toolName, i18n, it.toolOutput);
@@ -105,6 +114,8 @@ const label = computed((): string => {
 			return i18n.baseText('agentSessions.timeline.agent');
 		case 'skill':
 			return i18n.baseText('agentSessions.timeline.skill');
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurn');
 		case 'tool':
 			return i18n.baseText('agentSessions.timeline.tool');
 		case 'workflow':

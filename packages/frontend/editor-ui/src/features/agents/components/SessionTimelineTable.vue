@@ -38,6 +38,8 @@ function labelForKey(key: string): string {
 			return i18n.baseText('agentSessions.timeline.agent');
 		case 'skill':
 			return i18n.baseText('agentSessions.timeline.skill');
+		case 'model-turn':
+			return i18n.baseText('agentSessions.timeline.modelTurn');
 		case 'tool':
 			return i18n.baseText('agentSessions.timeline.tool');
 		case 'workflow':

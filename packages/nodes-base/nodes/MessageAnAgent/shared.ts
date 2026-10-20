@@ -636,6 +636,9 @@ export async function execute(this: IExecuteFunctions): Promise<INodeExecutionDa
 					toolCalls: result.toolCalls as unknown as IDataObject[],
 					finishReason: result.finishReason,
 					session: result.session as unknown as IDataObject,
+					...(result.modelTurns !== undefined && result.modelTurns.length > 0
+						? { modelTurns: result.modelTurns as unknown as IDataObject[] }
+						: {}),
 				},
 				pairedItem: { item: i },
 			});

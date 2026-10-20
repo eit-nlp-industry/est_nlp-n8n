@@ -35,6 +35,8 @@ const agentId = computed(() => {
 });
 
 function useCurrentHost(url: string): string {
+	// Same-origin proxy URLs are returned by the API and must stay as-is.
+	if (url.startsWith('/')) return url;
 	const studioUrl = new URL(url);
 	studioUrl.hostname = window.location.hostname;
 	return studioUrl.toString();
@@ -93,9 +95,7 @@ const onRestart = async () => {
 	studioUrl.value = undefined;
 	studioError.value = false;
 	try {
-		studioUrl.value = useCurrentHost(
-			(await restartStudio(projectId.value, agentId.value)).url,
-		);
+		studioUrl.value = useCurrentHost((await restartStudio(projectId.value, agentId.value)).url);
 	} catch (error) {
 		studioError.value = true;
 		toast.showError(error, i18n.baseText('deepseekHarness.studio.restart.error'));
@@ -135,7 +135,7 @@ onMounted(async () => {
 							ref="renameInput"
 							:model-value="agent.name"
 							:class="$style.name"
-			:placeholder="i18n.baseText('folders.rename.placeholder')"
+							:placeholder="i18n.baseText('folders.rename.placeholder')"
 							:max-length="128"
 							max-width="100%"
 							data-test-id="deepseek-harness-name-input"

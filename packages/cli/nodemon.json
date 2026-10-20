@@ -1,5 +1,5 @@
 {
 	"ignore": ["**/*.spec.ts", ".git", "node_modules"],
 	"watch": ["dist/.dev-ready"],
-	"exec": "npm start"
+	"exec": "node scripts/start-after-ready.mjs"
 }

@@ -42,7 +42,18 @@ describe('devServerPlugin', () => {
 		const env: NodeJS.ProcessEnv = { N8N_PORT: '5699', N8N_EDITOR_PORT: '8082' };
 
 		expect(runConfigHook(env, DEV)).toEqual({
-			server: { host: '0.0.0.0', port: 8082, strictPort: true },
+			server: {
+				host: '0.0.0.0',
+				port: 8082,
+				strictPort: true,
+				proxy: {
+					'/deepseek-harness-studio': {
+						target: 'http://localhost:5699',
+						ws: true,
+						changeOrigin: false,
+					},
+				},
+			},
 		});
 		expect(env.VUE_APP_URL_BASE_API).toBe('http://localhost:5699/');
 	});

@@ -723,6 +723,7 @@ describe('GlobalConfig', () => {
 			tracingEnabled: true,
 			tracingRecordInputs: true,
 			tracingRecordOutputs: true,
+			debugModelIo: false,
 			modules: [],
 			backgroundTasksEnabled: false,
 			sandboxEnabled: false,
@@ -734,6 +735,9 @@ describe('GlobalConfig', () => {
 		},
 		deepSeekHarness: {
 			home: '~/.dsh',
+			path: '',
+			profile: 'n8n-web',
+			nodePath: '',
 		},
 	} satisfies GlobalConfigShape;
 

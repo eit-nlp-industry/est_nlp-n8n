@@ -27,6 +27,8 @@ const icon = computed((): IconName => {
 			return 'bot';
 		case 'skill':
 			return 'book-open';
+		case 'model-turn':
+			return 'brain';
 		case 'tool':
 			return 'wrench';
 		case 'workflow':

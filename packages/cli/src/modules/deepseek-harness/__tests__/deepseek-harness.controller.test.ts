@@ -1,9 +1,9 @@
 import { DeepSeekHarnessController } from '../deepseek-harness.controller';
 
 describe('DeepSeekHarnessController', () => {
-	it('creates an agent for the requested project', async () => {
+	it('creates a profile for the requested project', async () => {
 		const service = {
-			createForProject: vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Research' }),
+			createProfileForProject: vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Research' }),
 		};
 		const controller = new DeepSeekHarnessController(service as never);
 
@@ -13,7 +13,7 @@ describe('DeepSeekHarnessController', () => {
 			{} as never,
 		);
 
-		expect(service.createForProject).toHaveBeenCalledWith('user@example.com', 'project-1');
+		expect(service.createProfileForProject).toHaveBeenCalledWith('user@example.com', 'project-1');
 	});
 
 	it('deletes an agent for the requested project', async () => {
@@ -44,13 +44,15 @@ describe('DeepSeekHarnessController', () => {
 
 	it('starts the native Studio for the requested project agent', async () => {
 		const service = {
-			startStudioForProject: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:43123/?token=x' }),
+			startStudioForProject: vi
+				.fn()
+				.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=x' }),
 		};
 		const controller = new DeepSeekHarnessController(service as never);
 
 		await expect(
 			controller.studio({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
-		).resolves.toEqual({ url: 'http://127.0.0.1:43123/?token=x' });
+		).resolves.toEqual({ url: '/deepseek-harness-studio/project-1/agent-1/?token=x' });
 
 		expect(service.startStudioForProject).toHaveBeenCalledWith('agent-1', 'project-1');
 	});
@@ -59,13 +61,13 @@ describe('DeepSeekHarnessController', () => {
 		const service = {
 			restartStudioForProject: vi
 				.fn()
-				.mockResolvedValue({ url: 'http://127.0.0.1:43124/?token=y' }),
+				.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=y' }),
 		};
 		const controller = new DeepSeekHarnessController(service as never);
 
 		await expect(
 			controller.restart({ params: { projectId: 'project-1' } } as never, {} as never, 'agent-1'),
-		).resolves.toEqual({ url: 'http://127.0.0.1:43124/?token=y' });
+		).resolves.toEqual({ url: '/deepseek-harness-studio/project-1/agent-1/?token=y' });
 
 		expect(service.restartStudioForProject).toHaveBeenCalledWith('agent-1', 'project-1');
 	});

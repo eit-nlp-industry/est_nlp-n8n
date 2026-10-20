@@ -12,7 +12,7 @@ import {
 	type AgentJsonConfig,
 } from '@n8n/api-types';
 import { mockLogger } from '@n8n/backend-test-utils';
-import type { AiConfig } from '@n8n/config';
+import type { AiConfig, AgentsConfig } from '@n8n/config';
 import type { User } from '@n8n/db';
 import { Container } from '@n8n/di';
 import { createDeferredPromise } from '@n8n/utils/promise/deferred-promise';
@@ -57,6 +57,7 @@ const aiConfigMock = mock<AiConfig>({
 	modelStreamIdleTimeoutMs: 90_000,
 	modelStreamFirstOutputTimeoutMs: 180_000,
 });
+const agentsConfigMock = mock<AgentsConfig>({ debugModelIo: false });
 
 const backgroundJobSignal: AgentBackgroundJobSignal = {
 	tasks: [{ id: 'job-1', title: 'Research', kind: 'subagent', status: 'completed' }],
@@ -222,6 +223,7 @@ function makeService(sandboxEnabled = false) {
 		agentSandboxRuntimeService,
 		agentRepository,
 		aiConfigMock,
+		agentsConfigMock,
 	);
 
 	return {

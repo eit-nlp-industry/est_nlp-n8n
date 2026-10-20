@@ -189,28 +189,38 @@ export class McpConnection {
 		args: Record<string, unknown>,
 		options?: { abortSignal?: AbortSignal; modelToolName?: string },
 	): Promise<McpCallToolResult> {
-		if (!this.client) throw new Error('MCP client not initialized; connect() must be called first');
+		if (!this.client) {
+			throw new Error('MCP client not initialized; connect() must be called first');
+		}
+
 		const { CallToolResultSchema } = await loadMcpSdk();
+
 		try {
 			const result = (await this.client.callTool({ name, arguments: args }, CallToolResultSchema, {
 				...(options?.abortSignal ? { signal: options.abortSignal } : {}),
-				// Reset the SDK's 60s idle timeout on progress notifications so a
-				// long-running MCP call that streams progress stays alive, while
-				// a stalled call (no progress) dies at the idle deadline.
+				// 等待工具响应最多10分钟；有效进度通知会重置计时。
+				timeout: 600_000,
 				resetTimeoutOnProgress: true,
 			})) as McpCallToolResult;
+
 			await this.notifyToolCallSettled({
 				toolName: name,
-				...(options?.modelToolName !== undefined && { modelToolName: options.modelToolName }),
+				...(options?.modelToolName !== undefined && {
+					modelToolName: options.modelToolName,
+				}),
 				success: result.isError !== true,
 			});
+
 			return result;
 		} catch (error) {
 			await this.notifyToolCallSettled({
 				toolName: name,
-				...(options?.modelToolName !== undefined && { modelToolName: options.modelToolName }),
+				...(options?.modelToolName !== undefined && {
+					modelToolName: options.modelToolName,
+				}),
 				success: false,
 			});
+
 			throw error;
 		}
 	}

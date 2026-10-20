@@ -144,6 +144,23 @@ export function resolveNpmInstallFlags(workspace: SandboxWorkspace): string {
 		: NPM_INSTALL_FLAGS_REFRESH_METADATA;
 }
 
+function resolveNpmRegistryFlag(): string {
+	const registry = process.env.N8N_INSTANCE_AI_SANDBOX_NPM_REGISTRY?.trim();
+	if (!registry) return '';
+
+	let url: URL;
+	try {
+		url = new URL(registry);
+	} catch {
+		throw new Error('N8N_INSTANCE_AI_SANDBOX_NPM_REGISTRY must be a valid URL');
+	}
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+		throw new Error('N8N_INSTANCE_AI_SANDBOX_NPM_REGISTRY must use HTTP or HTTPS');
+	}
+
+	return ` --registry='${escapeSingleQuotes(registry)}'`;
+}
+
 /**
  * Budget for the whole install step, every attempt together. A healthy install runs
  * in under a second and the sandbox gateway already cuts a single command at 30s, so
@@ -152,7 +169,7 @@ export function resolveNpmInstallFlags(workspace: SandboxWorkspace): string {
  * deadline a timed-out first attempt would hand a second, equally long attempt to the
  * retry below.
  */
-const INSTALL_STEP_BUDGET_MS = 120_000;
+const INSTALL_STEP_BUDGET_MS = 300_000;
 
 /**
  * Versions pinned from the host's installed packages. Pinning is load-bearing
@@ -534,7 +551,7 @@ export async function setupSandboxWorkspace(
 				// the remote command, which the sandbox collects at its own timeout.
 				const deadline = Date.now() + INSTALL_STEP_BUDGET_MS;
 				const install = async (flags: string) =>
-					await runInSandbox(workspace, `npm install ${flags}`, {
+					await runInSandbox(workspace, `npm install ${flags}${resolveNpmRegistryFlag()}`, {
 						cwd: root,
 						abortSignal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
 					});

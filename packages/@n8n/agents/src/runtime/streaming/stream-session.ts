@@ -83,12 +83,18 @@ export function startStreamSession(deps: StreamSessionDeps): ReadableStream<Stre
 		const { type: _type, ...payload } = data;
 		void guard.write({ type: 'subagent-chunk', ...payload });
 	};
+	const onModelTurn = (data: AgentEventData): void => {
+		if (data.type !== AgentEvent.ModelTurn) return;
+		const { type: _type, ...payload } = data;
+		void guard.write({ type: 'model-turn', ...payload });
+	};
 
 	deps.eventBus.on(AgentEvent.ToolExecutionStart, onToolExecutionStart);
 	deps.eventBus.on(AgentEvent.ToolExecutionEnd, onToolExecutionEnd);
 	deps.eventBus.on(AgentEvent.SubAgentStarted, onSubAgentStarted);
 	deps.eventBus.on(AgentEvent.SubAgentCompleted, onSubAgentCompleted);
 	deps.eventBus.on(AgentEvent.SubAgentChunk, onSubAgentChunk);
+	deps.eventBus.on(AgentEvent.ModelTurn, onModelTurn);
 
 	deps
 		.withRootSpan('stream', deps.options, deps.runId, async () => await deps.runLoop(guard))
@@ -123,6 +129,7 @@ export function startStreamSession(deps: StreamSessionDeps): ReadableStream<Stre
 			deps.eventBus.off(AgentEvent.SubAgentStarted, onSubAgentStarted);
 			deps.eventBus.off(AgentEvent.SubAgentCompleted, onSubAgentCompleted);
 			deps.eventBus.off(AgentEvent.SubAgentChunk, onSubAgentChunk);
+			deps.eventBus.off(AgentEvent.ModelTurn, onModelTurn);
 			void guard.close();
 			deps.abortScope.dispose();
 		});
