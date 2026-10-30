@@ -2,14 +2,58 @@
 import { usePushConnectionStore } from '@/app/stores/pushConnection.store';
 import { useBackendConnectionStore } from '@/app/stores/backendConnection.store';
 import { useI18n } from '@n8n/i18n';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { BaseTextKey } from '@n8n/i18n';
 
 import { N8nIcon, N8nText, N8nTooltip } from '@n8n/design-system';
 
+/** Hide brief reconnect flicker before showing the push error. */
+const PUSH_ERROR_GRACE_MS = 3_000;
+
 const pushConnectionStore = usePushConnectionStore();
 const backendConnectionStore = useBackendConnectionStore();
 const i18n = useI18n();
+
+const showPushError = ref(false);
+let pushErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearPushErrorTimer = () => {
+	if (pushErrorTimer) {
+		clearTimeout(pushErrorTimer);
+		pushErrorTimer = null;
+	}
+};
+
+watch(
+	() =>
+		[
+			pushConnectionStore.isConnectionRequested,
+			pushConnectionStore.isConnected,
+			pushConnectionStore.isConnecting,
+		] as const,
+	([requested, connected, connecting]) => {
+		const shouldWarn = requested && !connected && !connecting;
+		if (!shouldWarn) {
+			clearPushErrorTimer();
+			showPushError.value = false;
+			return;
+		}
+
+		if (showPushError.value || pushErrorTimer) {
+			return;
+		}
+
+		pushErrorTimer = setTimeout(() => {
+			showPushError.value = true;
+			pushErrorTimer = null;
+		}, PUSH_ERROR_GRACE_MS);
+	},
+	{ immediate: true },
+);
+
+onBeforeUnmount(() => {
+	clearPushErrorTimer();
+});
 
 type ConnectionStatus =
 	| {
@@ -33,16 +77,8 @@ const connectionStatus = computed<ConnectionStatus>(() => {
 		};
 	}
 
-	// Priority 2: Check if push connection is lost
-	// Only show the connection lost error if the connection has been requested,
-	// is not currently connected, and is not in the process of connecting.
-	// This prevents the error from showing during initial connection setup
-	// or when the user navigates to a page that doesn't open the connection.
-	if (
-		pushConnectionStore.isConnectionRequested &&
-		!pushConnectionStore.isConnected &&
-		!pushConnectionStore.isConnecting
-	) {
+	// Priority 2: Push lost for longer than the grace window
+	if (showPushError.value) {
 		return {
 			hasError: true,
 			message: 'pushConnection.error.message',

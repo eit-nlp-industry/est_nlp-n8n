@@ -100,11 +100,18 @@ export function createStudioProxyMiddleware(
 		if (typeof projectId !== 'string' || typeof agentId !== 'string') return undefined;
 		return rewriteSetCookiePaths(setCookie, studioProxyBasePath(projectId, agentId));
 	};
-	const proxyError = (_error: Error, _req: Request, res: ServerResponse) => {
-		if (!res.headersSent) {
-			res.writeHead(502);
-			res.end('Bad Gateway');
+	// http-proxy-middleware passes a Socket (not ServerResponse) on WS upgrade failures.
+	const proxyError = (error: Error, _req: Request, res: ServerResponse | Socket) => {
+		console.error(`DeepSeek Harness studio proxy error: ${error.message}`);
+		if (typeof (res as ServerResponse).writeHead === 'function') {
+			const httpRes = res as ServerResponse;
+			if (!httpRes.headersSent) {
+				httpRes.writeHead(502);
+				httpRes.end('Bad Gateway');
+			}
+			return;
 		}
+		(res as Socket).destroy();
 	};
 
 	const streamingProxy = createProxyMiddleware<Request>({

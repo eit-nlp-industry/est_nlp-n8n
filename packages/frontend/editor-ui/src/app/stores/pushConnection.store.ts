@@ -28,7 +28,7 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 	/** Whether the connection has been requested */
 	const isConnectionRequested = ref(false);
 
-	/** Whether the connection is currently being established */
+	/** Whether the connection is currently being established (initial connect) */
 	const isConnecting = ref(false);
 
 	const onMessageReceivedHandlers = ref<OnPushMessageHandler[]>([]);
@@ -46,19 +46,19 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 
 	const useWebSockets = computed(() => settingsStore.pushBackend === 'websocket');
 
-	const getConnectionUrl = () => {
+	const getWebSocketUrl = () => {
 		const restUrl = rootStore.restUrl;
-		const url = `/push?pushRef=${rootStore.pushRef}`;
+		const path = `/push?pushRef=${rootStore.pushRef}`;
+		const { protocol, host } = window.location;
+		const baseUrl = restUrl.startsWith('http')
+			? restUrl.replace(/^http/, 'ws')
+			: `${protocol === 'https:' ? 'wss' : 'ws'}://${host + restUrl}`;
+		return `${baseUrl}${path}`;
+	};
 
-		if (useWebSockets.value) {
-			const { protocol, host } = window.location;
-			const baseUrl = restUrl.startsWith('http')
-				? restUrl.replace(/^http/, 'ws')
-				: `${protocol === 'https:' ? 'wss' : 'ws'}://${host + restUrl}`;
-			return `${baseUrl}${url}`;
-		} else {
-			return `${restUrl}${url}`;
-		}
+	const getEventSourceUrl = () => {
+		const restUrl = rootStore.restUrl;
+		return `${restUrl}/push?pushRef=${rootStore.pushRef}`;
 	};
 
 	/**
@@ -83,13 +83,19 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 		});
 	}
 
-	const url = computed(() => getConnectionUrl());
+	// Create clients once. Building them inside a computed recreated the client on
+	// every dependency change and left the UI watching a disconnected instance while
+	// an orphaned socket kept reconnecting (Connection lost flicker).
+	const wsClient = useWebSocketClient({
+		url: getWebSocketUrl,
+		onMessage,
+	});
+	const sseClient = useEventSourceClient({
+		url: getEventSourceUrl,
+		onMessage,
+	});
 
-	const client = computed(() =>
-		useWebSockets.value
-			? useWebSocketClient({ url: url.value, onMessage })
-			: useEventSourceClient({ url: url.value, onMessage }),
-	);
+	const client = computed(() => (useWebSockets.value ? wsClient : sseClient));
 
 	function serializeAndSend(message: unknown) {
 		if (client.value.isConnected.value) {
@@ -214,6 +220,19 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 		},
 	);
 
+	// Switch transport when the backend setting becomes available after login.
+	watch(useWebSockets, (useWs, wasUseWs) => {
+		if (useWs === wasUseWs || !isConnectionRequested.value || connectionOwnerCount === 0) {
+			return;
+		}
+
+		const previous = wasUseWs ? wsClient : sseClient;
+		const next = useWs ? wsClient : sseClient;
+		previous.disconnect();
+		isConnecting.value = true;
+		next.connect();
+	});
+
 	/** Removes all buffered messages from the sent queue */
 	const clearQueue = () => {
 		outgoingQueue.value = [];
@@ -221,9 +240,14 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 
 	const isConnected = computed(() => client.value.isConnected.value);
 
+	/** True while an initial connect or an automatic reconnect is in progress. */
+	const isConnectingOrReconnecting = computed(
+		() => isConnecting.value || client.value.isReconnecting.value,
+	);
+
 	return {
 		isConnected,
-		isConnecting,
+		isConnecting: isConnectingOrReconnecting,
 		isConnectionRequested,
 		onMessageReceivedHandlers,
 		addEventListener,

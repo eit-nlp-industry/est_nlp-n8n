@@ -1,8 +1,8 @@
 import { useReconnectTimer } from '@/app/push-connection/useReconnectTimer';
-import { ref } from 'vue';
+import { ref, toValue, type MaybeRefOrGetter } from 'vue';
 
 export type UseEventSourceClientOptions = {
-	url: string;
+	url: MaybeRefOrGetter<string>;
 	onMessage: (data: string) => void;
 };
 
@@ -12,10 +12,13 @@ export type UseEventSourceClientOptions = {
  */
 export const useEventSourceClient = (options: UseEventSourceClientOptions) => {
 	const isConnected = ref(false);
+	/** True while a reconnect attempt is scheduled or in flight after a drop. */
+	const isReconnecting = ref(false);
 	const eventSource = ref<EventSource | null>(null);
 
 	const onConnected = () => {
 		isConnected.value = true;
+		isReconnecting.value = false;
 		reconnectTimer.resetConnectionAttempts();
 	};
 
@@ -25,6 +28,7 @@ export const useEventSourceClient = (options: UseEventSourceClientOptions) => {
 		// The browser retries transient failures itself (readyState stays CONNECTING);
 		// only a terminal failure needs our timer.
 		if (eventSource.value?.readyState === EventSource.CLOSED) {
+			isReconnecting.value = true;
 			reconnectTimer.scheduleReconnect();
 		}
 	};
@@ -41,13 +45,14 @@ export const useEventSourceClient = (options: UseEventSourceClientOptions) => {
 		}
 
 		isConnected.value = false;
+		isReconnecting.value = false;
 	};
 
 	const connect = () => {
 		// Ensure we disconnect any existing connection
 		disconnect();
 
-		eventSource.value = new EventSource(options.url, { withCredentials: true });
+		eventSource.value = new EventSource(toValue(options.url), { withCredentials: true });
 		eventSource.value.addEventListener('open', onConnected);
 		eventSource.value.addEventListener('message', onMessage);
 		// `EventSource` has no `close` event; a failure surfaces as `error`
@@ -67,6 +72,7 @@ export const useEventSourceClient = (options: UseEventSourceClientOptions) => {
 
 	return {
 		isConnected,
+		isReconnecting,
 		connect,
 		disconnect,
 		sendMessage,

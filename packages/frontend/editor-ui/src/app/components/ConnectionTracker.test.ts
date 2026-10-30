@@ -47,11 +47,16 @@ describe('ConnectionTracker', () => {
 	};
 
 	beforeEach(() => {
+		vi.useFakeTimers();
 		// Reset to default values
 		isConnected = true;
 		isConnecting = false;
 		isConnectionRequested = true;
 		isOnline = true;
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	it('should not render error when connected and online', () => {
@@ -73,12 +78,16 @@ describe('ConnectionTracker', () => {
 		expect(container.textContent).toContain('Offline');
 	});
 
-	it('should render push error when push disconnected and online', () => {
+	it('should render push error when push disconnected and online', async () => {
 		isConnected = false;
 		isConnecting = false;
 		isConnectionRequested = true;
 		isOnline = true;
 		const { container } = render();
+
+		// Grace window hides brief reconnect flicker
+		expect(container.textContent).not.toContain('Connection lost');
+		await vi.advanceTimersByTimeAsync(3_000);
 
 		expect(container).toMatchSnapshot();
 		expect(container.textContent).toContain('Connection lost');

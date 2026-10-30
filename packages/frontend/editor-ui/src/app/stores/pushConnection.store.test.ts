@@ -13,6 +13,7 @@ vi.mock('@/app/push-connection/useWebSocketClient', () => ({
 vi.mock('@/app/push-connection/useEventSourceClient', () => ({
 	useEventSourceClient: vi.fn().mockReturnValue({
 		isConnected: { value: false },
+		isReconnecting: { value: false },
 		connect: vi.fn(),
 		disconnect: vi.fn(),
 		sendMessage: vi.fn(),
@@ -51,6 +52,7 @@ describe('usePushConnectionStore', () => {
 		let onMessage: (data: unknown) => void = vi.fn();
 		const mockWebSocketClient: WebSocketClient = {
 			isConnected: ref(isConnected),
+			isReconnecting: ref(false),
 			connect: vi.fn(),
 			disconnect: vi.fn(),
 			sendMessage: vi.fn(),
