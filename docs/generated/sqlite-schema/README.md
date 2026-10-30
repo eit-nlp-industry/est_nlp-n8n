@@ -54,6 +54,7 @@ Auto-generated from the SQLite migrations in @n8n/db. Do not edit by hand.
 | [credentials_entity](credentials_entity.md) | 13 |  | table |
 | [data_table](data_table.md) | 5 |  | table |
 | [data_table_column](data_table_column.md) | 7 |  | table |
+| [deepseek_harness_agents](deepseek_harness_agents.md) | 16 |  | table |
 | [deployment_key](deployment_key.md) | 7 |  | table |
 | [dynamic_credential_entry](dynamic_credential_entry.md) | 6 |  | table |
 | [dynamic_credential_resolver](dynamic_credential_resolver.md) | 6 |  | table |
@@ -237,6 +238,7 @@ erDiagram
 "credentials_entity" }o--o| "dynamic_credential_resolver" : "FOREIGN KEY (resolverId) REFERENCES dynamic_credential_resolver (id) ON UPDATE NO ACTION ON DELETE SET NULL MATCH NONE"
 "data_table" }o--|| "project" : "FOREIGN KEY (projectId) REFERENCES project (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
 "data_table_column" }o--|| "data_table" : "FOREIGN KEY (dataTableId) REFERENCES data_table (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
+"deepseek_harness_agents" }o--|| "project" : "FOREIGN KEY (projectId) REFERENCES project (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
 "dynamic_credential_entry" |o--|| "dynamic_credential_resolver" : "FOREIGN KEY (resolver_id) REFERENCES dynamic_credential_resolver (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
 "dynamic_credential_entry" |o--|| "credentials_entity" : "FOREIGN KEY (credential_id) REFERENCES credentials_entity (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
 "dynamic_credential_user_entry" |o--|| "user" : "FOREIGN KEY (userId) REFERENCES user (id) ON UPDATE NO ACTION ON DELETE CASCADE MATCH NONE"
@@ -881,6 +883,24 @@ erDiagram
   varchar_128_ name
   varchar_32_ type
   datetime_3_ updatedAt
+}
+"deepseek_harness_agents" {
+  datetime_3_ createdAt
+  INTEGER directPort
+  varchar_36_ id PK
+  datetime_3_ lastStartedAt
+  datetime_3_ lastStoppedAt
+  varchar_128_ name
+  varchar_36_ projectId FK
+  boolean published
+  TEXT runtimeError
+  INTEGER runtimePid
+  INTEGER runtimePort
+  varchar_16_ runtimeStatus
+  TEXT runtimeUrl
+  varchar_16_ status
+  datetime_3_ updatedAt
+  varchar_254_ userName
 }
 "deployment_key" {
   varchar_20_ algorithm

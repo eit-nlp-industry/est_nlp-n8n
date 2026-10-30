@@ -5,6 +5,7 @@ import { isRecord } from '@n8n/utils/is-record';
 import { sanitizeErrorDetail } from '@n8n/utils/redaction/sanitize-error-detail';
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
+import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
@@ -25,13 +26,26 @@ const MODEL_SETTINGS_NAMESPACE = 'agent-default-model';
 
 type SpawnProcess = typeof spawn;
 type Fetch = typeof fetch;
-type WebRuntime = { url: string; workspaceId: string };
+export type WebRuntime = {
+	url: string;
+	workspaceId: string;
+	directUrl: string | null;
+	directPort: number | null;
+};
 export type DeepSeekHarnessRuntimeState = {
 	status: 'stopped' | 'starting' | 'running' | 'error';
 	pid: number | null;
 	port: number | null;
 	url: string | null;
 	error: string | null;
+};
+
+export type DeepSeekHarnessPortRange = { min: number; max: number };
+
+export type WebProcessInvocationOptions = {
+	port?: number;
+	bindHost?: string;
+	trustedHosts?: string[];
 };
 
 const STOPPED_RUNTIME_STATE: DeepSeekHarnessRuntimeState = {
@@ -97,9 +111,7 @@ export function getHarnessConfigurationStatus(
 	settings: HarnessSettingsDescription,
 	credentials: HarnessCredentialsDescription,
 ): DeepSeekHarnessConfigurationStatus {
-	const modelNamespace = settings.namespaces?.find(
-		({ ns }) => ns === MODEL_SETTINGS_NAMESPACE,
-	);
+	const modelNamespace = settings.namespaces?.find(({ ns }) => ns === MODEL_SETTINGS_NAMESPACE);
 	const modelValue = isRecord(modelNamespace?.value) ? modelNamespace.value : undefined;
 	const provider = typeof modelValue?.provider === 'string' ? modelValue.provider.trim() : null;
 	const model = typeof modelValue?.model === 'string' ? modelValue.model.trim() : null;
@@ -124,13 +136,91 @@ export function getPublicHost(config: Pick<GlobalConfig, 'editorBaseUrl' | 'host
 	return editorBaseUrl ? new URL(editorBaseUrl).hostname : config.host;
 }
 
+/** Parse `13080-13089`. Empty or invalid input returns null. */
+export function parsePortRange(value: string): DeepSeekHarnessPortRange | null {
+	const trimmed = value.trim();
+	if (!trimmed) return null;
+	const match = /^(\d+)\s*-\s*(\d+)$/.exec(trimmed);
+	if (!match) return null;
+	const min = Number(match[1]);
+	const max = Number(match[2]);
+	if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max > 65535 || min > max) {
+		return null;
+	}
+	return { min, max };
+}
+
+export function parseTrustedHosts(value: string): string[] {
+	return value
+		.split(',')
+		.map((host) => host.trim())
+		.filter((host) => host.length > 0);
+}
+
+/**
+ * Pick a sticky port: reuse `preferred` when free and in range, otherwise the
+ * lowest free port in the pool.
+ */
+export function allocateStickyPort(
+	preferred: number | null | undefined,
+	occupied: Iterable<number>,
+	range: DeepSeekHarnessPortRange,
+): number {
+	const taken = new Set(occupied);
+	if (
+		preferred != null &&
+		Number.isInteger(preferred) &&
+		preferred >= range.min &&
+		preferred <= range.max
+	) {
+		if (taken.has(preferred)) {
+			throw new Error(`DeepSeek Harness sticky port ${preferred} is already assigned`);
+		}
+		return preferred;
+	}
+	for (let port = range.min; port <= range.max; port++) {
+		if (!taken.has(port)) return port;
+	}
+	throw new Error(`DeepSeek Harness port range ${range.min}-${range.max} is exhausted`);
+}
+
+/** Rewrite the process startup URL onto the browser-facing direct host. */
+export function buildDirectAccessUrl(runtimeUrl: string, directHost: string): string | null {
+	const host = directHost.trim();
+	if (!host) return null;
+	const parsed = new URL(runtimeUrl);
+	const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+	return `http://${host}:${port}/${parsed.search}`;
+}
+
+/**
+ * First non-loopback IPv4 on this host. Used when a port pool is enabled but
+ * `N8N_DEEPSEEK_HARNESS_BIND_HOST` is empty (typical Docker bridge).
+ */
+export function detectNonLoopbackIPv4(): string | null {
+	for (const addresses of Object.values(networkInterfaces())) {
+		if (!addresses) continue;
+		for (const entry of addresses) {
+			// Node typings use 'IPv4' | 'IPv6'; older runtimes used numeric 4/6.
+			if (String(entry.family) !== 'IPv4' && String(entry.family) !== '4') continue;
+			if (entry.internal) continue;
+			return entry.address;
+		}
+	}
+	return null;
+}
+
 export function getWebProcessInvocation(
 	harnessPath: string,
 	profile: string,
 	nodePath: string = process.execPath,
-	trustedHost?: string,
+	options: WebProcessInvocationOptions = {},
 ): { command: string; args: string[] } {
-	const normalizedTrustedHost = trustedHost?.trim();
+	const bindHost = options.bindHost?.trim();
+	const trustedHosts = (options.trustedHosts ?? [])
+		.map((host) => host.trim())
+		.filter((host) => host.length > 0);
+	const port = options.port ?? 0;
 	return {
 		command: nodePath,
 		args: [
@@ -139,8 +229,9 @@ export function getWebProcessInvocation(
 			profile,
 			'--no-open',
 			'--port',
-			'0',
-			...(normalizedTrustedHost ? ['--trusted-host', normalizedTrustedHost] : []),
+			String(port),
+			...(bindHost ? ['--host', bindHost] : []),
+			...trustedHosts.flatMap((host) => ['--trusted-host', host]),
 		],
 	};
 }
@@ -176,8 +267,14 @@ export class DeepSeekHarnessWebService {
 	async startForAgent(agentId: string, projectId: string): Promise<WebRuntime> {
 		const key = `${projectId}:${agentId}`;
 		const running = this.processes.get(key);
-		if (running && !running.child.killed)
-			return { url: running.url, workspaceId: running.workspaceId };
+		if (running && !running.child.killed) {
+			return {
+				url: running.url,
+				workspaceId: running.workspaceId,
+				directUrl: running.directUrl,
+				directPort: running.directPort,
+			};
+		}
 
 		const starting = this.starting.get(key);
 		if (starting) return await starting;
@@ -345,6 +442,52 @@ export class DeepSeekHarnessWebService {
 		});
 	}
 
+	private resolveTrustedHosts(): string[] {
+		const configured = parseTrustedHosts(this.config.trustedHosts ?? '');
+		if (configured.length > 0) return configured;
+		const publicHost = getPublicHost(this.globalConfig).trim();
+		return publicHost ? [publicHost] : [];
+	}
+
+	/**
+	 * Resolve `--host`. Prefer the configured bind host; when a sticky port pool
+	 * is active and bind host is empty, pick a concrete non-loopback IPv4 so
+	 * Docker can publish the port (Harness rejects `0.0.0.0`).
+	 */
+	private resolveBindHost(stickyPortsEnabled: boolean): string {
+		const configured = (this.config.bindHost ?? '').trim();
+		if (configured) return configured;
+		if (!stickyPortsEnabled) return '';
+		return detectNonLoopbackIPv4() ?? '';
+	}
+
+	/**
+	 * Assign and persist a sticky port when a port range is configured.
+	 * Returns null when the pool is disabled (`PORT_RANGE` empty).
+	 */
+	private async ensureDirectPort(agent: {
+		id: string;
+		directPort?: number | null;
+	}): Promise<number | null> {
+		const range = parsePortRange(this.config.portRange ?? '');
+		if (!range) return null;
+
+		const preferred = agent.directPort ?? null;
+		if (preferred != null && preferred >= range.min && preferred <= range.max) {
+			const occupied = await this.repository.findOccupiedDirectPorts(agent.id);
+			if (occupied.includes(preferred)) {
+				throw new Error(`DeepSeek Harness sticky port ${preferred} is already assigned`);
+			}
+			return preferred;
+		}
+
+		const occupied = await this.repository.findOccupiedDirectPorts(agent.id);
+		const port = allocateStickyPort(preferred, occupied, range);
+		await this.repository.update({ id: agent.id }, { directPort: port });
+		agent.directPort = port;
+		return port;
+	}
+
 	private async start(key: string, agentId: string, projectId: string): Promise<WebRuntime> {
 		this.runtimeStates.set(key, { ...STOPPED_RUNTIME_STATE, status: 'starting' });
 		const agent = await this.repository.findByIdAndProjectId(agentId, projectId);
@@ -371,12 +514,14 @@ export class DeepSeekHarnessWebService {
 			? undefined
 			: await this.homeService.createDefaultWorkspace(agent.userName, agent.name, agent.id);
 		const nodePath = this.config.nodePath?.trim() || process.execPath;
-		const invocation = getWebProcessInvocation(
-			harnessPath,
-			profile,
-			nodePath,
-			getPublicHost(this.globalConfig),
-		);
+		const directPort = await this.ensureDirectPort(agent);
+		const bindHost = this.resolveBindHost(directPort != null);
+		const directHost = (this.config.directHost ?? '').trim() || bindHost || '';
+		const invocation = getWebProcessInvocation(harnessPath, profile, nodePath, {
+			port: directPort ?? 0,
+			bindHost: bindHost || undefined,
+			trustedHosts: this.resolveTrustedHosts(),
+		});
 		const child = this.spawnProcess(invocation.command, invocation.args, {
 			cwd: harnessPath,
 			env: getHarnessEnv(harnessPath, home),
@@ -424,14 +569,21 @@ export class DeepSeekHarnessWebService {
 					const workspaceId =
 						registeredDefault?.id ??
 						(await this.registerDefaultWorkspace(match[1], workspacePath!));
-					const entry = { child, url: match[1], workspaceId };
+					const directUrl = buildDirectAccessUrl(match[1], directHost);
+					const entry = {
+						child,
+						url: match[1],
+						workspaceId,
+						directUrl,
+						directPort: directPort ?? (Number(new URL(match[1]).port) || null),
+					};
 					settled = true;
 					clearTimeout(timeout);
 					this.processes.set(key, entry);
 					this.runtimeStates.set(key, {
 						status: 'running',
 						pid: child.pid ?? null,
-						port: Number(new URL(entry.url).port) || null,
+						port: entry.directPort,
 						url: entry.url,
 						error: null,
 					});
@@ -445,7 +597,12 @@ export class DeepSeekHarnessWebService {
 							error: 'Process exited after startup',
 						});
 					});
-					resolve({ url: entry.url, workspaceId: entry.workspaceId });
+					resolve({
+						url: entry.url,
+						workspaceId: entry.workspaceId,
+						directUrl: entry.directUrl,
+						directPort: entry.directPort,
+					});
 				} catch (error) {
 					fail(error instanceof Error ? error : new Error(String(error)));
 				}

@@ -9,9 +9,11 @@ import {
 } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
+import { computed, ref } from 'vue';
 
 const props = defineProps<{
 	agent: DeepSeekHarnessAgentDto;
+	directUrl?: string | null;
 	restarting?: boolean;
 	onPublish: () => Promise<void>;
 	onUnpublish: () => Promise<void>;
@@ -19,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const i18n = useI18n();
+const copied = ref(false);
 
 const actions: Array<ActionDropdownItem<'publish' | 'unpublish'>> = [
 	{
@@ -34,6 +37,8 @@ const actions: Array<ActionDropdownItem<'publish' | 'unpublish'>> = [
 		},
 	},
 ];
+
+const canCopyDirectUrl = computed(() => Boolean(props.directUrl));
 
 async function publish() {
 	await props.onPublish();
@@ -51,10 +56,38 @@ function onSelect(action: 'publish' | 'unpublish') {
 	if (action === 'publish') void publish();
 	if (action === 'unpublish') void unpublish();
 }
+
+async function copyDirectUrl() {
+	if (!props.directUrl) return;
+	await navigator.clipboard.writeText(props.directUrl);
+	copied.value = true;
+	window.setTimeout(() => {
+		copied.value = false;
+	}, 1500);
+}
 </script>
 
 <template>
 	<div :class="$style.actions" data-test-id="deepseek-harness-publish-actions">
+		<N8nTooltip v-if="canCopyDirectUrl" :show-after="300">
+			<template #content>
+				{{
+					copied
+						? i18n.baseText('deepseekHarness.studio.directUrl.copied')
+						: i18n.baseText('deepseekHarness.studio.directUrl.tooltip')
+				}}
+			</template>
+			<button
+				type="button"
+				:class="$style.directUrl"
+				:title="props.directUrl ?? undefined"
+				data-test-id="deepseek-harness-direct-url"
+				@click="copyDirectUrl"
+			>
+				<code :class="$style.directUrlText">{{ props.directUrl }}</code>
+				<N8nIcon :icon="copied ? 'check' : 'copy'" size="small" />
+			</button>
+		</N8nTooltip>
 		<N8nTooltip :show-after="300">
 			<template #content>
 				{{ i18n.baseText('deepseekHarness.studio.restart.tooltip') }}
@@ -124,16 +157,47 @@ function onSelect(action: 'publish' | 'unpublish') {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--spacing--2xs);
+	min-width: 0;
+}
+
+.directUrl {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--spacing--3xs);
+	max-width: 28rem;
+	min-width: 0;
+	padding: 0 var(--spacing--2xs);
+	height: var(--spacing--xl);
+	border: var(--border);
+	border-radius: var(--radius--3xs);
+	background: transparent;
+	color: var(--color--text);
+	cursor: pointer;
+	font: inherit;
+}
+
+.directUrl:hover {
+	background: var(--color--background);
+}
+
+.directUrlText {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--font-size--2xs);
+	font-family: var(--font-family--monospace);
 }
 
 .restartButton {
 	border: var(--border);
 	border-radius: var(--radius--3xs);
+	flex-shrink: 0;
 }
 
 .publishButtonWrapper {
 	position: relative;
 	display: inline-flex;
+	flex-shrink: 0;
 }
 
 .buttonGroup {

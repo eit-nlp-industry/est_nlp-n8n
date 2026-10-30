@@ -1,4 +1,4 @@
-import type { DeepSeekHarnessAgentDto } from '@n8n/api-types';
+import type { DeepSeekHarnessAgentDto, DeepSeekHarnessStudioDto } from '@n8n/api-types';
 import { makeRestApiRequest } from '@n8n/rest-api-client';
 import { useRootStore } from '@n8n/stores/useRootStore';
 
@@ -51,16 +51,22 @@ export function useDeepSeekHarnessApi() {
 		);
 	};
 
-	const startStudio = async (projectId: string, agentId: string): Promise<{ url: string }> => {
-		return await makeRestApiRequest<{ url: string }>(
+	const startStudio = async (
+		projectId: string,
+		agentId: string,
+	): Promise<DeepSeekHarnessStudioDto> => {
+		return await makeRestApiRequest<DeepSeekHarnessStudioDto>(
 			rootStore.restApiContext,
 			'GET',
 			`/projects/${projectId}/deepseek-harness/agents/${agentId}/studio`,
 		);
 	};
 
-	const restartStudio = async (projectId: string, agentId: string): Promise<{ url: string }> => {
-		return await makeRestApiRequest<{ url: string }>(
+	const restartStudio = async (
+		projectId: string,
+		agentId: string,
+	): Promise<DeepSeekHarnessStudioDto> => {
+		return await makeRestApiRequest<DeepSeekHarnessStudioDto>(
 			rootStore.restApiContext,
 			'POST',
 			`/projects/${projectId}/deepseek-harness/agents/${agentId}/restart`,

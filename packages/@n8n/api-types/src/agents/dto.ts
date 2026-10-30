@@ -150,8 +150,17 @@ export type DeepSeekHarnessAgentDto = {
 	projectId: string;
 	name: string;
 	published: boolean;
+	/** Sticky LAN direct-access port, or null when unset / port pool disabled. */
+	directPort: number | null;
 	createdAt: Date;
 	updatedAt: Date;
+};
+
+/** Studio start/restart response: proxy iframe URL plus optional LAN direct URL. */
+export type DeepSeekHarnessStudioDto = {
+	url: string;
+	directUrl: string | null;
+	directPort: number | null;
 };
 
 export class UpdateAgentConfigDto extends Z.class({

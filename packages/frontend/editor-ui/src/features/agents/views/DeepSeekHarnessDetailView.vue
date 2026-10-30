@@ -21,6 +21,7 @@ const agent = ref<DeepSeekHarnessAgentDto | null>(null);
 const isLoading = ref(true);
 const isRestarting = ref(false);
 const studioUrl = ref<string>();
+const directUrl = ref<string | null>(null);
 const studioError = ref(false);
 const renameInput = useTemplateRef<InstanceType<typeof N8nInlineTextEdit>>('renameInput');
 
@@ -58,10 +59,12 @@ const onNameSubmit = async (value: string) => {
 	}
 
 	const previousStudioUrl = studioUrl.value;
+	const previousDirectUrl = directUrl.value;
 	const shouldReloadStudio = Boolean(previousStudioUrl);
 	if (shouldReloadStudio) {
 		// The rename restarts Harness. Do not keep an iframe connected to the old process.
 		studioUrl.value = undefined;
+		directUrl.value = null;
 		studioError.value = false;
 	}
 
@@ -71,9 +74,16 @@ const onNameSubmit = async (value: string) => {
 		if (shouldReloadStudio) {
 			const runtime = await startStudio(projectId.value, agentId.value);
 			studioUrl.value = useCurrentHost(runtime.url);
+			directUrl.value = runtime.directUrl;
+			if (runtime.directPort != null) {
+				agent.value = { ...agent.value, directPort: runtime.directPort };
+			}
 		}
 	} catch (error) {
-		if (shouldReloadStudio && previousStudioUrl) studioUrl.value = previousStudioUrl;
+		if (shouldReloadStudio && previousStudioUrl) {
+			studioUrl.value = previousStudioUrl;
+			directUrl.value = previousDirectUrl;
+		}
 		toast.showError(error, i18n.baseText('folders.rename.error.title'));
 		renameInput.value?.forceCancel();
 	}
@@ -93,9 +103,15 @@ const onRestart = async () => {
 	if (!projectId.value || !agentId.value || isRestarting.value) return;
 	isRestarting.value = true;
 	studioUrl.value = undefined;
+	directUrl.value = null;
 	studioError.value = false;
 	try {
-		studioUrl.value = useCurrentHost((await restartStudio(projectId.value, agentId.value)).url);
+		const runtime = await restartStudio(projectId.value, agentId.value);
+		studioUrl.value = useCurrentHost(runtime.url);
+		directUrl.value = runtime.directUrl;
+		if (agent.value && runtime.directPort != null) {
+			agent.value = { ...agent.value, directPort: runtime.directPort };
+		}
 	} catch (error) {
 		studioError.value = true;
 		toast.showError(error, i18n.baseText('deepseekHarness.studio.restart.error'));
@@ -108,7 +124,12 @@ onMounted(async () => {
 	if (!projectId.value || !agentId.value) return;
 	try {
 		agent.value = await getAgent(projectId.value, agentId.value);
-		studioUrl.value = useCurrentHost((await startStudio(projectId.value, agentId.value)).url);
+		const runtime = await startStudio(projectId.value, agentId.value);
+		studioUrl.value = useCurrentHost(runtime.url);
+		directUrl.value = runtime.directUrl;
+		if (runtime.directPort != null) {
+			agent.value = { ...agent.value, directPort: runtime.directPort };
+		}
 	} catch (error) {
 		studioError.value = true;
 		toast.showError(error, i18n.baseText('deepseekHarness.studio.error'));
@@ -148,6 +169,7 @@ onMounted(async () => {
 			<DeepSeekHarnessPublishActions
 				v-if="agent"
 				:agent="agent"
+				:direct-url="directUrl"
 				:restarting="isRestarting"
 				:on-publish="onPublish"
 				:on-unpublish="onUnpublish"

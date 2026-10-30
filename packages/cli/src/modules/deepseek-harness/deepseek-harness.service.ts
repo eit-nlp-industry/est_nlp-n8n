@@ -134,19 +134,33 @@ export class DeepSeekHarnessService {
 		return await this.homeService.listWorkspaces(agent.userName, agent.name, agent.id);
 	}
 
-	async startStudioForProject(agentId: string, projectId: string): Promise<{ url: string }> {
+	async startStudioForProject(
+		agentId: string,
+		projectId: string,
+	): Promise<{ url: string; directUrl: string | null; directPort: number | null }> {
 		return await this.withAgentLifecycleLock(agentId, projectId, async () => {
 			const runtime = await this.webService.startForAgent(agentId, projectId);
-			return { url: this.toStudioProxyUrl(projectId, agentId, runtime.url) };
+			return {
+				url: this.toStudioProxyUrl(projectId, agentId, runtime.url),
+				directUrl: runtime.directUrl,
+				directPort: runtime.directPort,
+			};
 		});
 	}
 
 	/** Stop then start so on-disk profile edits are picked up. */
-	async restartStudioForProject(agentId: string, projectId: string): Promise<{ url: string }> {
+	async restartStudioForProject(
+		agentId: string,
+		projectId: string,
+	): Promise<{ url: string; directUrl: string | null; directPort: number | null }> {
 		return await this.withAgentLifecycleLock(agentId, projectId, async () => {
 			await this.webService.stopForAgent(agentId, projectId);
 			const runtime = await this.webService.startForAgent(agentId, projectId);
-			return { url: this.toStudioProxyUrl(projectId, agentId, runtime.url) };
+			return {
+				url: this.toStudioProxyUrl(projectId, agentId, runtime.url),
+				directUrl: runtime.directUrl,
+				directPort: runtime.directPort,
+			};
 		});
 	}
 
@@ -446,6 +460,7 @@ export class DeepSeekHarnessService {
 			projectId: agent.projectId,
 			name: agent.name,
 			published: agent.published ?? false,
+			directPort: agent.directPort ?? null,
 			createdAt: agent.createdAt,
 			updatedAt: agent.updatedAt,
 		};

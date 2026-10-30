@@ -1,6 +1,7 @@
 import {
 	CreateDeepSeekHarnessAgentDto,
 	type DeepSeekHarnessAgentDto,
+	type DeepSeekHarnessStudioDto,
 	UpdateDeepSeekHarnessAgentDto,
 } from '@n8n/api-types';
 import type { AuthenticatedRequest } from '@n8n/db';
@@ -45,7 +46,7 @@ export class DeepSeekHarnessController {
 		req: AuthenticatedRequest<{ projectId: string }>,
 		_res: unknown,
 		@Param('agentId') agentId: string,
-	): Promise<{ url: string }> {
+	): Promise<DeepSeekHarnessStudioDto> {
 		return await this.service.startStudioForProject(agentId, req.params.projectId);
 	}
 
@@ -55,7 +56,7 @@ export class DeepSeekHarnessController {
 		req: AuthenticatedRequest<{ projectId: string }>,
 		_res: unknown,
 		@Param('agentId') agentId: string,
-	): Promise<{ url: string }> {
+	): Promise<DeepSeekHarnessStudioDto> {
 		return await this.service.restartStudioForProject(agentId, req.params.projectId);
 	}
 

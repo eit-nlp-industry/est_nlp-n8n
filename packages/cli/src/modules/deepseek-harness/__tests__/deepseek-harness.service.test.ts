@@ -255,7 +255,11 @@ describe('DeepSeekHarnessService', () => {
 			}),
 			startForAgent: vi.fn().mockImplementation(async () => {
 				order.push('start');
-				return { url: 'http://127.0.0.1:43124/?token=y' };
+				return {
+					url: 'http://127.0.0.1:43124/?token=y',
+					directUrl: 'http://10.37.0.21:13080/?token=y',
+					directPort: 13080,
+				};
 			}),
 		};
 		const service = new DeepSeekHarnessService(
@@ -267,6 +271,8 @@ describe('DeepSeekHarnessService', () => {
 
 		await expect(service.restartStudioForProject('agent-1', 'project-1')).resolves.toEqual({
 			url: '/deepseek-harness-studio/project-1/agent-1/?token=y',
+			directUrl: 'http://10.37.0.21:13080/?token=y',
+			directPort: 13080,
 		});
 		expect(order).toEqual(['stop', 'start']);
 		expect(webService.stopForAgent).toHaveBeenCalledWith('agent-1', 'project-1');

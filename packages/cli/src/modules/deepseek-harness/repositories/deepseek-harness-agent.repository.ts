@@ -33,4 +33,15 @@ export class DeepSeekHarnessAgentRepository extends Repository<DeepSeekHarnessAg
 		return result.affected === 1;
 	}
 
+	/** Ports already assigned to other agents (excludes `excludeAgentId`). */
+	async findOccupiedDirectPorts(excludeAgentId?: string): Promise<number[]> {
+		const query = this.createQueryBuilder('agent')
+			.select('agent.directPort', 'directPort')
+			.where('agent.directPort IS NOT NULL');
+		if (excludeAgentId) {
+			query.andWhere('agent.id != :excludeAgentId', { excludeAgentId });
+		}
+		const rows = await query.getRawMany<{ directPort: string | number }>();
+		return rows.map((row) => Number(row.directPort));
+	}
 }

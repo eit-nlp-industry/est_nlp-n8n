@@ -4,11 +4,15 @@ import { join } from 'node:path';
 
 import { getHarnessEnv } from '../deepseek-harness-cli.service';
 import {
+	allocateStickyPort,
 	appendOutputTail,
+	buildDirectAccessUrl,
 	DeepSeekHarnessWebService,
 	getHarnessConfigurationStatus,
 	getPublicHost,
 	getWebProcessInvocation,
+	parsePortRange,
+	parseTrustedHosts,
 } from '../deepseek-harness-web.service';
 
 describe('getHarnessConfigurationStatus', () => {
@@ -16,7 +20,9 @@ describe('getHarnessConfigurationStatus', () => {
 		expect(
 			getHarnessConfigurationStatus(
 				{
-					namespaces: [{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } }],
+					namespaces: [
+						{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } },
+					],
 				},
 				{ OPENAI_API_KEY: { configured: true } },
 			),
@@ -32,7 +38,9 @@ describe('getHarnessConfigurationStatus', () => {
 		expect(
 			getHarnessConfigurationStatus(
 				{
-					namespaces: [{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } }],
+					namespaces: [
+						{ ns: 'agent-default-model', value: { provider: 'openai', model: 'gpt-4.1' } },
+					],
 				},
 				{ OPENAI_API_KEY: { configured: false } },
 			),
@@ -115,6 +123,8 @@ describe('DeepSeekHarnessWebService', () => {
 		expect(firstUrl).toEqual({
 			url: 'http://127.0.0.1:43123/?token=secret',
 			workspaceId: 'workspace-1',
+			directUrl: null,
+			directPort: 43123,
 		});
 		expect(secondUrl).toEqual(firstUrl);
 		expect(service.getRuntimeState('project-1', 'agent-1')).toEqual({
@@ -305,6 +315,8 @@ describe('DeepSeekHarnessWebService', () => {
 		await expect(result).resolves.toEqual({
 			url: 'http://127.0.0.1:43123/?token=secret',
 			workspaceId: 'workspace-1',
+			directUrl: null,
+			directPort: 43123,
 		});
 		expect(homeService.createDefaultWorkspace).toHaveBeenCalledWith(
 			'user@example.com',
@@ -364,6 +376,8 @@ describe('DeepSeekHarnessWebService', () => {
 		await expect(result).resolves.toEqual({
 			url: 'http://127.0.0.1:43123/?token=secret',
 			workspaceId: 'workspace-1',
+			directUrl: null,
+			directPort: 43123,
 		});
 		expect(homeService.createDefaultWorkspace).not.toHaveBeenCalled();
 		expect(fetchFn).not.toHaveBeenCalled();
@@ -466,13 +480,17 @@ describe('DeepSeekHarnessWebService', () => {
 });
 
 describe('getWebProcessInvocation', () => {
-	it('adds the public n8n host to the Harness trust fence', () => {
+	it('adds trusted hosts and optional bind host to the Harness process', () => {
 		expect(
 			getWebProcessInvocation(
 				'/opt/deepseek-harness',
 				'n8n-web',
 				'/opt/glibc-node/bin/node-glibc',
-				'n8n.home',
+				{
+					port: 13080,
+					bindHost: '10.37.0.21',
+					trustedHosts: ['n8n.home', '10.37.0.21'],
+				},
 			),
 		).toEqual({
 			command: '/opt/glibc-node/bin/node-glibc',
@@ -482,11 +500,61 @@ describe('getWebProcessInvocation', () => {
 				'n8n-web',
 				'--no-open',
 				'--port',
-				'0',
+				'13080',
+				'--host',
+				'10.37.0.21',
 				'--trusted-host',
 				'n8n.home',
+				'--trusted-host',
+				'10.37.0.21',
 			],
 		});
+	});
+});
+
+describe('parsePortRange', () => {
+	it('parses an inclusive range', () => {
+		expect(parsePortRange('13080-13089')).toEqual({ min: 13080, max: 13089 });
+	});
+
+	it('rejects empty or invalid values', () => {
+		expect(parsePortRange('')).toBeNull();
+		expect(parsePortRange('13080')).toBeNull();
+		expect(parsePortRange('13089-13080')).toBeNull();
+	});
+});
+
+describe('parseTrustedHosts', () => {
+	it('splits a comma-separated list', () => {
+		expect(parseTrustedHosts('n8n.home, 10.37.0.21')).toEqual(['n8n.home', '10.37.0.21']);
+	});
+});
+
+describe('allocateStickyPort', () => {
+	it('reuses the preferred port when free', () => {
+		expect(allocateStickyPort(13083, [13080, 13081], { min: 13080, max: 13089 })).toBe(13083);
+	});
+
+	it('picks the lowest free port when preferred is unset', () => {
+		expect(allocateStickyPort(null, [13080, 13081], { min: 13080, max: 13089 })).toBe(13082);
+	});
+
+	it('throws when the preferred sticky port is taken', () => {
+		expect(() => allocateStickyPort(13080, [13080], { min: 13080, max: 13089 })).toThrow(
+			/already assigned/,
+		);
+	});
+});
+
+describe('buildDirectAccessUrl', () => {
+	it('rewrites the process URL onto the direct host', () => {
+		expect(buildDirectAccessUrl('http://172.18.0.2:13083/?token=secret', '10.37.0.21')).toBe(
+			'http://10.37.0.21:13083/?token=secret',
+		);
+	});
+
+	it('returns null when no direct host is configured', () => {
+		expect(buildDirectAccessUrl('http://127.0.0.1:43123/?token=secret', '')).toBeNull();
 	});
 });
 
