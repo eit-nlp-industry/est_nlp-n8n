@@ -43,6 +43,12 @@ function useCurrentHost(url: string): string {
 	return studioUrl.toString();
 }
 
+/** Prefer LAN directUrl so root-absolute /api/media keeps the DSH cookie; fall back to Studio proxy. */
+function resolveStudioFrameSrc(runtime: { url: string; directUrl?: string | null }): string {
+	if (runtime.directUrl) return runtime.directUrl;
+	return useCurrentHost(runtime.url);
+}
+
 const onBreadcrumbsItemSelected = () => {
 	void router.push({ name: PROJECT_DEEPSEEK_HARNESS, params: { projectId: projectId.value } });
 };
@@ -73,7 +79,7 @@ const onNameSubmit = async (value: string) => {
 		agent.value = updated;
 		if (shouldReloadStudio) {
 			const runtime = await startStudio(projectId.value, agentId.value);
-			studioUrl.value = useCurrentHost(runtime.url);
+			studioUrl.value = resolveStudioFrameSrc(runtime);
 			directUrl.value = runtime.directUrl;
 			if (runtime.directPort != null) {
 				agent.value = { ...agent.value, directPort: runtime.directPort };
@@ -107,7 +113,7 @@ const onRestart = async () => {
 	studioError.value = false;
 	try {
 		const runtime = await restartStudio(projectId.value, agentId.value);
-		studioUrl.value = useCurrentHost(runtime.url);
+		studioUrl.value = resolveStudioFrameSrc(runtime);
 		directUrl.value = runtime.directUrl;
 		if (agent.value && runtime.directPort != null) {
 			agent.value = { ...agent.value, directPort: runtime.directPort };
@@ -125,7 +131,7 @@ onMounted(async () => {
 	try {
 		agent.value = await getAgent(projectId.value, agentId.value);
 		const runtime = await startStudio(projectId.value, agentId.value);
-		studioUrl.value = useCurrentHost(runtime.url);
+		studioUrl.value = resolveStudioFrameSrc(runtime);
 		directUrl.value = runtime.directUrl;
 		if (runtime.directPort != null) {
 			agent.value = { ...agent.value, directPort: runtime.directPort };

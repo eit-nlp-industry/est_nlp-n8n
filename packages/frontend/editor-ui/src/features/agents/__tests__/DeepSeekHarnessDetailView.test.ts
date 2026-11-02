@@ -5,12 +5,14 @@ import { vi } from 'vitest';
 import DeepSeekHarnessDetailView from '../views/DeepSeekHarnessDetailView.vue';
 
 const getAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Agent' });
-const startStudio = vi
-	.fn()
-	.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=x' });
-const restartStudio = vi
-	.fn()
-	.mockResolvedValue({ url: '/deepseek-harness-studio/project-1/agent-1/?token=y' });
+const startStudio = vi.fn().mockResolvedValue({
+	url: '/deepseek-harness-studio/project-1/agent-1/?token=x',
+	directUrl: null,
+});
+const restartStudio = vi.fn().mockResolvedValue({
+	url: '/deepseek-harness-studio/project-1/agent-1/?token=y',
+	directUrl: null,
+});
 const updateAgent = vi.fn().mockResolvedValue({ id: 'agent-1', name: 'Renamed' });
 
 vi.mock('vue-router', () => ({
@@ -78,6 +80,22 @@ describe('DeepSeekHarnessDetailView', () => {
 		);
 		expect(wrapper.get('[data-test-id="deepseek-harness-studio"]').attributes('src')).toBe(
 			'/deepseek-harness-studio/project-1/agent-1/?token=x',
+		);
+	});
+
+	it('prefers the LAN directUrl for the Studio iframe when present', async () => {
+		startStudio.mockResolvedValueOnce({
+			url: '/deepseek-harness-studio/project-1/agent-1/?token=x',
+			directUrl: 'http://10.37.0.21:13181/?token=x',
+		});
+		const wrapper = mount(DeepSeekHarnessDetailView);
+		await nextTick();
+		await nextTick();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await nextTick();
+
+		expect(wrapper.get('[data-test-id="deepseek-harness-studio"]').attributes('src')).toBe(
+			'http://10.37.0.21:13181/?token=x',
 		);
 	});
 

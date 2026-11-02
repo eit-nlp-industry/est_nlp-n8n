@@ -10,8 +10,9 @@ export const STUDIO_PROXY_PATH_PREFIX = '/deepseek-harness-studio';
 const STUDIO_PROXY_PATH_PATTERN =
 	/^\/deepseek-harness-studio\/(?<projectId>[^/]+)\/(?<agentId>[^/]+)(?:\/(?<rest>.*))?$/;
 
+/** Marks the page as Host-owned and rewrites root-absolute /api/ under the Studio proxy prefix. */
 const STUDIO_HOST_OWNERSHIP_SCRIPT =
-	'<script>globalThis.__DSH_TRANSPORT__={...(globalThis.__DSH_TRANSPORT__??{}),ownsHost:true};</script>';
+	'<script>globalThis.__DSH_TRANSPORT__={...(globalThis.__DSH_TRANSPORT__??{}),ownsHost:true};(function(){var m=location.pathname.match(/^(\\/deepseek-harness-studio\\/[^/]+\\/[^/]+)/);if(!m)return;var p=m[1];function rw(u){return typeof u==="string"&&(u==="/api"||u.indexOf("/api/")===0)?p+u:u;}var d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(d&&d.set){Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:d.enumerable,get:d.get,set:function(v){d.set.call(this,rw(v));}});}var sa=Element.prototype.setAttribute;Element.prototype.setAttribute=function(n,v){if(String(n).toLowerCase()==="src"&&this instanceof HTMLImageElement)v=rw(v);return sa.call(this,n,v);};if(typeof fetch==="function"){var f=fetch.bind(globalThis);globalThis.fetch=function(i,init){if(typeof i==="string")i=rw(i);else if(typeof Request!=="undefined"&&i instanceof Request)i=new Request(rw(i.url),i);return f(i,init);};}})();</script>';
 
 export function injectStudioHostOwnership(html: string): string {
 	const closingHeadIndex = html.search(/<\/head\s*>/iu);

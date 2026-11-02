@@ -43,6 +43,9 @@ describe('deepseek-harness-studio-proxy', () => {
 		expect(html).toContain(
 			'globalThis.__DSH_TRANSPORT__={...(globalThis.__DSH_TRANSPORT__??{}),ownsHost:true}',
 		);
+		expect(html).toContain('deepseek-harness-studio');
+		expect(html).toContain('HTMLImageElement.prototype');
+		expect(html).toContain('/api/');
 		expect(html.indexOf('ownsHost:true')).toBeLessThan(html.indexOf('</head>'));
 		expect(injectStudioHostOwnership('not html')).toBe('not html');
 	});
