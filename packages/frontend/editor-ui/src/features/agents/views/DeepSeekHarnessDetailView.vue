@@ -43,9 +43,13 @@ function useCurrentHost(url: string): string {
 	return studioUrl.toString();
 }
 
-/** Prefer LAN directUrl so root-absolute /api/media keeps the DSH cookie; fall back to Studio proxy. */
+/**
+ * Embed via the same-origin Studio proxy so the one-shot `?token=` can set a
+ * first-party cookie under https://n8n.home. LAN `directUrl` stays for copy /
+ * top-level open only — embedding it in an HTTPS parent breaks auth (third-party
+ * cookie / mixed content).
+ */
 function resolveStudioFrameSrc(runtime: { url: string; directUrl?: string | null }): string {
-	if (runtime.directUrl) return runtime.directUrl;
 	return useCurrentHost(runtime.url);
 }
 

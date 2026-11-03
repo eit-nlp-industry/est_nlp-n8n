@@ -83,7 +83,7 @@ describe('DeepSeekHarnessDetailView', () => {
 		);
 	});
 
-	it('prefers the LAN directUrl for the Studio iframe when present', async () => {
+	it('embeds Studio via the same-origin proxy even when directUrl is present', async () => {
 		startStudio.mockResolvedValueOnce({
 			url: '/deepseek-harness-studio/project-1/agent-1/?token=x',
 			directUrl: 'http://10.37.0.21:13181/?token=x',
@@ -95,7 +95,7 @@ describe('DeepSeekHarnessDetailView', () => {
 		await nextTick();
 
 		expect(wrapper.get('[data-test-id="deepseek-harness-studio"]').attributes('src')).toBe(
-			'http://10.37.0.21:13181/?token=x',
+			'/deepseek-harness-studio/project-1/agent-1/?token=x',
 		);
 	});
 
