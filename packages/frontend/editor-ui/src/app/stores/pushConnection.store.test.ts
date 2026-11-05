@@ -200,6 +200,20 @@ describe('usePushConnectionStore', () => {
 			mockWebSocketClient.isConnected.value = false;
 			expect(store.isConnected).toBe(false);
 		});
+
+		test('clears isConnecting when the client starts reconnecting', async () => {
+			const { store, mockWebSocketClient } = createTestInitialState();
+
+			store.pushConnect();
+			expect(store.isConnecting).toBe(true);
+
+			mockWebSocketClient.isReconnecting.value = true;
+			await vi.runAllTimersAsync();
+
+			expect(store.isConnecting).toBe(false);
+			expect(store.isReconnecting).toBe(true);
+			expect(store.isConnected).toBe(false);
+		});
 	});
 
 	describe('sending messages', () => {

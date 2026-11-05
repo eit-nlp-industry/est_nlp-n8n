@@ -11,11 +11,26 @@ export function useRunWorkflowApi() {
 	const pushConnectionStore = usePushConnectionStore();
 	const workflowsStore = useWorkflowsStore();
 
+	async function waitForPushConnection(timeoutMs = 5_000): Promise<boolean> {
+		if (pushConnectionStore.isConnected) return true;
+		// Brief reconnects used to fail Run while the Connection lost banner stayed
+		// hidden (isReconnecting was folded into isConnecting). Wait a short window.
+		if (!pushConnectionStore.isConnecting && !pushConnectionStore.isReconnecting) {
+			return false;
+		}
+		const deadline = Date.now() + timeoutMs;
+		while (Date.now() < deadline) {
+			if (pushConnectionStore.isConnected) return true;
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+		return pushConnectionStore.isConnected;
+	}
+
 	async function runWorkflowApi(
 		runData: IStartRunData,
 		documentId: WorkflowDocumentId,
 	): Promise<IExecutionPushResponse> {
-		if (!pushConnectionStore.isConnected) {
+		if (!(await waitForPushConnection())) {
 			throw new Error(i18n.baseText('workflowRun.noActiveConnectionToTheServer'));
 		}
 

@@ -177,6 +177,72 @@ describe('deepseek-harness-studio-proxy', () => {
 			await Promise.all([close(proxyServer), close(backend)]);
 		}
 	});
+
+	it('replays buffered binary upload bodies after n8n bodyParser', async () => {
+		const observedBodies: Buffer[] = [];
+		const backend = createServer((req, res) => {
+			if (!req.url?.startsWith('/api/session/uploadFileBinary')) {
+				res.writeHead(404);
+				res.end();
+				return;
+			}
+			const chunks: Buffer[] = [];
+			req.on('data', (chunk: Buffer) => {
+				chunks.push(chunk);
+			});
+			req.on('end', () => {
+				observedBodies.push(Buffer.concat(chunks));
+				res.writeHead(200, { 'content-type': 'application/json' });
+				res.end('{"ok":true}');
+			});
+		});
+
+		const backendPort = await listen(backend);
+		const webService = {
+			getRunningOrigin: () => `http://127.0.0.1:${backendPort}`,
+		};
+		const app = express();
+		// Mimic n8n: consume the stream into rawBody and leave an empty body object.
+		app.use((req, _res, next) => {
+			const chunks: Buffer[] = [];
+			req.on('data', (chunk: Buffer) => {
+				chunks.push(chunk);
+			});
+			req.on('end', () => {
+				(req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.concat(chunks);
+				req.body = {};
+				next();
+			});
+		});
+		const proxy = createStudioProxyMiddleware(webService as never);
+		app.use('/deepseek-harness-studio/:projectId/:agentId', proxy);
+		const proxyServer = createServer(app);
+		const proxyPort = await listen(proxyServer);
+		const basePath = '/deepseek-harness-studio/project-1/agent-1';
+		const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02]);
+
+		try {
+			const response = await request(
+				proxyPort,
+				`${basePath}/api/session/uploadFileBinary?sessionId=s1&mediaType=image%2Fpng&name=image.png`,
+				{
+					host: 'public.localhost',
+					origin: 'http://public.localhost',
+					cookie: 'dsh-auth=test',
+					'content-type': 'application/octet-stream',
+					'content-length': String(pngBytes.length),
+				},
+				'POST',
+				pngBytes,
+			);
+			expect(response.statusCode).toBe(200);
+			expect(response.body).toBe('{"ok":true}');
+			expect(observedBodies).toHaveLength(1);
+			expect(observedBodies[0]?.equals(pngBytes)).toBe(true);
+		} finally {
+			await Promise.all([close(proxyServer), close(backend)]);
+		}
+	});
 });
 
 async function listen(server: Server): Promise<number> {
@@ -195,7 +261,7 @@ async function request(
 	path: string,
 	headers: Record<string, string>,
 	method = 'GET',
-	body?: string,
+	body?: string | Buffer,
 ): Promise<{
 	statusCode: number | undefined;
 	headers: Record<string, string | string[] | undefined>;

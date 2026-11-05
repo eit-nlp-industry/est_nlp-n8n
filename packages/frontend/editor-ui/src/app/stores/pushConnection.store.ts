@@ -200,9 +200,14 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 	};
 
 	watch(
-		() => client.value.isConnected.value,
-		(didConnect) => {
+		() => [client.value.isConnected.value, client.value.isReconnecting.value] as const,
+		([didConnect, reconnecting]) => {
 			if (didConnect) {
+				isConnecting.value = false;
+			} else if (reconnecting) {
+				// Initial connect attempt ended; reconnect owns the state. Keeping
+				// isConnecting true here hid the Connection lost banner forever
+				// while Run still failed on !isConnected.
 				isConnecting.value = false;
 			}
 
@@ -240,14 +245,13 @@ export const usePushConnectionStore = defineStore(STORES.PUSH, () => {
 
 	const isConnected = computed(() => client.value.isConnected.value);
 
-	/** True while an initial connect or an automatic reconnect is in progress. */
-	const isConnectingOrReconnecting = computed(
-		() => isConnecting.value || client.value.isReconnecting.value,
-	);
+	const isReconnecting = computed(() => client.value.isReconnecting.value);
 
 	return {
 		isConnected,
-		isConnecting: isConnectingOrReconnecting,
+		/** True only during the first connect after pushConnect — not while reconnecting. */
+		isConnecting,
+		isReconnecting,
 		isConnectionRequested,
 		onMessageReceivedHandlers,
 		addEventListener,

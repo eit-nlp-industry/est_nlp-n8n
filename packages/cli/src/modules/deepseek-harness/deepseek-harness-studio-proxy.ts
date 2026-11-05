@@ -48,6 +48,12 @@ export function rewriteSetCookiePaths(
 	});
 }
 
+function getRequestRawBody(req: Request): Buffer | undefined {
+	if (!('rawBody' in req)) return undefined;
+	const value = (req as Request & { rawBody?: unknown }).rawBody;
+	return Buffer.isBuffer(value) ? value : undefined;
+}
+
 function parseStudioProxyPath(urlPath: string): {
 	projectId: string;
 	agentId: string;
@@ -90,6 +96,16 @@ export function createStudioProxyMiddleware(
 		return `${url.pathname}${url.search}`;
 	};
 	const proxyReq = (outgoingRequest: Parameters<typeof fixRequestBody>[0], req: Request) => {
+		// n8n's global bodyParser buffers non-multipart bodies into `rawBody` and
+		// leaves the request stream empty. fixRequestBody only rewrites JSON /
+		// form / text, so image uploads (application/octet-stream) would go
+		// upstream empty unless we replay the buffered bytes.
+		const rawBody = getRequestRawBody(req);
+		if (rawBody?.length) {
+			outgoingRequest.setHeader('Content-Length', String(rawBody.length));
+			outgoingRequest.write(rawBody);
+			return;
+		}
 		fixRequestBody(outgoingRequest, req);
 	};
 	const rewriteResponseCookies = (
