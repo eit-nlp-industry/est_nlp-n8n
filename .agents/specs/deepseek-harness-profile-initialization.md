@@ -9,8 +9,8 @@ Create a real DeepSeek Harness profile when an n8n DeepSeek Harness agent is cre
 - Use the agent directory as the isolated `DSH_HOME`.
 - Use the official DeepSeek Harness CLI without changing Harness source code.
 - Initialize the custom `n8n-web` profile from the shipped `web` profile.
-- Create one default `empty-workspace` directory for each agent profile.
-- Register the default workspace through Harness's existing `workspace/create` API when Web starts.
+- Create a `modes` directory and one default `workspace` directory for each agent profile.
+- Register `modes` and the default `workspace` through Harness's existing `workspace/create` API when Web starts.
 - Migrate persisted workspace paths before an agent profile directory is renamed.
 - Keep a compatibility link at the old profile path for historical session headers.
 - Merge duplicate workspace records when a previous rename already created both paths.
@@ -32,7 +32,7 @@ running a command from an unknown directory.
 
 1. Generate the unique n8n agent name and ID.
 2. Create the isolated agent home.
-3. Create `<agentHome>/empty-workspace`.
+3. Create `<agentHome>/modes` and `<agentHome>/workspace`.
 4. Run the platform-specific pnpm executable from the configured Harness path.
    Use the boot-free `--dump-config` mode so Profile creation does not start Studio:
 
@@ -46,12 +46,14 @@ running a command from an unknown directory.
 7. Persist the agent only after initialization succeeds.
 8. Remove the new home when initialization or persistence fails.
 
-When Studio starts, n8n authenticates with the URL token returned by Harness
-and calls `workspace/create` with the default workspace path only when the
-profile registry does not already contain `empty-workspace`. n8n reuses the
-registered workspace ID after a restart. n8n processes one startup URL only,
-even when the child emits the same URL in multiple output chunks. Workflow
-session creation passes the returned `workspaceId` to `session/create`.
+When Studio starts, n8n authenticates with the URL token returned by Harness.
+n8n calls `workspace/create` for `workspace` when the profile registry has no
+workspace named `workspace`. n8n calls `workspace/create` for `modes` when the
+profile registry has no workspace named `modes`. n8n reuses a registered ID
+after a restart. The runtime default workspace ID is the `workspace` ID.
+n8n processes one startup URL only, even when the child emits the same URL in
+multiple output chunks. Workflow session creation passes the `workspace` ID
+to `session/create`.
 
 When an agent is renamed, n8n stops the Web process and updates Harness's
 persisted `storages/workspace.json` file. n8n rebases current and historical
@@ -79,7 +81,7 @@ at the old path for historical session headers.
 - [x] Add a testable CLI initialization service.
 - [x] Initialize and verify the profile during agent creation.
 - [x] Add failure cleanup tests.
-- [x] Create and register the default `empty-workspace`.
+- [x] Create `modes` and `workspace`, and register both.
 - [x] Bind workflow-created sessions to the default workspace.
 - [x] Ignore duplicate startup URL output while workspace registration is pending.
 - [x] Migrate persisted workspace paths during profile rename.

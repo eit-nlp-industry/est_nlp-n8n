@@ -41,7 +41,8 @@ function resolveSegment(value: string): string {
 	return segment;
 }
 
-export const DEFAULT_WORKSPACE_NAME = 'empty-workspace';
+export const DEFAULT_WORKSPACE_NAME = 'workspace';
+export const MODES_DIRECTORY_NAME = 'modes';
 const STAGED_HOME_PATTERN = /\.deleting-[0-9a-f-]+$/i;
 
 export type DeepSeekHarnessWorkspace = { id: string; name: string };
@@ -80,14 +81,27 @@ export class DeepSeekHarnessHomeService {
 		return path.join(resolveHome(this.config.home), userSegment, `${agentSegment}-${idSegment}`);
 	}
 
+	getInitialDirectories(
+		userName: string,
+		agentName: string,
+		agentId: string,
+	): { workspace: string; modes: string } {
+		const home = this.getHome(userName, agentName, agentId);
+		return {
+			workspace: path.join(home, DEFAULT_WORKSPACE_NAME),
+			modes: path.join(home, MODES_DIRECTORY_NAME),
+		};
+	}
+
 	async createDefaultWorkspace(
 		userName: string,
 		agentName: string,
 		agentId: string,
 	): Promise<string> {
-		const workspace = path.join(this.getHome(userName, agentName, agentId), DEFAULT_WORKSPACE_NAME);
-		await mkdir(workspace, { recursive: true });
-		return workspace;
+		const directories = this.getInitialDirectories(userName, agentName, agentId);
+		await mkdir(directories.workspace, { recursive: true });
+		await mkdir(directories.modes, { recursive: true });
+		return directories.workspace;
 	}
 
 	async createHome(userName: string, agentName: string, agentId: string): Promise<string> {

@@ -56,13 +56,15 @@ describe('DeepSeekHarnessHomeService', () => {
 		);
 	});
 
-	it('creates the default empty workspace below the isolated home', async () => {
+	it('creates the modes directory and the default workspace below the isolated home', async () => {
 		const service = new DeepSeekHarnessHomeService({ home: root } as DeepSeekHarnessConfig);
+		const home = path.join(root, 'user@example.com', 'Agent-agent-1');
 
 		const workspace = await service.createDefaultWorkspace('user@example.com', 'Agent', 'agent-1');
 
-		expect(workspace).toBe(path.join(root, 'user@example.com', 'Agent-agent-1', 'empty-workspace'));
+		expect(workspace).toBe(path.join(home, 'workspace'));
 		await expect(access(workspace)).resolves.toBeUndefined();
+		await expect(access(path.join(home, 'modes'))).resolves.toBeUndefined();
 	});
 
 	it('keeps a compatibility link to the renamed profile', async () => {

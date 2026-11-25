@@ -74,12 +74,14 @@ describe('DeepSeekHarnessWebService', () => {
 			.mockResolvedValueOnce(
 				new Response(null, { status: 303, headers: { 'set-cookie': 'session=test' } }),
 			)
-			.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
-					}),
-					{ status: 200 },
+			.mockImplementation(() =>
+				Promise.resolve(
+					new Response(
+						JSON.stringify({
+							result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
+						}),
+						{ status: 200 },
+					),
 				),
 			);
 		const repository = {
@@ -135,7 +137,7 @@ describe('DeepSeekHarnessWebService', () => {
 			error: null,
 		});
 		expect(spawn).toHaveBeenCalledTimes(1);
-		expect(fetchFn).toHaveBeenCalledTimes(2);
+		expect(fetchFn).toHaveBeenCalledTimes(3);
 		expect(spawn).toHaveBeenCalledWith(
 			process.execPath,
 			[
@@ -175,12 +177,14 @@ describe('DeepSeekHarnessWebService', () => {
 			.mockResolvedValueOnce(
 				new Response(null, { status: 303, headers: { 'set-cookie': 'session=test' } }),
 			)
-			.mockResolvedValue(
-				new Response(
-					JSON.stringify({
-						result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
-					}),
-					{ status: 200 },
+			.mockImplementation(() =>
+				Promise.resolve(
+					new Response(
+						JSON.stringify({
+							result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
+						}),
+						{ status: 200 },
+					),
 				),
 			);
 		const repository = {
@@ -283,6 +287,17 @@ describe('DeepSeekHarnessWebService', () => {
 					}),
 					{ status: 200, headers: { 'content-type': 'application/json' } },
 				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						result: {
+							ok: true,
+							value: { workspace: { workspaceId: 'modes-1' }, created: true },
+						},
+					}),
+					{ status: 200, headers: { 'content-type': 'application/json' } },
+				),
 			);
 		const repository = {
 			findByIdAndProjectId: vi.fn().mockResolvedValue({
@@ -332,6 +347,16 @@ describe('DeepSeekHarnessWebService', () => {
 			expect.objectContaining({
 				method: 'POST',
 				headers: { 'content-type': 'application/json', cookie: 'session=harness-session' },
+				body: expect.stringContaining('D:/dsh/user/Agent-agent-1/workspace'),
+			}),
+		);
+		expect(fetchFn).toHaveBeenNthCalledWith(
+			3,
+			'http://127.0.0.1:43123/api/workspace/create',
+			expect.objectContaining({
+				method: 'POST',
+				headers: { 'content-type': 'application/json', cookie: 'session=harness-session' },
+				body: expect.stringContaining('D:/dsh/user/Agent-agent-1/modes'),
 			}),
 		);
 
@@ -357,7 +382,10 @@ describe('DeepSeekHarnessWebService', () => {
 		const homeService = {
 			getHome: vi.fn().mockReturnValue('D:/dsh/user/Agent-agent-1'),
 			createDefaultWorkspace: vi.fn(),
-			listWorkspaces: vi.fn().mockResolvedValue([{ id: 'workspace-1', name: 'empty-workspace' }]),
+			listWorkspaces: vi.fn().mockResolvedValue([
+				{ id: 'workspace-1', name: 'workspace' },
+				{ id: 'modes-1', name: 'modes' },
+			]),
 		};
 		const service = new DeepSeekHarnessWebService(
 			repository as never,
@@ -381,6 +409,68 @@ describe('DeepSeekHarnessWebService', () => {
 		});
 		expect(homeService.createDefaultWorkspace).not.toHaveBeenCalled();
 		expect(fetchFn).not.toHaveBeenCalled();
+
+		await service.shutdown();
+	});
+
+	it('registers modes when workspace is already registered', async () => {
+		const child = createChild();
+		const spawn = vi.fn(() => child);
+		const fetchFn = vi
+			.fn()
+			.mockResolvedValueOnce(
+				new Response(null, { status: 303, headers: { 'set-cookie': 'session=test' } }),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						result: { ok: true, value: { workspace: { workspaceId: 'modes-1' } } },
+					}),
+					{ status: 200 },
+				),
+			);
+		const repository = {
+			findByIdAndProjectId: vi.fn().mockResolvedValue({
+				id: 'agent-1',
+				projectId: 'project-1',
+				name: 'Agent',
+				userName: 'user@example.com',
+			}),
+		};
+		const homeService = {
+			getHome: vi.fn().mockReturnValue('D:/dsh/user/Agent-agent-1'),
+			createDefaultWorkspace: vi.fn(),
+			listWorkspaces: vi.fn().mockResolvedValue([{ id: 'workspace-1', name: 'workspace' }]),
+		};
+		const service = new DeepSeekHarnessWebService(
+			repository as never,
+			homeService as never,
+			{ ensureWorkspaceDirectory: vi.fn() } as never,
+			{ path: 'D:/deepseek-harness', profile: 'n8n-web' } as never,
+			{ host: 'n8n.home' } as never,
+			spawn as never,
+			fetchFn as never,
+		);
+
+		const result = service.startForAgent('agent-1', 'project-1');
+		await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+		child.stdout?.emit('data', Buffer.from('dsh web: http://127.0.0.1:43123/?token=secret\n'));
+
+		await expect(result).resolves.toEqual({
+			url: 'http://127.0.0.1:43123/?token=secret',
+			workspaceId: 'workspace-1',
+			directUrl: null,
+			directPort: 43123,
+		});
+		expect(homeService.createDefaultWorkspace).toHaveBeenCalled();
+		expect(fetchFn).toHaveBeenCalledTimes(2);
+		expect(fetchFn).toHaveBeenNthCalledWith(
+			2,
+			'http://127.0.0.1:43123/api/workspace/create',
+			expect.objectContaining({
+				body: expect.stringContaining('D:/dsh/user/Agent-agent-1/modes'),
+			}),
+		);
 
 		await service.shutdown();
 	});
@@ -458,12 +548,14 @@ describe('DeepSeekHarnessWebService', () => {
 				.mockResolvedValueOnce(
 					new Response(null, { status: 303, headers: { 'set-cookie': 'session=test' } }),
 				)
-				.mockResolvedValue(
-					new Response(
-						JSON.stringify({
-							result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
-						}),
-						{ status: 200 },
+				.mockImplementation(() =>
+					Promise.resolve(
+						new Response(
+							JSON.stringify({
+								result: { ok: true, value: { workspace: { workspaceId: 'workspace-1' } } },
+							}),
+							{ status: 200 },
+						),
 					),
 				) as never,
 		);

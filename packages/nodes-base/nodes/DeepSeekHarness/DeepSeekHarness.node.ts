@@ -119,7 +119,7 @@ export class DeepSeekHarness implements INodeType {
 				displayName: 'Workspace',
 				name: 'workspace',
 				type: 'resourceLocator',
-				default: { mode: 'list', value: 'empty-workspace' },
+				default: { mode: 'list', value: 'workspace' },
 				required: true,
 				description: 'The DeepSeek Harness workspace to use',
 				displayOptions: { show: { specifyWorkspace: [true] } },
@@ -236,7 +236,7 @@ export class DeepSeekHarness implements INodeType {
 						.filter((workspace) => !query || workspace.name.toLowerCase().includes(query))
 						.map((workspace) => ({
 							name: workspace.name,
-							value: workspace.name === 'empty-workspace' ? 'empty-workspace' : workspace.id,
+							value: workspace.name === 'workspace' ? 'workspace' : workspace.id,
 						})),
 				};
 			},

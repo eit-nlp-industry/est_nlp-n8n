@@ -12,6 +12,7 @@ import { NotFoundError } from '@/errors/response-errors/not-found.error';
 
 import {
 	DEFAULT_WORKSPACE_NAME,
+	MODES_DIRECTORY_NAME,
 	DeepSeekHarnessHomeService,
 } from './deepseek-harness-home.service';
 import { DeepSeekHarnessCliService, getHarnessEnv } from './deepseek-harness-cli.service';
@@ -510,9 +511,18 @@ export class DeepSeekHarnessWebService {
 			(workspace) =>
 				workspace.name === DEFAULT_WORKSPACE_NAME && workspace.id !== DEFAULT_WORKSPACE_NAME,
 		);
-		const workspacePath = registeredDefault
-			? undefined
-			: await this.homeService.createDefaultWorkspace(agent.userName, agent.name, agent.id);
+		const registeredModes = registeredWorkspaces.find(
+			(workspace) =>
+				workspace.name === MODES_DIRECTORY_NAME && workspace.id !== MODES_DIRECTORY_NAME,
+		);
+		const directories = this.initialDirectories(agent.userName, agent.name, agent.id);
+		if (!registeredDefault || !registeredModes) {
+			await this.homeService.createDefaultWorkspace(agent.userName, agent.name, agent.id);
+		}
+		const pendingWorkspacePaths = [
+			registeredDefault ? undefined : directories.workspace,
+			registeredModes ? undefined : directories.modes,
+		].filter((workspacePath): workspacePath is string => workspacePath !== undefined);
 		const nodePath = this.config.nodePath?.trim() || process.execPath;
 		const directPort = await this.ensureDirectPort(agent);
 		const bindHost = this.resolveBindHost(directPort != null);
@@ -566,9 +576,11 @@ export class DeepSeekHarnessWebService {
 				child.stderr?.off('data', collectStderr);
 
 				try {
-					const workspaceId =
-						registeredDefault?.id ??
-						(await this.registerDefaultWorkspace(match[1], workspacePath!));
+					const createdIds = await this.registerWorkspacePaths(match[1], pendingWorkspacePaths);
+					const workspaceId = registeredDefault?.id ?? createdIds[0];
+					if (!workspaceId) {
+						throw new Error('DeepSeek Harness workspace/create returned no workspace ID');
+					}
 					const directUrl = buildDirectAccessUrl(match[1], directHost);
 					const entry = {
 						child,
@@ -627,10 +639,26 @@ export class DeepSeekHarnessWebService {
 		});
 	}
 
-	private async registerDefaultWorkspace(
+	private initialDirectories(
+		userName: string,
+		agentName: string,
+		agentId: string,
+	): { workspace: string; modes: string } {
+		if (typeof this.homeService.getInitialDirectories === 'function') {
+			return this.homeService.getInitialDirectories(userName, agentName, agentId);
+		}
+		const home = this.homeService.getHome(userName, agentName, agentId);
+		return {
+			workspace: join(home, DEFAULT_WORKSPACE_NAME),
+			modes: join(home, MODES_DIRECTORY_NAME),
+		};
+	}
+
+	private async registerWorkspacePaths(
 		runtimeUrl: string,
-		workspacePath: string,
-	): Promise<string> {
+		workspacePaths: string[],
+	): Promise<string[]> {
+		if (workspacePaths.length === 0) return [];
 		const auth = await this.fetchFn(runtimeUrl, { redirect: 'manual' });
 		const cookie = auth.headers.get('set-cookie')?.split(';', 1)[0];
 		if (auth.status !== 303 || !cookie) {
@@ -639,6 +667,18 @@ export class DeepSeekHarnessWebService {
 			);
 		}
 
+		const workspaceIds: string[] = [];
+		for (const workspacePath of workspacePaths) {
+			workspaceIds.push(await this.createRegisteredWorkspace(runtimeUrl, cookie, workspacePath));
+		}
+		return workspaceIds;
+	}
+
+	private async createRegisteredWorkspace(
+		runtimeUrl: string,
+		cookie: string,
+		workspacePath: string,
+	): Promise<string> {
 		const endpoint = new URL('/api/workspace/create', runtimeUrl).toString();
 		const response = await this.fetchFn(endpoint, {
 			method: 'POST',

@@ -3,6 +3,7 @@ import { OperationalError, type ChunkType, type ExecuteAgentData } from 'n8n-wor
 import crypto from 'node:crypto';
 import { WebSocket } from 'ws';
 
+import { DEFAULT_WORKSPACE_NAME } from './deepseek-harness-home.service';
 import { DeepSeekHarnessWebService } from './deepseek-harness-web.service';
 import { DeepSeekHarnessAgentRepository } from './repositories/deepseek-harness-agent.repository';
 
@@ -149,10 +150,10 @@ export class DeepSeekHarnessRpcService {
 					origin,
 					cookie,
 					sessionId,
-						options.workspaceId && options.workspaceId !== 'empty-workspace'
-							? options.workspaceId
-							: runtime.workspaceId,
-					);
+					options.workspaceId && options.workspaceId !== DEFAULT_WORKSPACE_NAME
+						? options.workspaceId
+						: runtime.workspaceId,
+				);
 		const result = await this.promptAndFollow(
 			origin,
 			cookie,
@@ -163,15 +164,15 @@ export class DeepSeekHarnessRpcService {
 
 		return {
 			response: result,
-				structuredOutput: null,
-				usage: null,
-				toolCalls: [],
-				finishReason: 'completed',
-				session: {
-					agentId,
-					projectId,
-					sessionId: actualSessionId,
-					threadId: actualSessionId,
+			structuredOutput: null,
+			usage: null,
+			toolCalls: [],
+			finishReason: 'completed',
+			session: {
+				agentId,
+				projectId,
+				sessionId: actualSessionId,
+				threadId: actualSessionId,
 			},
 		};
 	}
@@ -240,108 +241,104 @@ export class DeepSeekHarnessRpcService {
 		message: string,
 		sendResponseChunk?: StreamResponseChunk,
 	): Promise<string> {
-		return await new Promise<string>(
-			(resolve, reject) => {
-				const socket = new WebSocket(`${origin.replace(/^http/u, 'ws')}/api/remote.mux`, {
-					headers: { cookie },
-				});
-				const streamId = `n8n-${crypto.randomUUID()}`;
-				let response = '';
-				let settled = false;
-				let followReady = false;
-				let streamedText = false;
-				const timer = setTimeout(
-					() => finish(new OperationalError('DeepSeek Harness response timed out')),
-					TURN_TIMEOUT_MS,
+		return await new Promise<string>((resolve, reject) => {
+			const socket = new WebSocket(`${origin.replace(/^http/u, 'ws')}/api/remote.mux`, {
+				headers: { cookie },
+			});
+			const streamId = `n8n-${crypto.randomUUID()}`;
+			let response = '';
+			let settled = false;
+			let followReady = false;
+			let streamedText = false;
+			const timer = setTimeout(
+				() => finish(new OperationalError('DeepSeek Harness response timed out')),
+				TURN_TIMEOUT_MS,
+			);
+
+			const finish = (error?: Error) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timer);
+				socket.close();
+				if (error) reject(error);
+				else resolve(response);
+			};
+
+			const sendPrompt = () => {
+				void this.call(origin, cookie, 'session/prompt', {
+					request: {
+						requestId: crypto.randomUUID(),
+						sessionId,
+						mode: 'queue',
+						content: [{ type: 'text', text: message }],
+					},
+				}).catch((error: unknown) =>
+					finish(error instanceof Error ? error : new Error(String(error))),
 				);
+			};
 
-				const finish = (error?: Error) => {
-					if (settled) return;
-					settled = true;
-					clearTimeout(timer);
-					socket.close();
-					if (error) reject(error);
-					else resolve(response);
-				};
-
-				const sendPrompt = () => {
-					void this.call(origin, cookie, 'session/prompt', {
-						request: {
-							requestId: crypto.randomUUID(),
-							sessionId,
-							mode: 'queue',
-							content: [{ type: 'text', text: message }],
-						},
-					}).catch((error: unknown) =>
-						finish(error instanceof Error ? error : new Error(String(error))),
-					);
-				};
-
-				socket.once('open', () => {
-					socket.send(
-						JSON.stringify({
-							type: 'open',
-							streamId,
-							endpoint: 'session/follow',
-							payload: {
-								args: {
-									request: {
-										address: { kind: 'session', sessionId },
-										...(sendResponseChunk ? { assistantStream: true } : {}),
-									},
+			socket.once('open', () => {
+				socket.send(
+					JSON.stringify({
+						type: 'open',
+						streamId,
+						endpoint: 'session/follow',
+						payload: {
+							args: {
+								request: {
+									address: { kind: 'session', sessionId },
+									...(sendResponseChunk ? { assistantStream: true } : {}),
 								},
 							},
-						}),
-					);
-				});
-				socket.on('message', async (raw: Buffer | string) => {
-					try {
-						const frame = JSON.parse(raw.toString()) as {
-							type?: string;
-							streamId?: string;
-							value?: SessionFollowFrame;
-							error?: { message?: string };
-						};
-						if (frame.streamId !== undefined && frame.streamId !== streamId) return;
-						if (frame.type === 'error') {
-							finish(
-								new OperationalError(frame.error?.message ?? 'DeepSeek Harness stream failed'),
-							);
-							return;
-						}
-						if (frame.type !== 'item' || !frame.value) return;
-
-						const follow = frame.value;
-						if (!followReady) {
-							if (follow.type !== 'snapshot') return;
-							followReady = true;
-							if (sendResponseChunk) await sendResponseChunk('begin');
-							sendPrompt();
-							return;
-						}
-
-						const applied = applyFollowFrame(follow);
-						if (applied.text) {
-							response += applied.text;
-							streamedText = true;
-							if (sendResponseChunk) await sendResponseChunk('item', applied.text);
-						}
-						if (applied.turnEnded) {
-							if (sendResponseChunk && response.length > 0 && !streamedText) {
-								await sendResponseChunk('item', response);
-							}
-							if (sendResponseChunk) await sendResponseChunk('end');
-							finish();
-						}
-					} catch (error) {
-						finish(error instanceof Error ? error : new Error(String(error)));
+						},
+					}),
+				);
+			});
+			socket.on('message', async (raw: Buffer | string) => {
+				try {
+					const frame = JSON.parse(raw.toString()) as {
+						type?: string;
+						streamId?: string;
+						value?: SessionFollowFrame;
+						error?: { message?: string };
+					};
+					if (frame.streamId !== undefined && frame.streamId !== streamId) return;
+					if (frame.type === 'error') {
+						finish(new OperationalError(frame.error?.message ?? 'DeepSeek Harness stream failed'));
+						return;
 					}
-				});
-				socket.once('error', (error) => finish(error));
-				socket.once('close', () => {
-					if (!settled) finish(new OperationalError('DeepSeek Harness stream closed unexpectedly'));
-				});
-			},
-		);
+					if (frame.type !== 'item' || !frame.value) return;
+
+					const follow = frame.value;
+					if (!followReady) {
+						if (follow.type !== 'snapshot') return;
+						followReady = true;
+						if (sendResponseChunk) await sendResponseChunk('begin');
+						sendPrompt();
+						return;
+					}
+
+					const applied = applyFollowFrame(follow);
+					if (applied.text) {
+						response += applied.text;
+						streamedText = true;
+						if (sendResponseChunk) await sendResponseChunk('item', applied.text);
+					}
+					if (applied.turnEnded) {
+						if (sendResponseChunk && response.length > 0 && !streamedText) {
+							await sendResponseChunk('item', response);
+						}
+						if (sendResponseChunk) await sendResponseChunk('end');
+						finish();
+					}
+				} catch (error) {
+					finish(error instanceof Error ? error : new Error(String(error)));
+				}
+			});
+			socket.once('error', (error) => finish(error));
+			socket.once('close', () => {
+				if (!settled) finish(new OperationalError('DeepSeek Harness stream closed unexpectedly'));
+			});
+		});
 	}
 }
